@@ -2,52 +2,7 @@
 
 A two-player narrative RPG for Matt & Michelle. Open on your phones, speak your actions, the GM responds.
 
----
-
-## One-Time Setup (~15 minutes)
-
-You need three free accounts. All are genuinely free — no credit card.
-
-### Step 1 — Get your free AI key (Google Gemini)
-
-1. Go to **aistudio.google.com** (sign in with your Google account)
-2. Click **"Get API key"** in the left sidebar
-3. Click **"Create API key"** → **"Create API key in new project"**
-4. Copy the key (looks like `AIzaSy...`) — save it somewhere temporarily
-
-### Step 2 — Get your free database (Upstash Redis)
-
-This remembers your campaign between sessions.
-
-1. Go to **upstash.com** → click **"Sign Up"** → sign in with GitHub
-2. Click **"Create Database"**
-3. Name it `resonance`, choose any region, leave defaults → **"Create"**
-4. On the database page, scroll to **"REST API"** section
-5. Copy the **UPSTASH_REDIS_REST_URL** and **UPSTASH_REDIS_REST_TOKEN** — save these
-
-### Step 3 — Deploy to Vercel (from GitHub)
-
-1. Push this folder to a GitHub repository:
-   - Go to github.com → **"New repository"** → name it `resonance-dnd`
-   - Upload these files (or use GitHub Desktop)
-
-2. Go to **vercel.com** → **"Sign Up"** → **"Continue with GitHub"**
-
-3. Click **"Add New Project"** → find your `resonance-dnd` repo → click **"Import"**
-
-4. Before clicking Deploy, click **"Environment Variables"** and add these three:
-
-   | Name | Value |
-   |------|-------|
-   | `GEMINI_API_KEY` | the key from Step 1 |
-   | `UPSTASH_REDIS_REST_URL` | the URL from Step 2 |
-   | `UPSTASH_REDIS_REST_TOKEN` | the token from Step 2 |
-
-5. Click **"Deploy"** — takes about 1 minute
-
-6. Your URL will be something like `resonance-dnd.vercel.app`
-   - **Bookmark this on both your phones**
-   - Michelle doesn't need any account — just the URL
+**Play at:** https://resonance-dnd.vercel.app
 
 ---
 
@@ -55,69 +10,109 @@ This remembers your campaign between sessions.
 
 ### Starting a session
 
-1. Open the URL on your phone
-2. The GM will narrate the opening scene automatically
-3. Select your character (MATT or MICHELLE button at the bottom)
+1. Open **https://resonance-dnd.vercel.app** on your phone — bookmark it
+2. The GM narrates the opening scene automatically on first load
+3. Select your character using the **MATT** or **MICHELLE** button at the bottom
 4. Tap the **🎤 microphone** and speak what you want to do, or type it
 
 ### Voice input
 
-- Tap the mic once to start listening, tap again to stop (or it stops automatically)
+- Tap the mic once to start, tap again to stop (or it stops automatically after a pause)
 - Your words appear in the text box — you can edit before sending
-- Works on Chrome (Android) and Safari (iOS)
+- Works best on **Chrome (Android)** and **Safari (iOS)**
 
 ### Taking actions
 
-Speak or type naturally:
+Speak or type naturally — describe what your character does:
 - *"I scan the room for anyone watching us"*
 - *"I grab Matt's arm and pull him toward the back exit"*
 - *"I try to bluff the guard — tell him we're with the archive delivery"*
 
-The GM will either narrate what happens, or ask you to roll dice (the dice animate automatically).
+The GM narrates what happens, or calls for a dice roll (dice animate automatically on screen).
 
 ### Dice rolls
 
-When the GM calls for a roll, the dice appear on screen and roll automatically.
-- **10+** Full success
-- **7–9** Success with a complication or cost
-- **6 or less** Something goes wrong
-- **2–3** Disaster
+When the GM calls for a roll, the dice appear and roll automatically.
 
-### Playing apart
+| Result | Outcome |
+|--------|---------|
+| 10+ | Full success |
+| 7–9 | Success with a complication or cost |
+| 6 or less | Something goes wrong |
+| 2–3 | Disaster |
 
-Both of you open the same URL on your own phones. You take turns — you'll see each other's actions and the GM's responses. The app checks for updates every 8 seconds.
+### Playing together or apart
+
+Both of you open the same URL on your own phones. You take turns — each player's actions and the GM's responses are visible to both. The app syncs every 8 seconds, so there's a brief delay when playing from separate locations.
 
 ### Ending a session
 
 Tap the **⚔** icon (top right) → **"End Session & Save"**
-Write a one-sentence summary when prompted. This saves to the campaign history so future sessions remember what happened.
+
+Write a one-sentence summary when prompted. This saves permanently to campaign history so future sessions remember what happened.
 
 ---
 
 ## Your Characters
 
-**MATT** — Waiter at the Salt & Wick. Witty, overlooked, loyal. Something strange happens around him sometimes. He doesn't know why.
-- Best stats: **Will +3** (mental toughness)
-- Abilities: Easily Overlooked, Not On My Watch (protect Michelle once/session), Lucky Break
+**MATT** — Waiter at the Salt & Wick pub. Witty, sarcastic, loyal to a fault. People have always overlooked him — he assumed it was just bad luck. It isn't.
+- Strongest stat: **Will +3**
+- Abilities: *Easily Overlooked* (advantage on stealth/eavesdropping), *Not On My Watch* (take a hit meant for Michelle once per session), *Lucky Break* (once per session, something inexplicably goes right when everything is going wrong)
 
-**MICHELLE** — Scholar at the Varek Archive. Expert fighter who avoids fighting. She can read people and places like a language — she knows what she is.
-- Best stats: **Acuity +3** (perception, magic, investigation)
-- Abilities: Read Resonance, Reluctant Blade, Weight of Knowing
+**MICHELLE** — Scholar at the Varek Archive. Formidably trained in combat, though she avoids it. She can read people and places like a language — sense truth and lies, feel the bonds between people, understand the hidden structure of things. She knows exactly what she is. She's been keeping it secret for three years.
+- Strongest stat: **Acuity +3**
+- Abilities: *Read Resonance* (sense truth/lies, emotional bonds, structural weaknesses), *Reluctant Blade* (end fights non-lethally at no penalty), *Weight of Knowing* (once per session, spend a harm condition for a critical insight)
 
 ---
 
 ## The World
 
-The **Concord** rules everything through its priests. They hunt people with abilities — calling them "Discord." The truth is darker than that. You'll find it.
+The **Concord** rules everything. Its priests teach that magic is corruption — called "Discord" — and hunt those who carry it. The Conclave's enforcers, the **Accord Wardens**, patrol every city in grey cloaks. They carry tuning forks that hum near people like you.
 
-**Conclave Awareness** (top right ⚡): How much the Concord suspects you. Starts at 0. Reaches 5, they start searching. Reaches 8, Wardens are ordered to capture you. Avoid drawing attention.
+The truth is darker. You'll find it.
+
+**⚡ Conclave Awareness** (top right): How much the Concord suspects you exist. Starts at 0.
+- Reaches 5: they begin actively searching
+- Reaches 8: Wardens are ordered to capture you on sight
+
+Keep it low. Don't draw attention.
+
+---
+
+## The Magic System — Resonance
+
+Everything in the world vibrates at a natural frequency. Most people feel nothing. A rare few — called Resonants — can perceive and manipulate these frequencies. The Concord calls them Discord. They call themselves nothing, because naming yourself is how you get caught.
+
+**Harmonic** (Michelle): You *read* frequencies. Truth vs. lies. The emotional threads between people. The hidden structure of objects and places. The world has no secrets from you, if you know how to listen.
+
+**Dissonant** (Matt): You *disrupt* frequencies. Things slip past you. Alarms don't notice you. People's eyes slide off you. You've always been forgettable — turns out there's a reason.
+
+*(Matt does not know he is a Dissonant. This will emerge during play.)*
 
 ---
 
 ## Troubleshooting
 
-**Mic button not working?** Try Chrome on Android or Safari on iOS. Some browsers require HTTPS — Vercel provides this automatically.
+**Mic button not working?**
+Use Chrome on Android or Safari on iOS. Other browsers may not support voice input — type instead.
 
-**"GM encountered an error"?** Your Gemini API key may have expired. Go back to aistudio.google.com and create a new one, then update it in Vercel's environment variables.
+**GM not responding / error message?**
+The Gemini API key may have expired (they occasionally do). Matt: go to aistudio.google.com, create a new key, update `GEMINI_API_KEY` in Vercel environment variables, then redeploy.
 
-**Want to start a completely fresh campaign?** In the browser console, run: `fetch('/api/state', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({action:'reset'})})`
+**App seems stuck / not loading new messages?**
+Pull down to refresh the page. The session log reloads from the server.
+
+**Start a completely fresh campaign:**
+In your phone's browser, open the URL and add `/api/state` at the end. You won't see anything useful — this is just for reference. To fully reset, Matt can open the browser developer console and run:
+`fetch('/api/state',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'reset'})})`
+
+---
+
+## Technical Notes (Matt only)
+
+- **Hosting:** Vercel (free) — auto-deploys when GitHub repo is updated
+- **Database:** Upstash Redis (free) — stores campaign state between sessions
+- **AI GM:** Google Gemini 1.5 Flash (free tier) — no credit card required
+- **GitHub repo:** https://github.com/mattmanne/resonance-dnd
+- **Vercel dashboard:** https://vercel.com (log in with Google)
+- **Upstash dashboard:** https://upstash.com (log in with Google)
