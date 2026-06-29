@@ -32,10 +32,10 @@ module.exports = async function handler(req, res) {
       current.session += 1;
       current.worldState.session_summaries.push(payload.summary);
       current.sessionLog = [];
-      current.characters.michelle.weight_of_knowing_used = false;
-      current.characters.michelle.magic_uses_remaining = 3;
-      current.characters.matt.not_on_my_watch_used = false;
-      current.characters.matt.lucky_break_used = false;
+      current.characters.lyra.weight_of_knowing_used = false;
+      current.characters.lyra.magic_uses_remaining = 3;
+      current.characters.fen.not_on_my_watch_used = false;
+      current.characters.fen.lucky_break_used = false;
       await setState(KEY, current);
       return res.json({ ok: true, session: current.session });
     }
