@@ -75,7 +75,7 @@ module.exports = async function handler(req, res) {
       characters: gameState.characters,
       worldState: {
         conclave_awareness: gameState.worldState.conclave_awareness,
-        matt_dissonance_awakening: gameState.worldState.matt_dissonance_awakening,
+        fen_dissonance_awakening: gameState.worldState.fen_dissonance_awakening,
         location: gameState.worldState.location,
       },
     },

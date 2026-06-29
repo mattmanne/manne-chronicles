@@ -19,61 +19,12 @@
         <span id="session-label">Session 1</span>
       </div>
       <div id="header-right">
+        <button id="auto-read-btn" class="icon-btn" title="Auto-read new narrations">🔊</button>
         <span id="awareness-badge" title="Conclave Awareness">⚡ 0</span>
-        <button id="status-btn" class="icon-btn" title="Characters">⚔</button>
       </div>
     </header>
 
-    <!-- Character Panel (slide down) -->
-    <div id="status-panel" class="hidden">
-      <div class="char-card" id="fen-card">
-        <div class="char-header">
-          <span class="char-name">FEN</span>
-          <span class="char-role">Waiter · Dissonant?</span>
-        </div>
-        <div class="harm-row">
-          <span class="harm-label">Harm:</span>
-          <span id="fen-harm" class="harm-value">Unhurt</span>
-        </div>
-        <div class="ability-row">
-          <span class="ability used-indicator" id="fen-notmywatch" title="Take harm meant for Michelle">🛡 Not On My Watch</span>
-          <span class="ability used-indicator" id="fen-luckybreak" title="Disrupt disaster once per session">✦ Lucky Break</span>
-        </div>
-        <div class="stat-row">
-          <span class="stat">FOR +0</span>
-          <span class="stat">ACU +1</span>
-          <span class="stat">AGI +1</span>
-          <span class="stat highlight">WIL +3</span>
-          <span class="stat">PRE +0</span>
-        </div>
-      </div>
-
-      <div class="char-card" id="lyra-card">
-        <div class="char-header">
-          <span class="char-name">LYRA</span>
-          <span class="char-role">Scholar · Harmonic</span>
-        </div>
-        <div class="harm-row">
-          <span class="harm-label">Harm:</span>
-          <span id="lyra-harm" class="harm-value">Unhurt</span>
-        </div>
-        <div class="ability-row">
-          <span class="ability" id="lyra-magic" title="Resonance uses remaining">◈ Magic: <span id="magic-count">3</span></span>
-          <span class="ability used-indicator" id="lyra-knowing" title="Spend harm for insight">◉ Weight of Knowing</span>
-        </div>
-        <div class="stat-row">
-          <span class="stat">FOR +1</span>
-          <span class="stat highlight">ACU +3</span>
-          <span class="stat">AGI +2</span>
-          <span class="stat">WIL +2</span>
-          <span class="stat">PRE +1</span>
-        </div>
-      </div>
-
-      <button id="new-session-btn" class="secondary-btn">End Session & Save</button>
-    </div>
-
-    <!-- Dice Overlay -->
+    <!-- Dice Overlay (always on top) -->
     <div id="dice-overlay" class="hidden">
       <div id="dice-box">
         <div id="dice-title">Rolling…</div>
@@ -88,30 +39,138 @@
       </div>
     </div>
 
-    <!-- Main Narration Log -->
-    <main id="log-area">
-      <div id="log-entries"></div>
-    </main>
+    <!-- Tab Panels -->
+    <div id="tab-panels">
 
-    <!-- Loading indicator -->
-    <div id="loading-bar" class="hidden">
-      <div class="loading-text">The GM considers…</div>
-      <div class="loading-dots"><span>.</span><span>.</span><span>.</span></div>
+      <!-- Story -->
+      <div id="tab-story" class="tab-panel active">
+        <main id="log-area">
+          <div id="log-entries"></div>
+        </main>
+        <div id="loading-bar" class="hidden">
+          <div class="loading-text">The GM considers…</div>
+          <div class="loading-dots"><span>.</span><span>.</span><span>.</span></div>
+        </div>
+        <footer id="input-area">
+          <div id="player-select">
+            <button class="player-btn active" data-player="fen" id="btn-fen">FEN</button>
+            <button class="player-btn" data-player="lyra" id="btn-lyra">LYRA</button>
+          </div>
+          <div id="action-row">
+            <input type="text" id="action-input" placeholder="What do you do?" autocomplete="off" autocorrect="off" />
+            <button id="voice-btn" title="Speak your action">🎤</button>
+            <button id="send-btn" title="Send">▶</button>
+          </div>
+          <div id="voice-status" class="hidden">Listening…</div>
+        </footer>
+      </div>
+
+      <!-- Characters -->
+      <div id="tab-characters" class="tab-panel">
+        <div class="tab-scroll">
+
+          <div class="char-card" id="fen-card">
+            <div class="char-header">
+              <span class="char-name">FEN</span>
+              <span class="char-role">Waiter · Dissonant?</span>
+            </div>
+            <div class="harm-row">
+              <span class="harm-label">Harm:</span>
+              <span id="fen-harm" class="harm-value Unhurt">Unhurt</span>
+            </div>
+            <div class="ability-row">
+              <button class="ability used-indicator available" id="fen-notmywatch"
+                data-character="fen" data-ability="not_on_my_watch_used"
+                title="Take a hit meant for Lyra — tap to mark used">🛡 Not On My Watch</button>
+              <button class="ability used-indicator available" id="fen-luckybreak"
+                data-character="fen" data-ability="lucky_break_used"
+                title="Something goes right when everything is wrong — tap to mark used">✦ Lucky Break</button>
+            </div>
+            <div class="stat-row">
+              <span class="stat">FOR +0</span>
+              <span class="stat">ACU +1</span>
+              <span class="stat">AGI +1</span>
+              <span class="stat highlight">WIL +3</span>
+              <span class="stat">PRE +0</span>
+            </div>
+          </div>
+
+          <div class="char-card" id="lyra-card">
+            <div class="char-header">
+              <span class="char-name">LYRA</span>
+              <span class="char-role">Scholar · Harmonic</span>
+            </div>
+            <div class="harm-row">
+              <span class="harm-label">Harm:</span>
+              <span id="lyra-harm" class="harm-value Unhurt">Unhurt</span>
+            </div>
+            <div class="ability-row">
+              <button class="ability magic-btn" id="lyra-magic"
+                title="Resonance charges remaining — tap to spend one">◈ Magic: <span id="magic-count">3</span></button>
+              <button class="ability used-indicator available" id="lyra-knowing"
+                data-character="lyra" data-ability="weight_of_knowing_used"
+                title="Spend a harm condition for critical insight — tap to mark used">◉ Weight of Knowing</button>
+            </div>
+            <div class="stat-row">
+              <span class="stat">FOR +1</span>
+              <span class="stat highlight">ACU +3</span>
+              <span class="stat">AGI +2</span>
+              <span class="stat">WIL +2</span>
+              <span class="stat">PRE +1</span>
+            </div>
+          </div>
+
+          <button id="new-session-btn" class="secondary-btn">End Session &amp; Save</button>
+
+        </div>
+      </div>
+
+      <!-- Archive -->
+      <div id="tab-archive" class="tab-panel">
+        <div class="tab-scroll" id="archive-content">
+          <div class="archive-empty">No sessions archived yet.<br>End a session to save it here.</div>
+        </div>
+      </div>
+
+      <!-- Map -->
+      <div id="tab-map" class="tab-panel">
+        <div class="tab-scroll">
+          <div class="awareness-meter">
+            <div class="awareness-header">
+              <span>⚡ CONCLAVE AWARENESS</span>
+              <span id="map-awareness-value">0 / 10</span>
+            </div>
+            <div class="awareness-track">
+              <div class="awareness-fill" id="map-awareness-fill"></div>
+            </div>
+            <div class="awareness-status" id="map-awareness-status">Undetected — carry on normally</div>
+          </div>
+          <div id="map-container"></div>
+          <div id="location-info"></div>
+        </div>
+      </div>
+
     </div>
 
-    <!-- Input Area -->
-    <footer id="input-area">
-      <div id="player-select">
-        <button class="player-btn active" data-player="fen" id="btn-fen">FEN</button>
-        <button class="player-btn" data-player="lyra" id="btn-lyra">LYRA</button>
-      </div>
-      <div id="action-row">
-        <input type="text" id="action-input" placeholder="What do you do?" autocomplete="off" autocorrect="off" />
-        <button id="voice-btn" title="Hold to speak">🎤</button>
-        <button id="send-btn" title="Send">▶</button>
-      </div>
-      <div id="voice-status" class="hidden">Listening…</div>
-    </footer>
+    <!-- Tab Bar -->
+    <nav id="tab-bar">
+      <button class="tab-btn active" data-tab="story">
+        <span class="tab-icon">◈</span>
+        <span class="tab-label">Story</span>
+      </button>
+      <button class="tab-btn" data-tab="characters">
+        <span class="tab-icon">⚔</span>
+        <span class="tab-label">Characters</span>
+      </button>
+      <button class="tab-btn" data-tab="archive">
+        <span class="tab-icon">≡</span>
+        <span class="tab-label">Archive</span>
+      </button>
+      <button class="tab-btn" data-tab="map">
+        <span class="tab-icon">⊕</span>
+        <span class="tab-label">Map</span>
+      </button>
+    </nav>
 
   </div>
 

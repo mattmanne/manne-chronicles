@@ -27,8 +27,35 @@ module.exports = async function handler(req, res) {
       return res.json({ ok: true });
     }
 
+    if (action === "toggle_ability") {
+      const current = (await getState(KEY)) || getInitialState();
+      const { character, ability } = payload;
+      if (current.characters[character] && ability in current.characters[character]) {
+        current.characters[character][ability] = !current.characters[character][ability];
+        await setState(KEY, current);
+        return res.json({ ok: true, characters: current.characters });
+      }
+      return res.status(400).json({ error: "Invalid character or ability" });
+    }
+
+    if (action === "use_magic") {
+      const current = (await getState(KEY)) || getInitialState();
+      if (current.characters.lyra.magic_uses_remaining > 0) {
+        current.characters.lyra.magic_uses_remaining--;
+        await setState(KEY, current);
+        return res.json({ ok: true, characters: current.characters });
+      }
+      return res.json({ ok: false, error: "No magic uses remaining", characters: current.characters });
+    }
+
     if (action === "new_session") {
       const current = (await getState(KEY)) || getInitialState();
+      if (!current.worldState.session_archive) current.worldState.session_archive = [];
+      current.worldState.session_archive.push({
+        session: current.session,
+        summary: payload.summary,
+        log: [...current.sessionLog]
+      });
       current.session += 1;
       current.worldState.session_summaries.push(payload.summary);
       current.sessionLog = [];
