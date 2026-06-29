@@ -65,6 +65,16 @@ Go to the **⚔ Characters** tab to manage abilities:
 - Lyra's **◈ Magic** counter: tap to spend one Resonance charge
 - Abilities reset automatically when you start a new session
 
+### Recovering from harm
+
+When a character is injured, their harm badge in the **⚔ Characters** tab glows and becomes tappable.
+- Tap the harm badge (e.g., **Hurt**) to recover one step (Hurt → Scratched)
+- Use this when a rest or recovery scene has happened in the narrative
+
+### Playing apart — unread indicator
+
+When you're on another tab (Map, Archive, Characters) and your partner takes an action, a small red dot appears on the **◈ Story** tab button. Tap Story to read the new narration and clear the indicator.
+
 ### Playing together or apart
 
 Both of you open the same URL on your own phones. You take turns — each player's actions and the GM's responses are visible to both. The app syncs every 8 seconds, so there's a brief delay when playing from separate locations.
@@ -101,7 +111,7 @@ The truth is darker. You'll find it.
 
 Keep it low. Don't draw attention.
 
-The **⊕ Map** tab shows Varek — your current location pulses gold. Red markers are Conclave territory. Tap any location for a description.
+The **⊕ Map** tab shows Varek — your current location pulses gold. The map updates automatically as you move between locations during play. Red markers are Conclave territory. Tap any location for a description.
 
 ---
 
