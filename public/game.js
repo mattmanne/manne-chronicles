@@ -316,12 +316,56 @@ function animateRoll(player, stat, advantage = false) {
   });
 }
 
+/* ── Speech Synthesis ── */
+let activeSpeech = null;
+
+function speakText(text, btn) {
+  if (!window.speechSynthesis) return;
+
+  if (activeSpeech) {
+    window.speechSynthesis.cancel();
+    if (activeSpeech.btn) {
+      activeSpeech.btn.textContent = "🔊";
+      activeSpeech.btn.classList.remove("speaking");
+    }
+    if (activeSpeech.text === text) {
+      activeSpeech = null;
+      return;
+    }
+  }
+
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.rate = 0.92;
+  utterance.pitch = 1.0;
+  utterance.volume = 1.0;
+
+  utterance.onstart = () => {
+    btn.textContent = "⏹";
+    btn.classList.add("speaking");
+  };
+
+  utterance.onend = () => {
+    btn.textContent = "🔊";
+    btn.classList.remove("speaking");
+    activeSpeech = null;
+  };
+
+  utterance.onerror = () => {
+    btn.textContent = "🔊";
+    btn.classList.remove("speaking");
+    activeSpeech = null;
+  };
+
+  activeSpeech = { text, btn };
+  window.speechSynthesis.speak(utterance);
+}
+
 /* ── DOM Builders ── */
 function appendGMEntry(text, animate) {
   const cleanText = text
     .replace(/\[CONCLAVE AWARENESS: \d+ → \d+\]/g, "")
     .replace(/\[DISSONANCE: \d+ → \d+\]/g, "")
-    .replace(/\[(MICHELLE|MATT): [A-Za-z]+ → [A-Za-z]+\]/g, "")
+    .replace(/\[(LYRA|FEN): [A-Za-z]+ → [A-Za-z]+\]/g, "")
     .trim();
 
   const stateChanges = extractStateChanges(text);
@@ -330,10 +374,16 @@ function appendGMEntry(text, animate) {
   entry.className = `log-entry gm${animate ? "" : " no-anim"}`;
 
   entry.innerHTML = `
-    <span class="entry-label">The Story</span>
+    <div class="entry-header">
+      <span class="entry-label">The Story</span>
+      <button class="speak-btn" title="Read aloud">🔊</button>
+    </div>
     <div class="entry-content">${escapeHtml(cleanText)}</div>
     ${stateChanges.map(s => `<div class="state-change${s.positive ? " positive" : ""}">${s.text}</div>`).join("")}
   `;
+
+  const speakBtn = entry.querySelector(".speak-btn");
+  speakBtn.addEventListener("click", () => speakText(cleanText, speakBtn));
 
   logEntries.appendChild(entry);
 }

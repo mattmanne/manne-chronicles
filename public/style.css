@@ -362,6 +362,12 @@ html, body {
   max-width: 90%;
 }
 
+.entry-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
 .entry-label {
   font-size: 0.65rem;
   letter-spacing: 0.12em;
@@ -369,7 +375,22 @@ html, body {
   color: var(--parch-dim);
 }
 
-.log-entry.player-michelle .entry-label { text-align: right; }
+.log-entry.player-lyra .entry-label { text-align: right; }
+
+.speak-btn {
+  background: none;
+  border: none;
+  font-size: 0.85rem;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 4px;
+  opacity: 0.5;
+  transition: opacity 0.2s;
+  line-height: 1;
+}
+
+.speak-btn:hover  { opacity: 1; }
+.speak-btn.speaking { opacity: 1; animation: pulse 1s infinite; }
 
 .log-entry .state-change {
   font-size: 0.72rem;
