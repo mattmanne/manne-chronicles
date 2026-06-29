@@ -1,5 +1,5 @@
 /* ── State ── */
-let currentPlayer = "matt";
+let currentPlayer = "fen";
 let isLoading = false;
 let isListening = false;
 let recognition = null;
@@ -7,8 +7,8 @@ let pollTimer = null;
 let lastTimestamp = 0;
 
 const STATS = {
-  matt:     { force: 0, acuity: 1, agility: 1, will: 3, presence: 0 },
-  michelle: { force: 1, acuity: 3, agility: 2, will: 2, presence: 1 }
+  fen:     { force: 0, acuity: 1, agility: 1, will: 3, presence: 0 },
+  lyra: { force: 1, acuity: 3, agility: 2, will: 2, presence: 1 }
 };
 
 const HARM_LEVELS = ["Unhurt", "Scratched", "Hurt", "Wounded", "Broken", "Dying"];
@@ -43,7 +43,7 @@ function setupPlayerButtons() {
       document.querySelectorAll(".player-btn").forEach(b => b.classList.remove("active"));
       btn.classList.add("active");
       currentPlayer = btn.dataset.player;
-      actionInput.placeholder = `What does ${currentPlayer === "matt" ? "Matt" : "Michelle"} do?`;
+      actionInput.placeholder = `What does ${currentPlayer === "fen" ? "Fen" : "Lyra"} do?`;
     });
   });
 }
@@ -145,7 +145,7 @@ async function loadExistingLog() {
       if (entry.role === "gm") {
         appendGMEntry(entry.content, false);
       } else {
-        appendPlayerEntry(entry.player || "matt", entry.content.replace(/^(Matt|Michelle): /, ""), false);
+        appendPlayerEntry(entry.player || "fen", entry.content.replace(/^(Fen|Lyra): /, ""), false);
       }
       if (entry.timestamp > lastTimestamp) lastTimestamp = entry.timestamp;
     }
@@ -165,7 +165,7 @@ function startPolling() {
           if (entry.role === "gm") {
             appendGMEntry(entry.content, true);
           } else {
-            appendPlayerEntry(entry.player || "matt", entry.content.replace(/^(Matt|Michelle): /, ""), true);
+            appendPlayerEntry(entry.player || "fen", entry.content.replace(/^(Fen|Lyra): /, ""), true);
           }
           if (entry.timestamp > lastTimestamp) lastTimestamp = entry.timestamp;
         }
@@ -182,7 +182,7 @@ async function triggerOpeningIfNeeded() {
     const res = await fetch("/api/poll?since=0");
     const data = await res.json();
     if (data.entries.length === 0) {
-      await sendToGM("matt", "[SESSION BEGINS]", "begin");
+      await sendToGM("fen", "[SESSION BEGINS]", "begin");
     }
   } catch(_) {}
 }
@@ -239,7 +239,7 @@ async function sendToGM(player, message, type) {
 }
 
 function formatRollMessage(player, stat, result) {
-  const name = player === "matt" ? "Matt" : "Michelle";
+  const name = player === "fen" ? "Fen" : "Lyra";
   return `${name} rolls ${stat.toUpperCase()}: ${result.die1} + ${result.die2} + (${result.modifier}) = ${result.total}`;
 }
 
@@ -250,7 +250,7 @@ function animateRoll(player, stat, advantage = false) {
     const statName = stat.toUpperCase();
 
     document.getElementById("dice-title").textContent =
-      `${player === "matt" ? "MATT" : "MICHELLE"} — Rolling ${statName}${advantage ? " (Advantage)" : ""}`;
+      `${player === "fen" ? "MATT" : "MICHELLE"} — Rolling ${statName}${advantage ? " (Advantage)" : ""}`;
 
     const die1El = document.getElementById("die1");
     const die2El = document.getElementById("die2");
@@ -341,7 +341,7 @@ function appendGMEntry(text, animate) {
 function appendPlayerEntry(player, text, animate) {
   const entry = document.createElement("div");
   entry.className = `log-entry player-${player}${animate ? "" : " no-anim"}`;
-  const name = player === "matt" ? "Matt" : "Michelle";
+  const name = player === "fen" ? "Fen" : "Lyra";
   entry.innerHTML = `
     <span class="entry-label">${name}</span>
     <div class="entry-content">${escapeHtml(text)}</div>
@@ -352,7 +352,7 @@ function appendPlayerEntry(player, text, animate) {
 function appendRollResult(player, stat, result) {
   const entry = document.createElement("div");
   entry.className = "roll-result-entry";
-  const name = player === "matt" ? "Matt" : "Michelle";
+  const name = player === "fen" ? "Fen" : "Lyra";
   entry.innerHTML = `
     <span>${name} rolled ${stat.toUpperCase()}: ${result.die1}+${result.die2}${result.modifier >= 0 ? "+" : ""}${result.modifier} = <strong>${result.total}</strong></span>
     <span class="roll-badge ${result.level}">${result.label}</span>
@@ -394,16 +394,16 @@ function updateCharacterUI(data) {
   const ws = data.worldState || data.gameState?.worldState;
   if (!chars) return;
 
-  updateHarm("matt", chars.matt?.harm);
-  updateHarm("michelle", chars.michelle?.harm);
+  updateHarm("fen", chars.fen?.harm);
+  updateHarm("lyra", chars.lyra?.harm);
 
-  if (chars.michelle?.magic_uses_remaining !== undefined) {
-    document.getElementById("magic-count").textContent = chars.michelle.magic_uses_remaining;
+  if (chars.lyra?.magic_uses_remaining !== undefined) {
+    document.getElementById("magic-count").textContent = chars.lyra.magic_uses_remaining;
   }
 
-  updateAbility("matt-notmywatch", chars.matt?.not_on_my_watch_used);
-  updateAbility("matt-luckybreak", chars.matt?.lucky_break_used);
-  updateAbility("michelle-knowing", chars.michelle?.weight_of_knowing_used);
+  updateAbility("fen-notmywatch", chars.fen?.not_on_my_watch_used);
+  updateAbility("fen-luckybreak", chars.fen?.lucky_break_used);
+  updateAbility("lyra-knowing", chars.lyra?.weight_of_knowing_used);
 
   if (ws?.conclave_awareness !== undefined) {
     const badge = document.getElementById("awareness-badge");

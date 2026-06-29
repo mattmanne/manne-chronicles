@@ -55,9 +55,9 @@ module.exports = async function handler(req, res) {
   if (awarenessMatch) gameState.worldState.conclave_awareness = parseInt(awarenessMatch[2]);
 
   const dissonanceMatch = cleanResponse.match(/\[DISSONANCE: (\d+) → (\d+)\]/);
-  if (dissonanceMatch) gameState.worldState.matt_dissonance_awakening = parseInt(dissonanceMatch[2]);
+  if (dissonanceMatch) gameState.worldState.fen_dissonance_awakening = parseInt(dissonanceMatch[2]);
 
-  const harmRegex = /\[(MICHELLE|MATT): ([A-Za-z]+) → ([A-Za-z]+)\]/g;
+  const harmRegex = /\[(LYRA|FEN): ([A-Za-z]+) → ([A-Za-z]+)\]/g;
   let harmMatch;
   while ((harmMatch = harmRegex.exec(cleanResponse)) !== null) {
     const who = harmMatch[1].toLowerCase();
