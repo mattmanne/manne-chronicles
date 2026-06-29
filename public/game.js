@@ -499,6 +499,7 @@ function formatCampaignExport(state) {
             .replace(/\[CONCLAVE AWARENESS: \d+ → \d+\]/g, "")
             .replace(/\[DISSONANCE: \d+ → \d+\]/g, "")
             .replace(/\[LOCATION: [^\]]+\]/g, "")
+            .replace(/\[SCAR: [^\]]+\]/g, "")
             .replace(/\[(LYRA|FEN): [A-Za-z]+ → [A-Za-z]+\]/g, "").trim();
         } else {
           content = content.replace(/^(Fen|Lyra): /, "");
@@ -555,6 +556,7 @@ function renderArchive(state) {
               .replace(/\[CONCLAVE AWARENESS: \d+ → \d+\]/g, "")
               .replace(/\[DISSONANCE: \d+ → \d+\]/g, "")
               .replace(/\[LOCATION: [^\]]+\]/g, "")
+              .replace(/\[SCAR: [^\]]+\]/g, "")
               .replace(/\[(LYRA|FEN): [A-Za-z]+ → [A-Za-z]+\]/g, "").trim();
           } else {
             content = content.replace(/^(Fen|Lyra): /, "");
@@ -600,6 +602,7 @@ function renderMap(state) {
 
   const currentId = matchLocation(currentLocStr);
   const visited = ws.visited_locations || [];
+  const scars   = ws.location_scars   || [];
 
   // Street grid lines
   const streets = [
@@ -629,6 +632,8 @@ function renderMap(state) {
     const isLand     = loc.type === "landmark";
     const isCurrent  = loc.id === currentId;
     const isVisited  = visited.includes(loc.id);
+    const locScars   = scars.filter(s => s.id === loc.id);
+    const hasScar    = locScars.length > 0;
     const dotColor   = isCon ? "#c0392b" : isLand ? "#c9a84c" : "#8a7040";
     const txtColor   = isCon ? "#c0392b" : isLand ? "#c9a84c" : "#6a5a30";
     const dotOpacity = (isCurrent || isVisited) ? 1 : 0.25;
@@ -644,12 +649,17 @@ function renderMap(state) {
     const center = isCurrent
       ? `<circle cx="${loc.x}" cy="${loc.y}" r="3" fill="white" opacity="0.85"/>`
       : "";
+    const scarMark = hasScar
+      ? `<line x1="${loc.x + r - 1}" y1="${loc.y - r - 4}" x2="${loc.x + r + 4}" y2="${loc.y - r + 1}" stroke="#8b1a1a" stroke-width="1.3"/>
+         <line x1="${loc.x + r + 4}" y1="${loc.y - r - 4}" x2="${loc.x + r - 1}" y2="${loc.y - r + 1}" stroke="#8b1a1a" stroke-width="1.3"/>`
+      : "";
 
     return `
       <g class="map-location" onclick="showLocationInfo('${loc.id}')">
         ${pulse}
         <circle cx="${loc.x}" cy="${loc.y}" r="${r}" fill="${dotColor}" opacity="${dotOpacity}"/>
         ${center}
+        ${scarMark}
         <text x="${lx}" y="${ly}" text-anchor="${anchor}" fill="${txtColor}" opacity="${txtOpacity}"
               font-size="9" font-family="Georgia,serif">${loc.name}</text>
       </g>`;
@@ -710,10 +720,15 @@ function showLocationInfo(id) {
   const loc = LOCATIONS.find(l => l.id === id);
   if (!loc) return;
   const danger = loc.type === "conclave";
+  const locScars = (cachedGameState?.worldState?.location_scars || []).filter(s => s.id === id);
+  const scarsHtml = locScars.length
+    ? `<div class="loc-scars">${locScars.map(s => `<span class="loc-scar">✕ ${escapeHtml(s.label)}</span>`).join("")}</div>`
+    : "";
   document.getElementById("location-info").innerHTML = `
     <div class="loc-info-card">
       <strong style="${danger ? "color:var(--red)" : ""}">${loc.name}${danger ? " ⚡" : ""}</strong>
       <span>${escapeHtml(loc.desc)}</span>
+      ${scarsHtml}
     </div>`;
 }
 
@@ -723,6 +738,7 @@ function getCleanText(text) {
     .replace(/\[CONCLAVE AWARENESS: \d+ → \d+\]/g, "")
     .replace(/\[DISSONANCE: \d+ → \d+\]/g, "")
     .replace(/\[LOCATION: [^\]]+\]/g, "")
+    .replace(/\[SCAR: [^\]]+\]/g, "")
     .replace(/\[(LYRA|FEN): [A-Za-z]+ → [A-Za-z]+\]/g, "")
     .replace(/\n{3,}/g, "\n\n")
     .trim();

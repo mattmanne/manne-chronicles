@@ -581,6 +581,8 @@ html, body {
 }
 .loc-info-card strong { font-family: var(--font-serif); color: var(--gold); font-size: 0.9rem; }
 .loc-info-card span { font-size: 0.8rem; color: var(--parch-dim); line-height: 1.5; font-style: italic; }
+.loc-scars { display: flex; flex-direction: column; gap: 3px; margin-top: 2px; }
+.loc-scar { font-size: 0.72rem; color: #8b1a1a; letter-spacing: 0.02em; }
 
 /* ── Animations ── */
 @keyframes fadeIn   { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }

@@ -95,6 +95,18 @@ module.exports = async function handler(req, res) {
     }
   }
 
+  const scarRegex = /\[SCAR: ([^:]+): ([^\]]+)\]/g;
+  let scarMatch;
+  while ((scarMatch = scarRegex.exec(cleanResponse)) !== null) {
+    const locId = matchLocationId(scarMatch[1].trim());
+    const label = scarMatch[2].trim();
+    if (locId) {
+      if (!gameState.worldState.location_scars) gameState.worldState.location_scars = [];
+      const exists = gameState.worldState.location_scars.some(s => s.id === locId && s.label === label);
+      if (!exists) gameState.worldState.location_scars.push({ id: locId, label });
+    }
+  }
+
   await setState(KEY, gameState);
 
   return res.json({
@@ -109,6 +121,8 @@ module.exports = async function handler(req, res) {
         conclave_awareness: gameState.worldState.conclave_awareness,
         fen_dissonance_awakening: gameState.worldState.fen_dissonance_awakening,
         location: gameState.worldState.location,
+        visited_locations: gameState.worldState.visited_locations,
+        location_scars: gameState.worldState.location_scars,
       },
     },
   });
