@@ -319,45 +319,97 @@ function animateRoll(player, stat, advantage = false) {
 /* ── Speech Synthesis ── */
 let activeSpeech = null;
 
-function speakText(text, btn) {
-  if (!window.speechSynthesis) return;
+function getStoryVoice() {
+  const voices = window.speechSynthesis.getVoices();
+  if (!voices.length) return null;
+  const preferred = [
+    "Daniel", "Arthur", "Google UK English Male",
+    "Microsoft George", "Microsoft David", "Aaron",
+    "Google US English"
+  ];
+  for (const name of preferred) {
+    const v = voices.find(v => v.name.includes(name));
+    if (v) return v;
+  }
+  return voices.find(v => v.lang.startsWith("en")) || null;
+}
 
+function stopSpeech() {
   if (activeSpeech) {
     window.speechSynthesis.cancel();
     if (activeSpeech.btn) {
       activeSpeech.btn.textContent = "🔊";
       activeSpeech.btn.classList.remove("speaking");
     }
-    if (activeSpeech.text === text) {
+    activeSpeech = null;
+  }
+}
+
+function speakText(text, btn) {
+  if (!window.speechSynthesis) return;
+
+  const isSameEntry = activeSpeech && activeSpeech.text === text;
+  stopSpeech();
+  if (isSameEntry) return;
+
+  const paragraphs = text.split(/\n\n+/).map(p => p.trim()).filter(Boolean);
+  const voice = getStoryVoice();
+
+  btn.textContent = "⏹";
+  btn.classList.add("speaking");
+  activeSpeech = { text, btn };
+
+  let idx = 0;
+
+  function speakNext() {
+    if (!activeSpeech || idx >= paragraphs.length) {
+      if (btn) {
+        btn.textContent = "🔊";
+        btn.classList.remove("speaking");
+      }
       activeSpeech = null;
       return;
     }
+
+    const utt = new SpeechSynthesisUtterance(paragraphs[idx]);
+    utt.rate  = 0.84;
+    utt.pitch = 0.95;
+    utt.volume = 1.0;
+    if (voice) utt.voice = voice;
+
+    utt.onend = () => {
+      idx++;
+      if (idx < paragraphs.length) {
+        setTimeout(speakNext, 350);
+      } else {
+        if (btn) {
+          btn.textContent = "🔊";
+          btn.classList.remove("speaking");
+        }
+        activeSpeech = null;
+      }
+    };
+
+    utt.onerror = () => {
+      if (btn) {
+        btn.textContent = "🔊";
+        btn.classList.remove("speaking");
+      }
+      activeSpeech = null;
+    };
+
+    window.speechSynthesis.speak(utt);
   }
 
-  const utterance = new SpeechSynthesisUtterance(text);
-  utterance.rate = 0.92;
-  utterance.pitch = 1.0;
-  utterance.volume = 1.0;
-
-  utterance.onstart = () => {
-    btn.textContent = "⏹";
-    btn.classList.add("speaking");
-  };
-
-  utterance.onend = () => {
-    btn.textContent = "🔊";
-    btn.classList.remove("speaking");
-    activeSpeech = null;
-  };
-
-  utterance.onerror = () => {
-    btn.textContent = "🔊";
-    btn.classList.remove("speaking");
-    activeSpeech = null;
-  };
-
-  activeSpeech = { text, btn };
-  window.speechSynthesis.speak(utterance);
+  if (voice) {
+    speakNext();
+  } else {
+    window.speechSynthesis.onvoiceschanged = () => {
+      activeSpeech = { text, btn };
+      speakNext();
+    };
+    speakNext();
+  }
 }
 
 /* ── DOM Builders ── */
