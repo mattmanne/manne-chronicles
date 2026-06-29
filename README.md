@@ -12,8 +12,17 @@ A two-player narrative RPG for Matt & Michelle. Open on your phones, speak your 
 
 1. Open **https://resonance-dnd.vercel.app** on your phone — bookmark it
 2. The GM narrates the opening scene automatically on first load
-3. Select your character using the **FEN** or **LYRA** button at the bottom
+3. On the **Story** tab, select your character using the **FEN** or **LYRA** button at the bottom
 4. Tap the **🎤 microphone** and speak what you want to do, or type it
+
+### The four tabs
+
+| Tab | What it's for |
+|-----|--------------|
+| **◈ Story** | The main narration log and your action input |
+| **⚔ Characters** | Character cards, abilities, harm — and End Session |
+| **≡ Archive** | Full logs from completed sessions |
+| **⊕ Map** | City map of Varek, Conclave Awareness meter |
 
 ### Voice input
 
@@ -24,9 +33,10 @@ A two-player narrative RPG for Matt & Michelle. Open on your phones, speak your 
 ### Text-to-speech
 
 Every GM narration has a small **🔊** button in the top right corner of the text block.
-- Tap it to hear the story read aloud in your phone's voice
+- Tap it to hear the story read aloud in a storytelling voice
 - While reading, it turns into **⏹** — tap again to stop
 - Tapping a new entry stops the current one and starts the new one
+- **Auto-read** — tap the 🔊 button in the top-right header to automatically read every new GM narration as it arrives
 
 ### Taking actions
 
@@ -48,15 +58,22 @@ When the GM calls for a roll, the dice appear and roll automatically.
 | 6 or less | Something goes wrong |
 | 2–3 | Disaster |
 
+### Using abilities
+
+Go to the **⚔ Characters** tab to manage abilities:
+- Tap an ability to mark it **Used** for the session (it strikes through and grays out)
+- Lyra's **◈ Magic** counter: tap to spend one Resonance charge
+- Abilities reset automatically when you start a new session
+
 ### Playing together or apart
 
 Both of you open the same URL on your own phones. You take turns — each player's actions and the GM's responses are visible to both. The app syncs every 8 seconds, so there's a brief delay when playing from separate locations.
 
 ### Ending a session
 
-Tap the **⚔** icon (top right) → **"End Session & Save"**
+Go to the **⚔ Characters** tab → **"End Session & Save"**
 
-Write a one-sentence summary when prompted. This saves permanently to campaign history so future sessions remember what happened.
+Write a one-sentence summary when prompted. This archives the full session log permanently — viewable later in the **≡ Archive** tab.
 
 ---
 
@@ -84,6 +101,8 @@ The truth is darker. You'll find it.
 
 Keep it low. Don't draw attention.
 
+The **⊕ Map** tab shows Varek — your current location pulses gold. Red markers are Conclave territory. Tap any location for a description.
+
 ---
 
 ## The Magic System — Resonance
@@ -104,21 +123,21 @@ Everything in the world vibrates at a natural frequency. Most people feel nothin
 Use Chrome on Android or Safari on iOS. Other browsers may not support voice input — type instead.
 
 **🔊 Speaker button not working?**
-Some browsers require user interaction before allowing audio. Try tapping something else on the page first, then tap the speaker button.
+Some browsers require a user interaction before allowing audio. Tap something else on the page first, then tap the speaker button.
 
 **GM not responding / error message?**
-The Groq API key may have expired or hit a limit. Matt: go to console.groq.com, create a new key, update `GROQ_API_KEY` in Vercel environment variables under Settings → Environment Variables, then redeploy.
+The Groq API key may have expired or hit a limit. Go to console.groq.com, create a new key, update `GROQ_API_KEY` in Vercel under Settings → Environment Variables, then redeploy.
 
 **App seems stuck / not loading new messages?**
-Pull down to refresh the page. The session log reloads from the server.
+Pull down to refresh. The session log reloads from the server.
 
 **Start a completely fresh campaign:**
-Tap the ⚔ icon → "End Session & Save" to properly archive the session first. For a full wipe, open the browser address bar, go to `https://resonance-dnd.vercel.app/api/state`, then use the browser console and run:
+Go to the **⚔ Characters** tab → "End Session & Save" to archive the session first. For a full wipe, open the browser address bar, go to `https://resonance-dnd.vercel.app/api/state`, then use the browser console:
 `fetch('/api/state',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'reset'})})`
 
 ---
 
-## Technical Notes (Matt only)
+## Technical Notes
 
 - **Hosting:** Vercel (free) — auto-deploys when GitHub repo is updated
 - **Database:** Upstash Redis (free) — stores campaign state between sessions
