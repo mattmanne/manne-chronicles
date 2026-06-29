@@ -1,0 +1,13 @@
+{
+  "name": "resonance-dnd",
+  "version": "1.0.0",
+  "description": "Resonance: A Legacy Campaign — two-player narrative RPG",
+  "scripts": {
+    "dev": "vercel dev",
+    "start": "vercel dev"
+  },
+  "dependencies": {
+    "@google/generative-ai": "^0.21.0",
+    "@upstash/redis": "^1.34.0"
+  }
+}

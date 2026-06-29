@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>Resonance</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <div id="app">
+
+    <!-- Header -->
+    <header id="top-bar">
+      <div id="title-area">
+        <span id="game-title">RESONANCE</span>
+        <span id="session-label">Session 1</span>
+      </div>
+      <div id="header-right">
+        <span id="awareness-badge" title="Conclave Awareness">⚡ 0</span>
+        <button id="status-btn" class="icon-btn" title="Characters">⚔</button>
+      </div>
+    </header>
+
+    <!-- Character Panel (slide down) -->
+    <div id="status-panel" class="hidden">
+      <div class="char-card" id="matt-card">
+        <div class="char-header">
+          <span class="char-name">MATT</span>
+          <span class="char-role">Waiter · Dissonant?</span>
+        </div>
+        <div class="harm-row">
+          <span class="harm-label">Harm:</span>
+          <span id="matt-harm" class="harm-value">Unhurt</span>
+        </div>
+        <div class="ability-row">
+          <span class="ability used-indicator" id="matt-notmywatch" title="Take harm meant for Michelle">🛡 Not On My Watch</span>
+          <span class="ability used-indicator" id="matt-luckybreak" title="Disrupt disaster once per session">✦ Lucky Break</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat">FOR +0</span>
+          <span class="stat">ACU +1</span>
+          <span class="stat">AGI +1</span>
+          <span class="stat highlight">WIL +3</span>
+          <span class="stat">PRE +0</span>
+        </div>
+      </div>
+
+      <div class="char-card" id="michelle-card">
+        <div class="char-header">
+          <span class="char-name">MICHELLE</span>
+          <span class="char-role">Scholar · Harmonic</span>
+        </div>
+        <div class="harm-row">
+          <span class="harm-label">Harm:</span>
+          <span id="michelle-harm" class="harm-value">Unhurt</span>
+        </div>
+        <div class="ability-row">
+          <span class="ability" id="michelle-magic" title="Resonance uses remaining">◈ Magic: <span id="magic-count">3</span></span>
+          <span class="ability used-indicator" id="michelle-knowing" title="Spend harm for insight">◉ Weight of Knowing</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat">FOR +1</span>
+          <span class="stat highlight">ACU +3</span>
+          <span class="stat">AGI +2</span>
+          <span class="stat">WIL +2</span>
+          <span class="stat">PRE +1</span>
+        </div>
+      </div>
+
+      <button id="new-session-btn" class="secondary-btn">End Session & Save</button>
+    </div>
+
+    <!-- Dice Overlay -->
+    <div id="dice-overlay" class="hidden">
+      <div id="dice-box">
+        <div id="dice-title">Rolling…</div>
+        <div id="dice-display">
+          <div class="die" id="die1">?</div>
+          <div class="die-plus">+</div>
+          <div class="die" id="die2">?</div>
+          <div class="die-plus" id="modifier-display"></div>
+        </div>
+        <div id="dice-total">—</div>
+        <div id="dice-result-label"></div>
+      </div>
+    </div>
+
+    <!-- Main Narration Log -->
+    <main id="log-area">
+      <div id="log-entries"></div>
+    </main>
+
+    <!-- Loading indicator -->
+    <div id="loading-bar" class="hidden">
+      <div class="loading-text">The GM considers…</div>
+      <div class="loading-dots"><span>.</span><span>.</span><span>.</span></div>
+    </div>
+
+    <!-- Input Area -->
+    <footer id="input-area">
+      <div id="player-select">
+        <button class="player-btn active" data-player="matt" id="btn-matt">MATT</button>
+        <button class="player-btn" data-player="michelle" id="btn-michelle">MICHELLE</button>
+      </div>
+      <div id="action-row">
+        <input type="text" id="action-input" placeholder="What do you do?" autocomplete="off" autocorrect="off" />
+        <button id="voice-btn" title="Hold to speak">🎤</button>
+        <button id="send-btn" title="Send">▶</button>
+      </div>
+      <div id="voice-status" class="hidden">Listening…</div>
+    </footer>
+
+  </div>
+
+  <script src="game.js"></script>
+</body>
+</html>
