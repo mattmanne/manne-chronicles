@@ -64,6 +64,9 @@ module.exports = async function handler(req, res) {
     if (gameState.characters[who]) gameState.characters[who].harm = harmMatch[3];
   }
 
+  const locationMatch = cleanResponse.match(/\[LOCATION: ([^\]]+)\]/);
+  if (locationMatch) gameState.worldState.location = locationMatch[1].trim();
+
   await setState(KEY, gameState);
 
   return res.json({

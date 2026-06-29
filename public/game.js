@@ -58,6 +58,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   setupVoice();
   setupInputHandlers();
   setupAbilityToggles();
+  setupHarmRecovery();
   setupNewSession();
   setupAutoRead();
   await loadExistingLog();
@@ -75,8 +76,13 @@ function setupTabs() {
 function switchTab(tab) {
   document.querySelectorAll(".tab-btn").forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
   document.querySelectorAll(".tab-panel").forEach(p => p.classList.toggle("active", p.id === `tab-${tab}`));
+  if (tab === "story")   { setUnreadBadge(false); setTimeout(scrollToBottom, 50); }
   if (tab === "archive") loadArchive();
   if (tab === "map")     renderMap(cachedGameState);
+}
+
+function setUnreadBadge(val) {
+  document.querySelector('.tab-btn[data-tab="story"]').classList.toggle("unread", val);
 }
 
 /* ── Auto-read Toggle ── */
@@ -135,6 +141,24 @@ function setupInputHandlers() {
   sendBtn.addEventListener("click", submitAction);
   actionInput.addEventListener("keydown", (e) => {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submitAction(); }
+  });
+}
+
+/* ── Harm Recovery ── */
+function setupHarmRecovery() {
+  ["fen", "lyra"].forEach(character => {
+    const el = document.getElementById(`${character}-harm`);
+    if (!el) return;
+    el.addEventListener("click", async () => {
+      if (el.classList.contains("Unhurt")) return;
+      const res = await fetch("/api/state", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "recover_harm", payload: { character } })
+      });
+      const data = await res.json();
+      if (data.ok) updateCharacterUI({ characters: data.characters });
+    });
   });
 }
 
@@ -221,7 +245,12 @@ function startPolling() {
         }
         cachedGameState = { worldState: data.worldState, characters: data.characters };
         updateCharacterUI(data);
-        scrollToBottom();
+        if (document.getElementById("tab-story").classList.contains("active")) {
+          scrollToBottom();
+        } else {
+          setUnreadBadge(true);
+        }
+        if (document.getElementById("tab-map").classList.contains("active")) renderMap(cachedGameState);
       }
     } catch(_) {}
   }, 8000);
@@ -271,6 +300,7 @@ async function sendToGM(player, message, type) {
         cachedGameState = data.gameState;
         updateCharacterUI(data.gameState);
         lastTimestamp = Math.max(lastTimestamp, Date.now() - 1000);
+        if (document.getElementById("tab-map").classList.contains("active")) renderMap(cachedGameState);
       }
       scrollToBottom();
     }
@@ -454,6 +484,7 @@ function renderArchive(state) {
             content = content
               .replace(/\[CONCLAVE AWARENESS: \d+ → \d+\]/g, "")
               .replace(/\[DISSONANCE: \d+ → \d+\]/g, "")
+              .replace(/\[LOCATION: [^\]]+\]/g, "")
               .replace(/\[(LYRA|FEN): [A-Za-z]+ → [A-Za-z]+\]/g, "").trim();
           } else {
             content = content.replace(/^(Fen|Lyra): /, "");
@@ -617,7 +648,9 @@ function getCleanText(text) {
   return (text || "")
     .replace(/\[CONCLAVE AWARENESS: \d+ → \d+\]/g, "")
     .replace(/\[DISSONANCE: \d+ → \d+\]/g, "")
+    .replace(/\[LOCATION: [^\]]+\]/g, "")
     .replace(/\[(LYRA|FEN): [A-Za-z]+ → [A-Za-z]+\]/g, "")
+    .replace(/\n{3,}/g, "\n\n")
     .trim();
 }
 
@@ -679,6 +712,8 @@ function extractStateChanges(text) {
     const worsened = HARM_LEVELS.indexOf(m[3]) > HARM_LEVELS.indexOf(m[2]);
     changes.push({ text: `${m[1]}: ${m[2]} → ${m[3]}`, positive: !worsened });
   }
+  const loc = text.match(/\[LOCATION: ([^\]]+)\]/);
+  if (loc) changes.push({ text: `📍 ${loc[1].trim()}`, positive: true });
   return changes;
 }
 
@@ -713,7 +748,11 @@ function updateCharacterUI(data) {
 function updateHarm(player, harm) {
   if (!harm) return;
   const el = document.getElementById(`${player}-harm`);
-  if (el) { el.textContent = harm; el.className = `harm-value ${harm}`; }
+  if (el) {
+    el.textContent = harm;
+    el.className = `harm-value ${harm}`;
+    el.title = harm === "Unhurt" ? "" : "Tap to recover one step";
+  }
 }
 
 function updateAbility(id, used) {

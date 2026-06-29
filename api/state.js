@@ -1,5 +1,5 @@
 const { getState, setState } = require("../lib/redis");
-const { getInitialState } = require("../lib/gamestate");
+const { getInitialState, HARM_LEVELS } = require("../lib/gamestate");
 
 const KEY = "resonance:gamestate";
 
@@ -46,6 +46,19 @@ module.exports = async function handler(req, res) {
         return res.json({ ok: true, characters: current.characters });
       }
       return res.json({ ok: false, error: "No magic uses remaining", characters: current.characters });
+    }
+
+    if (action === "recover_harm") {
+      const current = (await getState(KEY)) || getInitialState();
+      const { character } = payload;
+      if (!current.characters[character]) return res.status(400).json({ error: "Invalid character" });
+      const idx = HARM_LEVELS.indexOf(current.characters[character].harm);
+      if (idx > 0) {
+        current.characters[character].harm = HARM_LEVELS[idx - 1];
+        await setState(KEY, current);
+        return res.json({ ok: true, characters: current.characters });
+      }
+      return res.json({ ok: false, error: "Already unhurt", characters: current.characters });
     }
 
     if (action === "new_session") {

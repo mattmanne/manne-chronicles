@@ -142,8 +142,18 @@ html, body {
 .tab-btn.active { color: var(--gold); border-top-color: var(--gold-dim); }
 .tab-btn:hover  { color: var(--parchment); }
 
-.tab-icon  { font-size: 1.1rem; line-height: 1; }
+.tab-icon  { font-size: 1.1rem; line-height: 1; position: relative; display: inline-block; }
 .tab-label { font-size: 0.6rem; letter-spacing: 0.1em; text-transform: uppercase; }
+
+.tab-btn.unread .tab-icon::after {
+  content: "";
+  position: absolute;
+  top: -3px; right: -5px;
+  width: 7px; height: 7px;
+  background: var(--red);
+  border-radius: 50%;
+  border: 1.5px solid var(--bg);
+}
 
 /* ── Character Cards ── */
 .char-card {
@@ -173,6 +183,9 @@ html, body {
   border: 1px solid var(--border);
   transition: all 0.3s;
 }
+.harm-value:not(.Unhurt) { cursor: pointer; }
+.harm-value:not(.Unhurt):hover { filter: brightness(1.25); }
+
 .harm-value.Unhurt    { color: var(--green); border-color: var(--green); }
 .harm-value.Scratched { color: #8bc34a; }
 .harm-value.Hurt      { color: var(--amber); border-color: var(--amber); }
