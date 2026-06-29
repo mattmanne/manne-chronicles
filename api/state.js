@@ -1,40 +1,34 @@
-const { Redis } = require("@upstash/redis");
+const { getState, setState } = require("../lib/redis");
 const { getInitialState } = require("../lib/gamestate");
 
-const redis = new Redis({
-  url: process.env.UPSTASH_REDIS_REST_URL,
-  token: process.env.UPSTASH_REDIS_REST_TOKEN,
-});
-
-const STATE_KEY = "resonance:gamestate";
+const KEY = "resonance:gamestate";
 
 module.exports = async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
-
   if (req.method === "OPTIONS") return res.status(200).end();
 
   if (req.method === "GET") {
-    const state = await redis.get(STATE_KEY);
-    return res.json(state || getInitialState());
+    const state = (await getState(KEY)) || getInitialState();
+    return res.json(state);
   }
 
   if (req.method === "POST") {
     const { action, payload } = req.body;
 
     if (action === "reset") {
-      await redis.set(STATE_KEY, getInitialState());
+      await setState(KEY, getInitialState());
       return res.json({ ok: true });
     }
 
     if (action === "update") {
-      await redis.set(STATE_KEY, payload);
+      await setState(KEY, payload);
       return res.json({ ok: true });
     }
 
     if (action === "new_session") {
-      const current = (await redis.get(STATE_KEY)) || getInitialState();
+      const current = (await getState(KEY)) || getInitialState();
       current.session += 1;
       current.worldState.session_summaries.push(payload.summary);
       current.sessionLog = [];
@@ -42,7 +36,7 @@ module.exports = async function handler(req, res) {
       current.characters.michelle.magic_uses_remaining = 3;
       current.characters.matt.not_on_my_watch_used = false;
       current.characters.matt.lucky_break_used = false;
-      await redis.set(STATE_KEY, current);
+      await setState(KEY, current);
       return res.json({ ok: true, session: current.session });
     }
 
