@@ -21,8 +21,8 @@ module.exports = async function handler(req, res) {
 
   const recentLog = gameState.sessionLog.slice(-MAX_HISTORY);
   const history = recentLog.map((entry) => ({
-    role: entry.role === "gm" ? "model" : "user",
-    parts: [{ text: entry.content }],
+    role: entry.role === "gm" ? "assistant" : "user",
+    content: entry.content,
   }));
 
   const playerLabel = player.charAt(0).toUpperCase() + player.slice(1);
