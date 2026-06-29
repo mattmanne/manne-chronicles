@@ -441,6 +441,28 @@ html, body {
 #voice-status.hidden { display: none; }
 
 /* ── Archive Tab ── */
+.archive-header {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.export-btn {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--parch-dim);
+  font-family: inherit;
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  padding: 4px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.export-btn:hover { border-color: var(--gold-dim); color: var(--gold); }
+
 .archive-empty {
   color: var(--parch-dim); font-style: italic;
   text-align: center; padding: 32px 16px;

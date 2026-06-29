@@ -85,6 +85,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   setupHarmRecovery();
   setupNewSession();
   setupAutoRead();
+  setupExport();
   await loadExistingLog();
   startPolling();
   triggerOpeningIfNeeded();
@@ -451,6 +452,71 @@ function finishSpeech(btn) {
   activeSpeech = null;
 }
 
+/* ── Export ── */
+function setupExport() {
+  document.getElementById("export-btn").addEventListener("click", async () => {
+    try {
+      const res = await fetch("/api/state");
+      const state = await res.json();
+      const text = formatCampaignExport(state);
+      const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "resonance-campaign.txt";
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch(_) {
+      alert("Export failed — try again.");
+    }
+  });
+}
+
+function formatCampaignExport(state) {
+  const archive   = state.worldState?.session_archive  || [];
+  const summaries = state.worldState?.session_summaries || [];
+  const archivedSessions = new Set(archive.map(a => a.session));
+  const legacyItems = summaries
+    .map((s, i) => ({ session: i + 1, summary: s, log: null }))
+    .filter(s => !archivedSessions.has(s.session));
+  const all = [...archive, ...legacyItems].sort((a, b) => a.session - b.session);
+
+  const sep  = "═".repeat(44);
+  const dash = "─".repeat(44);
+  const lines = ["RESONANCE — A LEGACY CAMPAIGN", sep, ""];
+
+  for (const item of all) {
+    lines.push(`SESSION ${item.session}`);
+    if (item.summary) lines.push(`Summary: ${item.summary}`);
+    lines.push(dash);
+    if (item.log) {
+      for (const e of item.log) {
+        const isGM = e.role === "gm";
+        const label = isGM ? "Story" : (e.player === "lyra" ? "Lyra" : "Fen");
+        let content = e.content || "";
+        if (isGM) {
+          content = content
+            .replace(/\[CONCLAVE AWARENESS: \d+ → \d+\]/g, "")
+            .replace(/\[DISSONANCE: \d+ → \d+\]/g, "")
+            .replace(/\[LOCATION: [^\]]+\]/g, "")
+            .replace(/\[(LYRA|FEN): [A-Za-z]+ → [A-Za-z]+\]/g, "").trim();
+        } else {
+          content = content.replace(/^(Fen|Lyra): /, "");
+        }
+        lines.push(`${label}: ${content}`);
+        lines.push("");
+      }
+    } else {
+      lines.push("(Full log not available for this session.)");
+      lines.push("");
+    }
+    lines.push(sep, "");
+  }
+
+  if (!all.length) lines.push("No sessions archived yet.");
+  return lines.join("\n");
+}
+
 /* ── Archive ── */
 async function loadArchive() {
   try {
@@ -533,6 +599,7 @@ function renderMap(state) {
   }
 
   const currentId = matchLocation(currentLocStr);
+  const visited = ws.visited_locations || [];
 
   // Street grid lines
   const streets = [
@@ -558,15 +625,18 @@ function renderMap(state) {
 
   // Location dots + labels + pulse ring for current
   const locSvg = LOCATIONS.map(loc => {
-    const isCon     = loc.type === "conclave";
-    const isLand    = loc.type === "landmark";
-    const isCurrent = loc.id === currentId;
-    const dotColor  = isCon ? "#c0392b" : isLand ? "#c9a84c" : "#8a7040";
-    const txtColor  = isCon ? "#c0392b" : isLand ? "#c9a84c" : "#6a5a30";
-    const r         = isLand ? 7 : 5;
-    const anchor    = loc.la || "middle";
-    const lx        = loc.x + (loc.lx || 0);
-    const ly        = loc.y + (loc.ly || 17);
+    const isCon      = loc.type === "conclave";
+    const isLand     = loc.type === "landmark";
+    const isCurrent  = loc.id === currentId;
+    const isVisited  = visited.includes(loc.id);
+    const dotColor   = isCon ? "#c0392b" : isLand ? "#c9a84c" : "#8a7040";
+    const txtColor   = isCon ? "#c0392b" : isLand ? "#c9a84c" : "#6a5a30";
+    const dotOpacity = (isCurrent || isVisited) ? 1 : 0.25;
+    const txtOpacity = (isCurrent || isVisited) ? 1 : 0.3;
+    const r          = isLand ? 7 : 5;
+    const anchor     = loc.la || "middle";
+    const lx         = loc.x + (loc.lx || 0);
+    const ly         = loc.y + (loc.ly || 17);
 
     const pulse = isCurrent
       ? `<circle cx="${loc.x}" cy="${loc.y}" r="${r + 8}" fill="none" stroke="${dotColor}" stroke-width="1.5" class="loc-pulse"/>`
@@ -578,9 +648,9 @@ function renderMap(state) {
     return `
       <g class="map-location" onclick="showLocationInfo('${loc.id}')">
         ${pulse}
-        <circle cx="${loc.x}" cy="${loc.y}" r="${r}" fill="${dotColor}"/>
+        <circle cx="${loc.x}" cy="${loc.y}" r="${r}" fill="${dotColor}" opacity="${dotOpacity}"/>
         ${center}
-        <text x="${lx}" y="${ly}" text-anchor="${anchor}" fill="${txtColor}"
+        <text x="${lx}" y="${ly}" text-anchor="${anchor}" fill="${txtColor}" opacity="${txtOpacity}"
               font-size="9" font-family="Georgia,serif">${loc.name}</text>
       </g>`;
   }).join("");

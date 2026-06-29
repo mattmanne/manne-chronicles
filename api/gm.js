@@ -6,6 +6,19 @@ const { getInitialState } = require("../lib/gamestate");
 const KEY = "resonance:gamestate";
 const MAX_HISTORY = 40;
 
+function matchLocationId(name) {
+  const s = name.toLowerCase();
+  if (s.includes("salt") || s.includes("wick") || s.includes("pub")) return "salt-wick";
+  if (s.includes("archive")) return "archive";
+  if (s.includes("scholar")) return "scholars-row";
+  if (s.includes("market")) return "market-square";
+  if (s.includes("concordance") || (s.includes("conclave") && !s.includes("warden"))) return "conclave-hall";
+  if (s.includes("warden")) return "warden-post";
+  if (s.includes("dock")) return "docks";
+  if (s.includes("low quarter") || s.includes("low-quarter")) return "low-quarter";
+  return null;
+}
+
 module.exports = async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
@@ -70,7 +83,17 @@ module.exports = async function handler(req, res) {
   }
 
   const locationMatch = cleanResponse.match(/\[LOCATION: ([^\]]+)\]/);
-  if (locationMatch) gameState.worldState.location = locationMatch[1].trim();
+  if (locationMatch) {
+    const locName = locationMatch[1].trim();
+    gameState.worldState.location = locName;
+    const locId = matchLocationId(locName);
+    if (locId) {
+      if (!gameState.worldState.visited_locations) gameState.worldState.visited_locations = [];
+      if (!gameState.worldState.visited_locations.includes(locId)) {
+        gameState.worldState.visited_locations.push(locId);
+      }
+    }
+  }
 
   await setState(KEY, gameState);
 
