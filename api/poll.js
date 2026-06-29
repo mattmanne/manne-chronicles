@@ -21,6 +21,8 @@ module.exports = async function handler(req, res) {
       fen_dissonance_awakening: state.worldState.fen_dissonance_awakening,
       location: state.worldState.location,
       session: state.session,
+      visited_locations: state.worldState.visited_locations || [],
+      location_scars: state.worldState.location_scars || [],
     },
   });
 };

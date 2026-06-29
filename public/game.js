@@ -61,9 +61,16 @@ function initSecret() {
   }
   gameSecret = localStorage.getItem("gameSecret");
   if (!gameSecret) {
-    gameSecret = prompt("Enter the campaign secret:");
-    if (gameSecret) localStorage.setItem("gameSecret", gameSecret);
+    const entered = prompt("Enter the campaign secret to continue:");
+    if (entered) {
+      gameSecret = entered;
+      localStorage.setItem("gameSecret", entered);
+    } else {
+      document.body.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100vh;background:#090912;color:#c9a84c;font-family:Georgia,serif;text-align:center;padding:2rem"><div><div style="font-size:1.1rem;margin-bottom:1rem">Campaign secret required.</div><div style="font-size:0.8rem;color:#6a5a30;line-height:1.8">Reload the page to try again,<br>or visit the URL with ?secret=YOUR_SECRET</div></div></div>`;
+      return false;
+    }
   }
+  return true;
 }
 
 function authPost(url, body) {
@@ -76,7 +83,7 @@ function authPost(url, body) {
 
 /* ── Init ── */
 document.addEventListener("DOMContentLoaded", async () => {
-  initSecret();
+  if (!initSecret()) return;
   setupTabs();
   setupPlayerButtons();
   setupVoice();
@@ -709,10 +716,10 @@ function matchLocation(str) {
   if (s.includes("archive"))                                            return "archive";
   if (s.includes("scholar"))                                            return "scholars-row";
   if (s.includes("market"))                                             return "market-square";
-  if (s.includes("concordance") || s.includes("conclave hall"))        return "conclave-hall";
+  if (s.includes("concordance") || (s.includes("conclave") && !s.includes("warden"))) return "conclave-hall";
   if (s.includes("warden"))                                             return "warden-post";
   if (s.includes("dock"))                                               return "docks";
-  if (s.includes("low quarter") || s.includes("quarter"))              return "low-quarter";
+  if (s.includes("low quarter") || s.includes("low-quarter"))          return "low-quarter";
   return "salt-wick";
 }
 

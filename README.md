@@ -21,7 +21,7 @@ A two-player narrative RPG for Matt & Michelle. Open on your phones, speak your 
 |-----|--------------|
 | **◈ Story** | The main narration log and your action input |
 | **⚔ Characters** | Character cards, abilities, harm — and End Session |
-| **≡ Archive** | Full logs from completed sessions |
+| **≡ Archive** | Full logs from completed sessions — tap **⬇ Export** to download the campaign as a text file |
 | **⊕ Map** | City map of Varek, Conclave Awareness meter |
 
 ### Voice input
@@ -113,6 +113,10 @@ Keep it low. Don't draw attention.
 
 The **⊕ Map** tab shows Varek — your current location pulses gold. The map updates automatically as you move between locations during play. Red markers are Conclave territory. Tap any location for a description.
 
+Locations you haven't visited yet appear dimmed. As you explore, they light up permanently.
+
+Some locations will eventually show a small crimson **✕** mark — a **location scar**, placed by the GM when something permanent and significant happened there. Tap the location to see what left its mark.
+
 ---
 
 ## The Magic System — Resonance
@@ -145,8 +149,8 @@ Pull down to refresh. The session log reloads from the server.
 The app requires a campaign secret to prevent strangers from resetting your progress. Enter the value of `GAME_SECRET` from your Vercel environment variables. It's stored in your browser after the first entry — you won't be prompted again on that device. To share with Michelle, visit `https://resonance-dnd.vercel.app?secret=YOUR_SECRET_HERE` once on her phone and it will be saved automatically.
 
 **Start a completely fresh campaign:**
-Go to the **⚔ Characters** tab → "End Session & Save" to archive the session first. For a full wipe, open the browser address bar, go to `https://resonance-dnd.vercel.app/api/state`, then use the browser console:
-`fetch('/api/state',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'reset'})})`
+Go to the **⚔ Characters** tab → "End Session & Save" to archive the session first. For a full wipe, open the browser console and run (replacing YOUR_SECRET with your `GAME_SECRET` value):
+`fetch('/api/state',{method:'POST',headers:{'Content-Type':'application/json','X-Game-Secret':'YOUR_SECRET'},body:JSON.stringify({action:'reset'})})`
 
 ---
 
