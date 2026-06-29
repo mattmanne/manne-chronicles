@@ -7,6 +7,7 @@ let recognition = null;
 let pollTimer = null;
 let lastTimestamp = 0;
 let cachedGameState = null;
+let gameSecret = null;
 
 const STATS = {
   fen:  { force: 0, acuity: 1, agility: 1, will: 3, presence: 0 },
@@ -51,8 +52,31 @@ const voiceStatus = document.getElementById("voice-status");
 const diceOverlay = document.getElementById("dice-overlay");
 const sessionLabel = document.getElementById("session-label");
 
+/* ── Secret ── */
+function initSecret() {
+  const urlParam = new URLSearchParams(window.location.search).get("secret");
+  if (urlParam) {
+    localStorage.setItem("gameSecret", urlParam);
+    window.history.replaceState({}, "", window.location.pathname);
+  }
+  gameSecret = localStorage.getItem("gameSecret");
+  if (!gameSecret) {
+    gameSecret = prompt("Enter the campaign secret:");
+    if (gameSecret) localStorage.setItem("gameSecret", gameSecret);
+  }
+}
+
+function authPost(url, body) {
+  return fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Game-Secret": gameSecret || "" },
+    body: JSON.stringify(body)
+  });
+}
+
 /* ── Init ── */
 document.addEventListener("DOMContentLoaded", async () => {
+  initSecret();
   setupTabs();
   setupPlayerButtons();
   setupVoice();
@@ -151,11 +175,7 @@ function setupHarmRecovery() {
     if (!el) return;
     el.addEventListener("click", async () => {
       if (el.classList.contains("Unhurt")) return;
-      const res = await fetch("/api/state", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "recover_harm", payload: { character } })
-      });
+      const res = await authPost("/api/state", { action: "recover_harm", payload: { character } });
       const data = await res.json();
       if (data.ok) updateCharacterUI({ characters: data.characters });
     });
@@ -168,11 +188,7 @@ function setupAbilityToggles() {
     btn.addEventListener("click", async () => {
       if (btn.classList.contains("used")) return;
       const { character, ability } = btn.dataset;
-      const res = await fetch("/api/state", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "toggle_ability", payload: { character, ability } })
-      });
+      const res = await authPost("/api/state", { action: "toggle_ability", payload: { character, ability } });
       const data = await res.json();
       if (data.ok) updateCharacterUI({ characters: data.characters });
     });
@@ -181,11 +197,7 @@ function setupAbilityToggles() {
   document.getElementById("lyra-magic").addEventListener("click", async () => {
     const count = parseInt(document.getElementById("magic-count").textContent);
     if (count <= 0) return;
-    const res = await fetch("/api/state", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "use_magic", payload: {} })
-    });
+    const res = await authPost("/api/state", { action: "use_magic", payload: {} });
     const data = await res.json();
     if (data.ok) updateCharacterUI({ characters: data.characters });
   });
@@ -196,11 +208,7 @@ function setupNewSession() {
   document.getElementById("new-session-btn").addEventListener("click", async () => {
     const summary = prompt("Briefly summarize what happened this session (saved to campaign history):");
     if (!summary) return;
-    const res = await fetch("/api/state", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "new_session", payload: { summary } })
-    });
+    const res = await authPost("/api/state", { action: "new_session", payload: { summary } });
     const data = await res.json();
     if (data.ok) {
       logEntries.innerHTML = "";
@@ -279,11 +287,7 @@ async function submitAction() {
 async function sendToGM(player, message, type) {
   setLoading(true);
   try {
-    const res = await fetch("/api/gm", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ player, message, type })
-    });
+    const res = await authPost("/api/gm", { player, message, type });
     const data = await res.json();
     if (data.error) { appendSystemMessage("Error: " + data.error); return; }
 

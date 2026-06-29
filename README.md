@@ -141,6 +141,9 @@ The Groq API key may have expired or hit a limit. Go to console.groq.com, create
 **App seems stuck / not loading new messages?**
 Pull down to refresh. The session log reloads from the server.
 
+**Prompted for a secret on first load?**
+The app requires a campaign secret to prevent strangers from resetting your progress. Enter the value of `GAME_SECRET` from your Vercel environment variables. It's stored in your browser after the first entry — you won't be prompted again on that device. To share with Michelle, visit `https://resonance-dnd.vercel.app?secret=YOUR_SECRET_HERE` once on her phone and it will be saved automatically.
+
 **Start a completely fresh campaign:**
 Go to the **⚔ Characters** tab → "End Session & Save" to archive the session first. For a full wipe, open the browser address bar, go to `https://resonance-dnd.vercel.app/api/state`, then use the browser console:
 `fetch('/api/state',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'reset'})})`
