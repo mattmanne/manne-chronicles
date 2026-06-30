@@ -1029,6 +1029,95 @@ body.world-manlandia #villain-badge   { display: inline-block; }
 .help-voice-btn:hover { border-color: var(--gold-dim); color: var(--parchment); }
 .help-voice-btn.listening { border-color: var(--red); color: var(--red); }
 
+/* ── End Session Overlay ── */
+#end-session-overlay {
+  display: none; position: fixed; inset: 0;
+  background: rgba(9,9,18,0.85);
+  align-items: flex-end; justify-content: center;
+  z-index: 1000;
+}
+#end-session-overlay.active { display: flex; }
+
+.end-session-box {
+  display: flex; flex-direction: column; gap: 14px;
+  width: 100%; max-width: 680px;
+  background: var(--surface);
+  border-top: 1px solid var(--gold-dim);
+  border-radius: 18px 18px 0 0;
+  padding: 24px 20px 32px;
+}
+
+.end-session-header { display: flex; align-items: center; }
+.end-session-title {
+  font-family: var(--font-serif); font-size: 1rem;
+  letter-spacing: 0.1em; color: var(--gold);
+}
+.end-session-subtitle {
+  font-size: 0.82rem; color: var(--parch-dim); line-height: 1.5;
+}
+
+.end-session-textarea {
+  width: 100%; padding: 12px 14px; font-size: 0.9rem;
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 10px; color: var(--parchment); outline: none;
+  resize: none; font-family: var(--font-sans); line-height: 1.5;
+}
+.end-session-textarea:focus { border-color: var(--gold-dim); }
+
+.end-session-actions { display: flex; gap: 10px; }
+.end-session-cancel-btn {
+  flex: 0; padding: 12px 18px; font-size: 0.87rem;
+  background: none; border: 1px solid var(--border);
+  border-radius: 8px; color: var(--parch-dim); cursor: pointer;
+  transition: all 0.2s; white-space: nowrap;
+}
+.end-session-cancel-btn:hover { border-color: var(--gold-dim); color: var(--parchment); }
+
+.end-session-confirm-btn {
+  flex: 1; padding: 12px 18px; font-size: 0.87rem; font-weight: 600;
+  background: var(--gold); color: var(--bg);
+  border: none; border-radius: 8px; cursor: pointer;
+  transition: background 0.2s;
+}
+.end-session-confirm-btn:hover { background: #d9b85c; }
+.end-session-confirm-btn:disabled { opacity: 0.5; cursor: default; }
+
+/* ── Wizard backstory textarea ── */
+.wiz-backstory {
+  width: 100%; padding: 12px 14px; font-size: 0.88rem;
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 10px; color: var(--parchment); outline: none;
+  resize: none; font-family: var(--font-sans); line-height: 1.5;
+}
+.wiz-backstory:focus { border-color: var(--gold-dim); }
+
+/* ── Tone selector (Manlandia Characters tab) ── */
+.tone-selector {
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 8px; padding: 12px 14px;
+  display: flex; align-items: center; gap: 12px;
+}
+.tone-selector-label {
+  font-size: 0.68rem; letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--parch-dim); white-space: nowrap;
+}
+.tone-btns { display: flex; gap: 6px; flex: 1; }
+.tone-btn {
+  flex: 1; padding: 7px 4px; font-size: 0.76rem;
+  background: none; border: 1px solid var(--border);
+  border-radius: 7px; color: var(--parch-dim);
+  cursor: pointer; transition: all 0.2s; text-align: center;
+}
+.tone-btn:hover { border-color: var(--gold-dim); color: var(--parchment); }
+.tone-btn.active { border-color: var(--gold); background: rgba(201,168,76,0.12); color: var(--gold); }
+
+/* ── Character backstory on card ── */
+.char-backstory {
+  font-size: 0.72rem; color: var(--parch-dim);
+  font-style: italic; line-height: 1.4;
+  padding: 4px 0 0; border-top: 1px solid var(--border);
+}
+
 /* ── Curse fill color ── */
 .awareness-fill.curse-fill { background: #6a6a6a; }
 .awareness-fill.curse-fill.warning { background: #888; }

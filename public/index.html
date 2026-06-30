@@ -71,16 +71,16 @@
         </div>
       </div>
 
-      <!-- Step 4: Photo -->
+      <!-- Step 4: Photo + Backstory -->
       <div class="wiz-step hidden" id="wiz-step-4">
         <div class="wiz-icon">📸</div>
-        <h2 class="wiz-title">Add a picture of your hero!</h2>
-        <p class="wiz-subtitle">Optional — only shows on your device</p>
+        <h2 class="wiz-title">Picture &amp; story</h2>
+        <p class="wiz-subtitle">Both optional — make your hero feel real!</p>
         <div id="wiz-photo-preview" class="wiz-photo-preview"></div>
         <label for="wiz-photo-input" class="wiz-btn wiz-photo-btn">📷 Choose a Picture</label>
         <input type="file" id="wiz-photo-input" accept="image/*" style="display:none" />
+        <textarea id="wiz-backstory" class="wiz-backstory" placeholder="Write a sentence about your hero… Who are they? Why are they on this quest? (optional)" maxlength="200" rows="3"></textarea>
         <button class="wiz-btn" id="wiz-finish-btn">🎉 Create My Hero!</button>
-        <button class="wiz-link" id="wiz-skip-photo">Skip — no picture</button>
       </div>
 
       <!-- Done! -->
@@ -92,6 +92,21 @@
         <button class="wiz-btn" id="wiz-close-btn">Let's go! →</button>
       </div>
 
+    </div>
+  </div>
+
+  <!-- End Session Overlay -->
+  <div id="end-session-overlay">
+    <div class="end-session-box">
+      <div class="end-session-header">
+        <span class="end-session-title">📖 End Session</span>
+      </div>
+      <p class="end-session-subtitle">What happened this session? It'll be saved to your campaign history.</p>
+      <textarea id="end-session-input" class="end-session-textarea" placeholder="Briefly describe what your heroes did…" maxlength="300" rows="4"></textarea>
+      <div class="end-session-actions">
+        <button id="end-session-cancel" class="end-session-cancel-btn">Cancel</button>
+        <button id="end-session-confirm" class="end-session-confirm-btn">Archive Session →</button>
+      </div>
     </div>
   </div>
 
@@ -244,6 +259,14 @@
 
           <!-- Manlandia characters (2×2 grid) -->
           <div class="manlandia-only">
+            <div class="tone-selector">
+              <div class="tone-selector-label">Story Mood</div>
+              <div class="tone-btns">
+                <button class="tone-btn" data-tone="epic">🏰 Epic</button>
+                <button class="tone-btn" data-tone="adventure">⚔️ Adventure</button>
+                <button class="tone-btn" data-tone="silly">🎪 Silly</button>
+              </div>
+            </div>
             <div class="manlandia-chars-grid">
               <div class="char-card manlandia-card" id="p1-card">
                 <div class="char-header manlandia-char-header">
@@ -259,6 +282,7 @@
                 </div>
                 <div class="ability-row" id="p1-ability-row"></div>
                 <div class="card-actions" id="p1-card-actions"></div>
+                <div class="char-backstory hidden" id="p1-backstory"></div>
               </div>
               <div class="char-card manlandia-card" id="p2-card">
                 <div class="char-header manlandia-char-header">
@@ -274,6 +298,7 @@
                 </div>
                 <div class="ability-row" id="p2-ability-row"></div>
                 <div class="card-actions" id="p2-card-actions"></div>
+                <div class="char-backstory hidden" id="p2-backstory"></div>
               </div>
               <div class="char-card manlandia-card" id="p3-card">
                 <div class="char-header manlandia-char-header">
@@ -289,6 +314,7 @@
                 </div>
                 <div class="ability-row" id="p3-ability-row"></div>
                 <div class="card-actions" id="p3-card-actions"></div>
+                <div class="char-backstory hidden" id="p3-backstory"></div>
               </div>
               <div class="char-card manlandia-card" id="p4-card">
                 <div class="char-header manlandia-char-header">
@@ -304,6 +330,7 @@
                 </div>
                 <div class="ability-row" id="p4-ability-row"></div>
                 <div class="card-actions" id="p4-card-actions"></div>
+                <div class="char-backstory hidden" id="p4-backstory"></div>
               </div>
             </div>
           </div>

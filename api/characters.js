@@ -32,7 +32,7 @@ module.exports = async function handler(req, res) {
   }
 
   const { key } = worldConfig;
-  const { player, name, archetype, ability_id } = req.body;
+  const { player, name, archetype, ability_id, backstory } = req.body;
 
   if (!VALID_PLAYERS.includes(player))                        return res.status(400).json({ error: "Invalid player" });
   if (!name || typeof name !== "string" || !name.trim())      return res.status(400).json({ error: "Name required" });
@@ -50,6 +50,7 @@ module.exports = async function handler(req, res) {
     ability_id,
     ability_used: existing.ability_used ?? false,
     harm:         existing.harm ?? "Unhurt",
+    backstory:    typeof backstory === "string" ? backstory.trim().slice(0, 200) : (existing.backstory ?? ""),
   };
 
   await setState(key, gameState);

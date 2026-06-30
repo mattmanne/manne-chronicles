@@ -52,11 +52,19 @@ module.exports = async function handler(req, res) {
   const worldConfig = getWorldConfig(req.query.world);
   const { key, getInitialState, buildSystemPrompt } = worldConfig;
 
-  const { player, message, type } = req.body;
+  const { player, message, type, tone } = req.body;
   if (!player || !message) return res.status(400).json({ error: "Missing player or message" });
 
   const gameState = (await getState(key)) || getInitialState();
-  const systemPrompt = buildSystemPrompt(gameState);
+  let systemPrompt = buildSystemPrompt(gameState);
+
+  if (worldConfig.id === "manlandia" && tone && tone !== "adventure") {
+    if (tone === "silly") {
+      systemPrompt += "\n\nTONE ADJUSTMENT: Make this session playful and silly. Creatures are goofy. Situations turn absurd. Use wordplay and light humor. Think funny children's movie energy. Keep the adventure real but wrap it in warmth and comedy.";
+    } else if (tone === "epic") {
+      systemPrompt += "\n\nTONE ADJUSTMENT: Make this session feel grand and epic. Powerful, vivid descriptions. Dramatic moments. Heroes feel legendary. High stakes. Think big fantasy movie energy.";
+    }
+  }
 
   const recentLog = gameState.sessionLog.slice(-MAX_HISTORY);
   const history = recentLog.map((entry) => ({
@@ -190,6 +198,21 @@ module.exports = async function handler(req, res) {
     while ((harmMatch = harmRegex.exec(cleanResponse)) !== null) {
       const who = harmMatch[1].toLowerCase();
       if (gameState.characters[who]) gameState.characters[who].harm = harmMatch[3];
+    }
+
+    // Ability used: [ABILITY FEN: ability_name] or [ABILITY LYRA: ability_name]
+    const resAbilityRegex = /\[ABILITY (FEN|LYRA): ([a-z_]+)\]/gi;
+    let raMatch;
+    while ((raMatch = resAbilityRegex.exec(cleanResponse)) !== null) {
+      const who     = raMatch[1].toLowerCase();
+      const ability = raMatch[2].toLowerCase();
+      if (who === "lyra" && ability === "magic") {
+        if (gameState.characters.lyra && gameState.characters.lyra.magic_uses_remaining > 0) {
+          gameState.characters.lyra.magic_uses_remaining--;
+        }
+      } else if (gameState.characters[who] && ability in gameState.characters[who]) {
+        gameState.characters[who][ability] = true;
+      }
     }
 
     responseWorldState = {

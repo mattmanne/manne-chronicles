@@ -10,6 +10,7 @@ let lastTimestamp    = 0;
 let cachedGameState  = null;
 let gameSecret       = null;
 let continueInitDone = false;
+let manlandiaTone    = localStorage.getItem("manlandia_tone") || "adventure";
 
 const STATS = {
   fen:  { force: 0, acuity: 1, agility: 1, will: 3, presence: 0 },
@@ -226,6 +227,7 @@ async function continueInit() {
   setupExport();
   setupWizard();
   setupHelp();
+  setupToneSelector();
   await loadExistingLog();
   startPolling();
   triggerOpeningIfNeeded();
@@ -372,18 +374,38 @@ function setupAbilityToggles() {
 
 /* ── New Session ── */
 function setupNewSession() {
-  document.getElementById("new-session-btn").addEventListener("click", async () => {
-    const summary = prompt("Briefly summarize what happened this session (saved to campaign history):");
-    if (!summary) return;
-    const res = await authPost("/api/state", { action: "new_session", payload: { summary } });
-    const data = await res.json();
-    if (data.ok) {
-      logEntries.innerHTML = "";
-      lastTimestamp = 0;
-      sessionLabel.textContent = `Session ${data.session}`;
-      switchTab("story");
-      alert(`Session ${data.session - 1} archived! Starting Session ${data.session}.`);
-      triggerOpeningIfNeeded();
+  document.getElementById("new-session-btn").addEventListener("click", () => {
+    document.getElementById("end-session-input").value = "";
+    document.getElementById("end-session-overlay").classList.add("active");
+    setTimeout(() => document.getElementById("end-session-input").focus(), 100);
+  });
+
+  document.getElementById("end-session-cancel").addEventListener("click", () => {
+    document.getElementById("end-session-overlay").classList.remove("active");
+  });
+
+  document.getElementById("end-session-confirm").addEventListener("click", async () => {
+    const summary = document.getElementById("end-session-input").value.trim();
+    if (!summary) { document.getElementById("end-session-input").focus(); return; }
+    const confirmBtn = document.getElementById("end-session-confirm");
+    confirmBtn.disabled = true;
+    confirmBtn.textContent = "Saving…";
+    try {
+      const res = await authPost("/api/state", { action: "new_session", payload: { summary } });
+      const data = await res.json();
+      if (data.ok) {
+        document.getElementById("end-session-overlay").classList.remove("active");
+        logEntries.innerHTML = "";
+        lastTimestamp = 0;
+        sessionLabel.textContent = `Session ${data.session}`;
+        switchTab("story");
+        triggerOpeningIfNeeded();
+      }
+    } catch(_) {
+      confirmBtn.textContent = "Archive Session →";
+    } finally {
+      confirmBtn.disabled = false;
+      if (confirmBtn.textContent === "Saving…") confirmBtn.textContent = "Archive Session →";
     }
   });
 }
@@ -457,7 +479,7 @@ async function submitAction() {
 async function sendToGM(player, message, type) {
   setLoading(true);
   try {
-    const res = await authPost("/api/gm", { player, message, type });
+    const res = await authPost("/api/gm", { player, message, type, ...(currentWorld === "manlandia" && { tone: manlandiaTone }) });
     const data = await res.json();
     if (data.error) { appendSystemMessage("Error: " + data.error); return; }
 
@@ -694,7 +716,6 @@ function setupWizard() {
   });
 
   document.getElementById("wiz-finish-btn").addEventListener("click", () => wizFinish());
-  document.getElementById("wiz-skip-photo").addEventListener("click", () => { wizardData.photo = null; wizFinish(); });
   document.getElementById("wiz-close-btn").addEventListener("click", closeWizard);
 
   // Delegated: create/edit hero buttons and manlandia ability buttons
@@ -718,11 +739,14 @@ function openWizard(player) {
   document.getElementById("wiz-name").value = "";
   document.querySelectorAll("[data-archetype], [data-ability]").forEach(b => b.classList.remove("selected"));
   document.getElementById("wiz-photo-preview").innerHTML = "";
-  // Pre-fill name if character already has one
+  document.getElementById("wiz-backstory").value = "";
   const existing = cachedGameState?.characters?.[player];
   if (existing?.name && !existing.name.startsWith("Hero ")) {
     document.getElementById("wiz-name").value = existing.name;
     wizardData.name = existing.name;
+  }
+  if (existing?.backstory) {
+    document.getElementById("wiz-backstory").value = existing.backstory;
   }
   wizSetStep(1);
   document.getElementById("character-wizard").classList.add("active");
@@ -752,6 +776,7 @@ async function wizFinish() {
   }
 
   // Save character data to server
+  const backstory = (document.getElementById("wiz-backstory")?.value || "").trim();
   let chars;
   try {
     const res = await authPost("/api/characters", {
@@ -759,6 +784,7 @@ async function wizFinish() {
       name:       wizardData.name,
       archetype:  wizardData.archetype,
       ability_id: wizardData.ability_id,
+      backstory,
     });
     const data = await res.json();
     if (!data.ok) { alert("Oops — try again!"); return; }
@@ -804,6 +830,22 @@ function resizeForStorage(file, callback) {
     img.src = e.target.result;
   };
   reader.readAsDataURL(file);
+}
+
+/* ── Tone Selector ── */
+function setupToneSelector() {
+  const btns = document.querySelectorAll(".tone-btn");
+  function syncToneUI() {
+    btns.forEach(b => b.classList.toggle("active", b.dataset.tone === manlandiaTone));
+  }
+  syncToneUI();
+  btns.forEach(btn => {
+    btn.addEventListener("click", () => {
+      manlandiaTone = btn.dataset.tone;
+      localStorage.setItem("manlandia_tone", manlandiaTone);
+      syncToneUI();
+    });
+  });
 }
 
 /* ── Help ── */
@@ -956,6 +998,18 @@ function renderManlandiaCard(n, char) {
       actionsEl.innerHTML = `<button class="create-hero-btn" data-player="${p}">✨ Create My Hero</button>`;
     }
   }
+
+  // Backstory
+  const backstoryEl = document.getElementById(`p${n}-backstory`);
+  if (backstoryEl) {
+    if (char?.backstory) {
+      backstoryEl.textContent = char.backstory;
+      backstoryEl.classList.remove("hidden");
+    } else {
+      backstoryEl.textContent = "";
+      backstoryEl.classList.add("hidden");
+    }
+  }
 }
 
 function stripGMTags(content) {
@@ -969,7 +1023,8 @@ function stripGMTags(content) {
     .replace(/\[LOCATION: [^\]]+\]/g, "")
     .replace(/\[SCAR: [^\]]+\]/g, "")
     .replace(/\[(LYRA|FEN): [A-Za-z]+ → [A-Za-z]+\]/g, "")
-    .replace(/\[ABILITY \d: used\]/gi, "").trim();
+    .replace(/\[ABILITY \d: used\]/gi, "")
+    .replace(/\[ABILITY (FEN|LYRA): [a-z_]+\]/gi, "").trim();
 }
 
 function formatCampaignExport(state) {
@@ -1353,6 +1408,7 @@ function getCleanText(text) {
     .replace(/\[SCAR: [^\]]+\]/g, "")
     .replace(/\[(LYRA|FEN): [A-Za-z]+ → [A-Za-z]+\]/g, "")
     .replace(/\[ABILITY \d: used\]/gi, "")
+    .replace(/\[ABILITY (FEN|LYRA): [a-z_]+\]/gi, "")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
 }
