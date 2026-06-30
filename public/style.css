@@ -926,6 +926,88 @@ body.world-manlandia #villain-badge   { display: inline-block; }
   color: var(--parch-dim);
 }
 
+/* ── Help Overlay ── */
+#help-overlay {
+  display: none;
+  position: fixed; inset: 0;
+  background: rgba(9,9,18,0.85);
+  align-items: flex-end;
+  justify-content: center;
+  z-index: 1000;
+}
+#help-overlay.active { display: flex; }
+
+.help-box {
+  display: flex; flex-direction: column;
+  width: 100%; max-width: 680px;
+  height: 82dvh;
+  background: var(--surface);
+  border-top: 1px solid var(--gold-dim);
+  border-radius: 18px 18px 0 0;
+}
+
+.help-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 16px 12px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.help-title {
+  font-family: var(--font-serif); font-size: 0.95rem;
+  letter-spacing: 0.1em; color: var(--gold);
+}
+
+.help-messages {
+  flex: 1; overflow-y: auto; padding: 16px;
+  display: flex; flex-direction: column; gap: 12px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.help-msg-q {
+  align-self: flex-end;
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 14px 14px 4px 14px;
+  padding: 10px 14px; max-width: 85%;
+  font-size: 0.87rem; color: var(--parchment); line-height: 1.4;
+}
+
+.help-msg-a {
+  align-self: flex-start;
+  background: rgba(201,168,76,0.07); border: 1px solid var(--gold-dim);
+  border-radius: 14px 14px 14px 4px;
+  padding: 11px 14px; max-width: 92%;
+  font-size: 0.87rem; color: var(--parchment); line-height: 1.55;
+}
+
+.help-msg-thinking {
+  align-self: flex-start; color: var(--parch-dim);
+  font-size: 0.8rem; font-style: italic; padding: 2px 4px;
+}
+
+.help-input-row {
+  display: flex; gap: 8px;
+  padding: 12px 14px 14px;
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.help-input {
+  flex: 1; padding: 11px 14px; font-size: 0.9rem;
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 8px; color: var(--parchment); outline: none;
+}
+.help-input:focus { border-color: var(--gold-dim); }
+
+.help-send-btn {
+  padding: 11px 18px; font-size: 0.87rem; font-weight: 600;
+  background: var(--gold); color: var(--bg);
+  border: none; border-radius: 8px; cursor: pointer;
+  white-space: nowrap; transition: background 0.2s;
+}
+.help-send-btn:hover { background: #d9b85c; }
+.help-send-btn:disabled { opacity: 0.5; cursor: default; }
+
 /* ── Curse fill color ── */
 .awareness-fill.curse-fill { background: #6a6a6a; }
 .awareness-fill.curse-fill.warning { background: #888; }

@@ -225,6 +225,7 @@ async function continueInit() {
   setupAutoRead();
   setupExport();
   setupWizard();
+  setupHelp();
   await loadExistingLog();
   startPolling();
   triggerOpeningIfNeeded();
@@ -803,6 +804,66 @@ function resizeForStorage(file, callback) {
     img.src = e.target.result;
   };
   reader.readAsDataURL(file);
+}
+
+/* ── Help ── */
+function setupHelp() {
+  document.getElementById("help-btn").addEventListener("click", () => {
+    document.getElementById("help-overlay").classList.add("active");
+    setTimeout(() => document.getElementById("help-input").focus(), 100);
+  });
+  document.getElementById("help-close-btn").addEventListener("click", () => {
+    document.getElementById("help-overlay").classList.remove("active");
+  });
+  document.getElementById("help-send-btn").addEventListener("click", sendHelpQuestion);
+  document.getElementById("help-input").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") sendHelpQuestion();
+  });
+}
+
+async function sendHelpQuestion() {
+  const input   = document.getElementById("help-input");
+  const sendBtn = document.getElementById("help-send-btn");
+  const messages = document.getElementById("help-messages");
+  const question = input.value.trim();
+  if (!question || sendBtn.disabled) return;
+
+  const qEl = document.createElement("div");
+  qEl.className = "help-msg-q";
+  qEl.textContent = question;
+  messages.appendChild(qEl);
+
+  const thinking = document.createElement("div");
+  thinking.className = "help-msg-thinking";
+  thinking.textContent = "Thinking…";
+  messages.appendChild(thinking);
+  messages.scrollTop = messages.scrollHeight;
+
+  input.value = "";
+  sendBtn.disabled = true;
+
+  try {
+    const res = await fetch(withWorld("/api/help"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question }),
+    });
+    const data = await res.json();
+    thinking.remove();
+    const aEl = document.createElement("div");
+    aEl.className = "help-msg-a";
+    aEl.textContent = data.answer || data.error || "Sorry, I couldn't get an answer. Try again!";
+    messages.appendChild(aEl);
+  } catch (_) {
+    thinking.remove();
+    const errEl = document.createElement("div");
+    errEl.className = "help-msg-a";
+    errEl.textContent = "Hmm, something went wrong. Check your connection and try again!";
+    messages.appendChild(errEl);
+  }
+
+  sendBtn.disabled = false;
+  messages.scrollTop = messages.scrollHeight;
 }
 
 function syncPlayerStats(characters) {

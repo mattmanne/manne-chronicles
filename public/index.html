@@ -95,6 +95,23 @@
     </div>
   </div>
 
+  <!-- Help Overlay -->
+  <div id="help-overlay">
+    <div class="help-box">
+      <div class="help-header">
+        <span class="help-title">❓ Ask for Help</span>
+        <button id="help-close-btn" class="icon-btn">✕</button>
+      </div>
+      <div id="help-messages" class="help-messages">
+        <div class="help-msg-a">Hi! Ask me anything about the game — rules, your characters, what the dice mean, or what's happening in the story. I'm here to help! 🌟</div>
+      </div>
+      <div class="help-input-row">
+        <input type="text" id="help-input" class="help-input" placeholder="Ask anything about the game…" maxlength="300" autocomplete="off" autocorrect="off" />
+        <button id="help-send-btn" class="help-send-btn">Ask</button>
+      </div>
+    </div>
+  </div>
+
   <div id="app">
 
     <!-- Header -->
@@ -104,6 +121,7 @@
         <span id="session-label">Session 1</span>
       </div>
       <div id="header-right">
+        <button id="help-btn" class="icon-btn" title="Ask for help">?</button>
         <button id="world-switch-btn" class="icon-btn" title="Switch world">⇌</button>
         <button id="auto-read-btn" class="icon-btn" title="Auto-read new narrations">🔊</button>
         <span id="awareness-badge" class="resonance-only" title="Conclave Awareness">⚡ 0</span>
