@@ -1755,6 +1755,9 @@ function setupUnlockOverlay() {
         document.body.classList.add("adult-unlocked");
         overlayEl.classList.remove("active");
         renderCampaignList();
+      } else if (res.status === 500) {
+        errorEl.textContent = "Not configured — ask Matt to set ADULT_PIN in Vercel";
+        errorEl.classList.remove("hidden");
       } else {
         errorEl.textContent = "Wrong PIN — try again";
         errorEl.classList.remove("hidden");
