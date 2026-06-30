@@ -1352,6 +1352,7 @@ function getCleanText(text) {
     .replace(/\[LOCATION: [^\]]+\]/g, "")
     .replace(/\[SCAR: [^\]]+\]/g, "")
     .replace(/\[(LYRA|FEN): [A-Za-z]+ → [A-Za-z]+\]/g, "")
+    .replace(/\[ABILITY \d: used\]/gi, "")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
 }

@@ -50,6 +50,8 @@ A chat sheet opens where you can ask anything in plain language:
 
 The helper knows the full rules and your current game state. Works for both worlds. Safe for kids to use on their own.
 
+The help chat also supports voice — tap the **🎤** button in the help overlay to ask your question aloud instead of typing.
+
 ### Voice input
 
 - Tap the mic once to start, tap again to stop (or it stops automatically after a pause)
