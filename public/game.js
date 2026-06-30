@@ -161,12 +161,16 @@ function applyWorldUI() {
   document.body.classList.remove("world-resonance", "world-manlandia");
   document.body.classList.add(isML ? "world-manlandia" : "world-resonance");
 
-  // Reset all player cards/buttons to visible; updateCharacterUI will hide extras once state loads
+  // Reset player cards/buttons, then immediately hide beyond playerCount for custom campaigns
+  const immediatePC = currentWorld.startsWith("c_")
+    ? (campaignList.find(c => c.id === currentWorld)?.playerCount || 4)
+    : 4;
   [1,2,3,4].forEach(n => {
+    const visible = n <= immediatePC;
     const card = document.getElementById(`p${n}-card`);
-    if (card) card.style.display = "";
+    if (card) card.style.display = visible ? "" : "none";
     const btn = document.getElementById(`btn-p${n}`);
-    if (btn) { btn.style.display = ""; btn.textContent = `HERO ${n}`; }
+    if (btn) { btn.style.display = visible ? "" : "none"; btn.textContent = `HERO ${n}`; }
     const nameEl = document.getElementById(`p${n}-name`);
     if (nameEl) nameEl.textContent = `HERO ${n}`;
   });
@@ -258,8 +262,17 @@ async function loadCampaigns() {
   } catch(_) { campaignList = []; }
 }
 
-async function deleteCampaign(id) {
-  if (!confirm("Delete this world? This can't be undone.")) return;
+let pendingDeleteId = null;
+
+function deleteCampaign(id) {
+  const camp = campaignList.find(c => c.id === id);
+  const nameEl = document.getElementById("delete-confirm-name");
+  if (nameEl) nameEl.textContent = camp?.name || id;
+  pendingDeleteId = id;
+  document.getElementById("delete-confirm-overlay").classList.add("active");
+}
+
+async function doDeleteCampaign(id) {
   try {
     await authPost("/api/campaigns", { action: "delete", payload: { id } });
     campaignList = campaignList.filter(c => c.id !== id);
@@ -269,6 +282,19 @@ async function deleteCampaign(id) {
       localStorage.setItem("currentWorld", currentWorld);
     }
   } catch(_) {}
+}
+
+function setupDeleteConfirm() {
+  document.getElementById("delete-confirm-cancel")?.addEventListener("click", () => {
+    document.getElementById("delete-confirm-overlay").classList.remove("active");
+    pendingDeleteId = null;
+  });
+  document.getElementById("delete-confirm-ok")?.addEventListener("click", async () => {
+    const id = pendingDeleteId;
+    pendingDeleteId = null;
+    document.getElementById("delete-confirm-overlay").classList.remove("active");
+    if (id) await doDeleteCampaign(id);
+  });
 }
 
 function setupWorldCreator() {
@@ -348,6 +374,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   setupWorldSelector();
   setupWorldCreator();
   setupUnlockOverlay();
+  setupDeleteConfirm();
   const worldReady = initWorld();
   if (worldReady) {
     applyWorldUI();
