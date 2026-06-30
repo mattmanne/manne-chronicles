@@ -88,9 +88,9 @@ When the GM calls for a roll, the dice appear and roll automatically.
 
 ### Using abilities
 
-Go to the **⚔ Characters** tab to manage abilities:
-- Tap an ability to mark it **Used** for the session (it strikes through and grays out)
-- Lyra's **◈ Magic** counter: tap to spend one Resonance charge
+Just use your ability naturally in the story — describe it in your action and the GM will mark it as used automatically. The ability button on the **⚔ Characters** tab will cross out and grey out by itself.
+
+- Lyra's **◈ Magic** counter: tap to spend one Resonance charge manually if needed
 - Abilities reset automatically when you start a new session
 
 ### Recovering from harm
@@ -107,11 +107,23 @@ When you're on another tab (Map, Archive, Characters) and your partner takes an 
 
 Both of you open the same URL on your own phones. You take turns — each player's actions and the GM's responses are visible to both. The app syncs every 8 seconds, so there's a brief delay when playing from separate locations.
 
+### Story mood (Manlandia only)
+
+On the **⚔ Characters** tab, the **Story Mood** buttons let you choose how the GM narrates:
+
+| Mood | Feel |
+|------|------|
+| 🏰 Epic | Grand and dramatic — high stakes, vivid descriptions, legendary heroes |
+| ⚔️ Adventure | Balanced — the default tone |
+| 🎪 Silly | Playful and funny — goofy creatures, absurd moments, warm comedy |
+
+Your choice saves automatically and applies to every story turn until you change it.
+
 ### Ending a session
 
 Go to the **⚔ Characters** tab → **"End Session & Save"**
 
-Write a one-sentence summary when prompted. This archives the full session log permanently — viewable later in the **≡ Archive** tab.
+A prompt appears asking for a one-sentence summary of what happened. This archives the full session log permanently — viewable later in the **≡ Archive** tab.
 
 ---
 
@@ -135,7 +147,7 @@ Four characters play together — one per player device.
 1. **Name** — type your hero's name
 2. **Best at** — choose your archetype (Fighting, Magic, Sneaking, Leading, or Talking)
 3. **Special power** — pick your once-per-session ability
-4. **Photo** — optional picture that shows on your device only
+4. **Picture & story** — optional photo (saved to your device only) and a short sentence about your hero's backstory. The GM will use the backstory to personalise the adventure.
 
 Each archetype gives your hero different strengths that affect dice rolls. Once created, heroes can be edited at any time from the Characters tab.
 
