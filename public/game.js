@@ -1669,7 +1669,9 @@ function updateCharacterUI(data) {
   if (isManlandiaLike()) {
     syncPlayerStats(chars);
     const playerCount = currentWorld.startsWith("c_")
-      ? (cachedGameState?.worldConfig?.playerCount || 4)
+      ? (cachedGameState?.worldConfig?.playerCount
+         || campaignList.find(c => c.id === currentWorld)?.playerCount
+         || 4)
       : 4;
     [1,2,3,4].forEach(n => {
       const visible = n <= playerCount;
