@@ -1556,20 +1556,7 @@ function updateStoneTracker(stonesFound) {
 
 /* ── DOM Builders ── */
 function getCleanText(text) {
-  return (text || "")
-    .replace(/\[CONCLAVE AWARENESS: \d+ → \d+\]/g, "")
-    .replace(/\[DISSONANCE: \d+ → \d+\]/g, "")
-    .replace(/\[VILLAIN AWARENESS: \d+ → \d+\]/g, "")
-    .replace(/\[CURSE: \d+ → \d+\]/g, "")
-    .replace(/\[STONE FOUND: [^\]]+\]/g, "")
-    .replace(/\[CHARACTER \d: [A-Za-z]+ → [A-Za-z]+\]/g, "")
-    .replace(/\[LOCATION: [^\]]+\]/g, "")
-    .replace(/\[SCAR: [^\]]+\]/g, "")
-    .replace(/\[(LYRA|FEN): [A-Za-z]+ → [A-Za-z]+\]/g, "")
-    .replace(/\[ABILITY \d: used\]/gi, "")
-    .replace(/\[ABILITY (FEN|LYRA): [a-z_]+\]/gi, "")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
+  return stripGMTags(text).replace(/\n{3,}/g, "\n\n");
 }
 
 function appendGMEntry(text, animate) {
