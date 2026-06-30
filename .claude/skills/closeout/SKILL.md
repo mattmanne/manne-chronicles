@@ -1,0 +1,120 @@
+---
+name: closeout
+description: End-of-session close-out for the Resonance/Manlandia DnD app. Runs live API tests, syntax-checks all JS, verifies git is clean, updates memory docs, and produces a session summary with next steps. Use after any coding session on this project.
+disable-model-invocation: false
+---
+
+You are closing out a coding session on the Resonance/Manlandia family RPG app at https://resonance-dnd.vercel.app.
+
+Work through all steps below in order. Do not skip steps. Report a clear pass/fail for every check.
+
+---
+
+## STEP 1 — Syntax Check All JS Files
+
+Run `node --check` on every JS file:
+
+```
+api/campaigns.js  api/characters.js  api/gm.js  api/help.js
+api/poll.js  api/state.js  api/unlock.js
+lib/gamestate-custom.js  lib/gamestate-manlandia.js  lib/gamestate.js
+lib/gemini.js  lib/prompt-custom.js  lib/prompt-manlandia.js
+lib/prompt.js  lib/redis.js  lib/worldconfig.js
+public/game.js
+```
+
+Report any failures immediately. If any fail, fix them before continuing.
+
+---
+
+## STEP 2 — Git Status
+
+Run `git status` and `git log --oneline -6`.
+
+- Everything must be committed and pushed (`nothing to commit, working tree clean`, `Your branch is up to date with 'origin/main'`).
+- If anything is uncommitted, commit and push it now with an appropriate message.
+
+---
+
+## STEP 3 — Live API Tests
+
+Base URL: `https://resonance-dnd.vercel.app`
+Game secret header: `X-Game-Secret: MannesAreTheBest`
+
+Run these checks in order:
+
+**Auth & Unlock**
+- POST `/api/unlock` with `{"pin":"wrong"}` → expect `{"ok":false}`
+- POST `/api/unlock` with `{"pin":"5414"}` → expect `{"ok":true}`
+- POST `/api/gm?world=manlandia` with no `X-Game-Secret` header → expect `{"error":"Unauthorized"}`
+- POST `/api/help?world=manlandia` with no secret → expect a valid `answer` field (help needs no auth)
+
+**State (GET)**
+- GET `/api/state?world=resonance` → expect `characters.fen` and `characters.lyra` exist
+- GET `/api/state?world=manlandia` → expect `characters.player1` exists, `worldState.villain_awareness` is a number
+- GET `/api/campaigns` → expect response with `campaigns` array
+
+**Poll**
+- GET `/api/poll?since=0&world=resonance` → expect `entries` array and `worldState` object
+- GET `/api/poll?since=0&world=manlandia` → expect `entries` array and `worldState` object
+
+**GM (live call — pick whichever world has entries)**
+- If manlandia has 0 entries: POST `/api/gm?world=manlandia` with `{"player":"player1","message":"[SESSION BEGINS]","type":"begin"}` → expect `response` string or `needsRoll: true`
+
+Report PASS or FAIL for each. Stop and investigate any FAIL before continuing.
+
+---
+
+## STEP 4 — Key Behaviour Checks
+
+These are logic checks using the existing state, not new calls:
+
+1. **Adult gate**: Confirm `worldConfig.adult === true` for any known adult campaign in the campaigns list.
+2. **Custom campaign playerCount**: If any custom campaigns exist, GET their state and confirm `worldConfig.playerCount` is set.
+3. **Character isolation**: Confirm kid campaigns (manlandia) have `characters.player1` through `player4`; resonance has `fen` and `lyra` only.
+4. **No cross-contamination**: Resonance state has no `villain_awareness`; Manlandia state has no `conclave_awareness`.
+
+---
+
+## STEP 5 — Memory Update
+
+Read the current memory files:
+- `memory/project_resonance.md`
+- `memory/project_resonance_v2.md`
+
+Update them to accurately reflect the current state of the app. Key things to keep current:
+- All completed features (never remove a completed feature from the list)
+- Active backlog (add anything new that came up this session)
+- Key files table (add any new files added this session)
+- Env vars in the tech stack section (add `ADULT_PIN` if not already there)
+
+Also scan for any memory that is now stale or wrong and update it.
+
+---
+
+## STEP 6 — Session Summary
+
+Write a concise close-out report covering:
+
+**What was built/fixed this session** (one line each, be specific)
+
+**Current app state** — what works end-to-end right now:
+- World selector and world switching
+- Which worlds are gated behind adult unlock
+- Character creation / wizard
+- GM narration loop
+- Any known limitations or rough edges
+
+**Vercel env vars required** — list all env vars the deployment needs to function
+
+**Next session pick-up** — top 3 things worth doing next, ranked by player impact. Be specific about what the work actually is, not just "improve X".
+
+**Any open risks or known issues** — things that could break or that need attention
+
+---
+
+## STEP 7 — Final Confirmation
+
+State clearly: "✅ Session closed. App is deployed, all tests pass, git is clean."
+
+Or if anything failed: list exactly what is broken and what needs to be done before the next session.
