@@ -27,8 +27,8 @@ module.exports = async function handler(req, res) {
   }
 
   const worldConfig = getWorldConfig(req.query.world);
-  if (worldConfig.id !== "manlandia") {
-    return res.status(400).json({ error: "Characters API is Manlandia only" });
+  if (worldConfig.id !== "manlandia" && worldConfig.type !== "custom") {
+    return res.status(400).json({ error: "Characters API requires Manlandia or a custom campaign" });
   }
 
   const { key } = worldConfig;

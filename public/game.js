@@ -11,6 +11,7 @@ let cachedGameState  = null;
 let gameSecret       = null;
 let continueInitDone = false;
 let manlandiaTone    = localStorage.getItem("manlandia_tone") || "adventure";
+let campaignList     = [];
 
 const STATS = {
   fen:  { force: 0, acuity: 1, agility: 1, will: 3, presence: 0 },
@@ -133,16 +134,21 @@ function initSecret() {
   return true;
 }
 
+/* ── Helpers ── */
+function isManlandiaLike() {
+  return currentWorld === "manlandia" || currentWorld.startsWith("c_");
+}
+
 /* ── World Selection ── */
 function initWorld() {
   const urlParam = new URLSearchParams(window.location.search).get("world");
-  if (urlParam === "resonance" || urlParam === "manlandia") {
+  if (urlParam && (urlParam === "resonance" || urlParam === "manlandia" || urlParam.startsWith("c_"))) {
     currentWorld = urlParam;
     localStorage.setItem("currentWorld", currentWorld);
     return true;
   }
   const saved = localStorage.getItem("currentWorld");
-  if (saved === "resonance" || saved === "manlandia") {
+  if (saved && (saved === "resonance" || saved === "manlandia" || saved.startsWith("c_"))) {
     currentWorld = saved;
     return true;
   }
@@ -150,12 +156,23 @@ function initWorld() {
 }
 
 function applyWorldUI() {
+  const isML = isManlandiaLike();
   document.body.classList.remove("world-resonance", "world-manlandia");
-  document.body.classList.add(`world-${currentWorld}`);
-  document.title = currentWorld === "manlandia" ? "Manlandia" : "Resonance";
-  document.getElementById("game-title").textContent = currentWorld === "manlandia" ? "MANLANDIA" : "RESONANCE";
+  document.body.classList.add(isML ? "world-manlandia" : "world-resonance");
+
+  let title;
+  if (currentWorld === "manlandia") title = "MANLANDIA";
+  else if (currentWorld.startsWith("c_")) {
+    const camp = campaignList.find(c => c.id === currentWorld);
+    title = (camp?.name || localStorage.getItem("currentWorldName") || "MY WORLD").toUpperCase();
+  } else {
+    title = "RESONANCE";
+  }
+  document.title = title.charAt(0) + title.slice(1).toLowerCase();
+  document.getElementById("game-title").textContent = title;
+
   document.querySelectorAll(".player-btn").forEach(b => b.classList.remove("active"));
-  if (currentWorld === "manlandia") {
+  if (isML) {
     currentPlayer = "player1";
     const btn = document.getElementById("btn-p1");
     if (btn) btn.classList.add("active");
@@ -166,10 +183,47 @@ function applyWorldUI() {
   }
 }
 
+function renderCampaignList() {
+  const container = document.getElementById("custom-campaigns-list");
+  if (!container) return;
+  if (!campaignList.length) { container.innerHTML = ""; return; }
+  container.innerHTML = campaignList.map(c => `
+    <div class="world-btn custom-campaign-card" data-world="${c.id}">
+      <div class="custom-campaign-info">
+        <span class="world-btn-name">${c.name.toUpperCase()}</span>
+        <span class="world-btn-sub">${c.playerCount} hero${c.playerCount > 1 ? "es" : ""} · ${c.subtitle || "Custom world"}</span>
+      </div>
+      <button class="campaign-delete-btn" data-id="${c.id}" title="Delete this world">🗑</button>
+    </div>
+  `).join("");
+}
+
 function setupWorldSelector() {
-  document.querySelectorAll(".world-btn").forEach(btn => {
-    btn.addEventListener("click", () => switchWorld(btn.dataset.world));
+  // Fixed world buttons
+  document.querySelectorAll(".world-btn[data-world]").forEach(btn => {
+    if (!btn.closest("#custom-campaigns-list")) {
+      btn.addEventListener("click", () => switchWorld(btn.dataset.world));
+    }
   });
+
+  // Delegated: custom campaigns + delete
+  document.getElementById("custom-campaigns-list").addEventListener("click", e => {
+    const delBtn = e.target.closest(".campaign-delete-btn");
+    if (delBtn) {
+      e.stopPropagation();
+      deleteCampaign(delBtn.dataset.id);
+      return;
+    }
+    const card = e.target.closest(".custom-campaign-card[data-world]");
+    if (card) switchWorld(card.dataset.world);
+  });
+
+  // Create new world button
+  document.getElementById("create-world-btn").addEventListener("click", () => {
+    document.getElementById("world-creator").classList.add("active");
+  });
+
+  // World switch header button
   const switchBtn = document.getElementById("world-switch-btn");
   if (switchBtn) {
     switchBtn.addEventListener("click", () => {
@@ -182,9 +236,80 @@ function setupWorldSelector() {
   }
 }
 
+async function loadCampaigns() {
+  try {
+    const res = await fetch("/api/campaigns");
+    const data = await res.json();
+    campaignList = data.campaigns || [];
+    renderCampaignList();
+  } catch(_) { campaignList = []; }
+}
+
+async function deleteCampaign(id) {
+  if (!confirm("Delete this world? This can't be undone.")) return;
+  try {
+    await authPost("/api/campaigns", { action: "delete", payload: { id } });
+    campaignList = campaignList.filter(c => c.id !== id);
+    renderCampaignList();
+    if (currentWorld === id) {
+      currentWorld = "resonance";
+      localStorage.setItem("currentWorld", currentWorld);
+    }
+  } catch(_) {}
+}
+
+function setupWorldCreator() {
+  let selectedCount = 2;
+
+  // Player count buttons
+  document.querySelectorAll(".wc-count-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      selectedCount = parseInt(btn.dataset.count);
+      document.querySelectorAll(".wc-count-btn").forEach(b => b.classList.toggle("active", b === btn));
+    });
+  });
+
+  document.getElementById("wc-close-btn").addEventListener("click", closeWorldCreator);
+  document.getElementById("wc-cancel-btn").addEventListener("click", closeWorldCreator);
+
+  document.getElementById("wc-create-btn").addEventListener("click", async () => {
+    const name  = document.getElementById("wc-name").value.trim();
+    const theme = document.getElementById("wc-theme").value.trim();
+    if (!name)  { document.getElementById("wc-name").focus();  return; }
+    if (!theme) { document.getElementById("wc-theme").focus(); return; }
+
+    const btn = document.getElementById("wc-create-btn");
+    btn.disabled = true;
+    btn.textContent = "Creating…";
+    try {
+      const res  = await authPost("/api/campaigns", { action: "create", payload: { name, theme, playerCount: selectedCount } });
+      const data = await res.json();
+      if (!data.ok) { btn.textContent = "Create World →"; btn.disabled = false; return; }
+      campaignList.push(data.campaign);
+      renderCampaignList();
+      closeWorldCreator();
+      switchWorld(data.campaign.id);
+    } catch(_) {
+      btn.textContent = "Create World →";
+      btn.disabled = false;
+    }
+  });
+}
+
+function closeWorldCreator() {
+  document.getElementById("world-creator").classList.remove("active");
+  document.getElementById("wc-name").value = "";
+  document.getElementById("wc-theme").value = "";
+  document.querySelectorAll(".wc-count-btn").forEach(b => b.classList.toggle("active", b.dataset.count === "2"));
+}
+
 async function switchWorld(worldId) {
   currentWorld = worldId;
   localStorage.setItem("currentWorld", currentWorld);
+  if (currentWorld.startsWith("c_")) {
+    const camp = campaignList.find(c => c.id === currentWorld);
+    if (camp) localStorage.setItem("currentWorldName", camp.name);
+  }
   document.getElementById("world-selector").classList.remove("active");
   applyWorldUI();
   if (!continueInitDone) {
@@ -204,7 +329,9 @@ async function switchWorld(worldId) {
 /* ── Init ── */
 document.addEventListener("DOMContentLoaded", async () => {
   if (!initSecret()) return;
+  await loadCampaigns();
   setupWorldSelector();
+  setupWorldCreator();
   const worldReady = initWorld();
   if (worldReady) {
     applyWorldUI();
@@ -479,7 +606,7 @@ async function submitAction() {
 async function sendToGM(player, message, type) {
   setLoading(true);
   try {
-    const res = await authPost("/api/gm", { player, message, type, ...(currentWorld === "manlandia" && { tone: manlandiaTone }) });
+    const res = await authPost("/api/gm", { player, message, type, ...(isManlandiaLike() && { tone: manlandiaTone }) });
     const data = await res.json();
     if (data.error) { appendSystemMessage("Error: " + data.error); return; }
 
@@ -647,7 +774,7 @@ function setupExport() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = currentWorld === "manlandia" ? "manlandia-campaign.txt" : "resonance-campaign.txt";
+      a.download = isManlandiaLike() ? `${currentWorld}-campaign.txt` : "resonance-campaign.txt";
       a.click();
       URL.revokeObjectURL(url);
     } catch(_) { alert("Export failed — try again."); }
@@ -1038,7 +1165,7 @@ function formatCampaignExport(state) {
 
   const sep  = "═".repeat(44);
   const dash = "─".repeat(44);
-  const title = currentWorld === "manlandia" ? "MANLANDIA — A FAMILY ADVENTURE" : "RESONANCE — A LEGACY CAMPAIGN";
+  const title = currentWorld === "resonance" ? "RESONANCE — A LEGACY CAMPAIGN" : (document.getElementById("game-title")?.textContent || currentWorld).toUpperCase();
   const lines = [title, sep, ""];
 
   for (const item of all) {
@@ -1115,7 +1242,37 @@ function renderArchive(state) {
 /* ── Map ── */
 function renderMap(state) {
   if (currentWorld === "manlandia") renderManlandiaMap(state);
+  else if (currentWorld.startsWith("c_")) renderCustomMap(state);
   else renderResonanceMap(state);
+}
+
+function renderCustomMap(state) {
+  const ws = state?.worldState || {};
+  const camp = campaignList.find(c => c.id === currentWorld) || {};
+  const mapEl = document.getElementById("map-container-resonance");
+  const manEl = document.getElementById("map-container-manlandia");
+  if (manEl) manEl.style.display = "none";
+  if (!mapEl) return;
+  mapEl.style.display = "";
+  mapEl.innerHTML = `
+    <div class="custom-map-panel">
+      <div class="custom-map-name">${camp.name || "Your World"}</div>
+      <div class="custom-map-location">📍 ${ws.location || "The Beginning"}</div>
+      <div class="custom-map-meters">
+        <div class="custom-map-meter">
+          <span class="custom-map-meter-label">👁 Danger</span>
+          <div class="custom-map-bar"><div class="custom-map-bar-fill danger-fill" style="width:${(ws.villain_awareness||0)*10}%"></div></div>
+          <span class="custom-map-meter-val">${ws.villain_awareness||0}/10</span>
+        </div>
+        <div class="custom-map-meter">
+          <span class="custom-map-meter-label">🌫 Peril</span>
+          <div class="custom-map-bar"><div class="custom-map-bar-fill peril-fill" style="width:${(ws.curse_level||0)*10}%"></div></div>
+          <span class="custom-map-meter-val">${ws.curse_level||0}/10</span>
+        </div>
+      </div>
+      ${ws.location_scars?.length ? `<div class="custom-map-scars">${ws.location_scars.map(s => `<div class="map-scar-entry">✕ <strong>${s.id}</strong> — ${s.label}</div>`).join("")}</div>` : ""}
+    </div>
+  `;
 }
 
 function renderResonanceMap(state) {
@@ -1465,13 +1622,15 @@ function appendSystemMessage(msg) {
 function extractStateChanges(text) {
   const changes = [];
 
-  if (currentWorld === "manlandia") {
+  if (isManlandiaLike()) {
     const villain = text.match(/\[VILLAIN AWARENESS: (\d+) → (\d+)\]/);
     if (villain) changes.push({ text: `👁 Villain Awareness: ${villain[1]} → ${villain[2]}`, positive: false });
     const curse = text.match(/\[CURSE: (\d+) → (\d+)\]/);
-    if (curse) changes.push({ text: `🌫 Greying Curse: ${curse[1]} → ${curse[2]}`, positive: false });
-    for (const m of [...text.matchAll(/\[STONE FOUND: ([^\]]+)\]/g)]) {
-      changes.push({ text: `✦ Stone Found: ${m[1].trim()}`, positive: true });
+    if (curse) changes.push({ text: `🌫 World Peril: ${curse[1]} → ${curse[2]}`, positive: false });
+    if (currentWorld === "manlandia") {
+      for (const m of [...text.matchAll(/\[STONE FOUND: ([^\]]+)\]/g)]) {
+        changes.push({ text: `✦ Stone Found: ${m[1].trim()}`, positive: true });
+      }
     }
     for (const m of [...text.matchAll(/\[CHARACTER (\d): ([A-Za-z]+) → ([A-Za-z]+)\]/g)]) {
       const worsened = HARM_LEVELS.indexOf(m[3]) > HARM_LEVELS.indexOf(m[2]);
@@ -1500,7 +1659,7 @@ function updateCharacterUI(data) {
   const ws    = data.worldState  || data.gameState?.worldState;
   if (!chars) return;
 
-  if (currentWorld === "manlandia") {
+  if (isManlandiaLike()) {
     syncPlayerStats(chars);
     [1,2,3,4].forEach(n => {
       const p = `player${n}`;

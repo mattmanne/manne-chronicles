@@ -26,6 +26,15 @@ module.exports = async function handler(req, res) {
       visited_locations: state.worldState.visited_locations || [],
       location_scars: state.worldState.location_scars || [],
     };
+  } else if (worldConfig.type === "custom") {
+    worldStatePayload = {
+      villain_awareness: state.worldState.villain_awareness,
+      curse_level: state.worldState.curse_level,
+      location: state.worldState.location,
+      session: state.session,
+      visited_locations: state.worldState.visited_locations || [],
+      location_scars: state.worldState.location_scars || [],
+    };
   } else {
     worldStatePayload = {
       conclave_awareness: state.worldState.conclave_awareness,

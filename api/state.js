@@ -26,7 +26,15 @@ module.exports = async function handler(req, res) {
     const { action, payload } = req.body;
 
     if (action === "reset") {
-      await setState(key, getInitialState());
+      let fresh;
+      if (worldConfig.type === "custom") {
+        const cur = await getState(key);
+        const { getInitialStateCustom } = require('../lib/gamestate-custom');
+        fresh = getInitialStateCustom(cur?.worldConfig || {});
+      } else {
+        fresh = getInitialState();
+      }
+      await setState(key, fresh);
       return res.json({ ok: true });
     }
 
@@ -84,7 +92,7 @@ module.exports = async function handler(req, res) {
         current.characters.fen.lucky_break_used = false;
       }
 
-      if (worldConfig.id === "manlandia") {
+      if (worldConfig.id === "manlandia" || worldConfig.type === "custom") {
         ["player1","player2","player3","player4"].forEach(p => {
           if (current.characters[p]) current.characters[p].ability_used = false;
         });

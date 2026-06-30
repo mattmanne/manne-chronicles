@@ -622,6 +622,7 @@ html, body {
   align-items: stretch; gap: 14px;
   padding: 40px 28px;
   max-width: 380px; width: 100%;
+  max-height: 90vh; overflow-y: auto;
 }
 
 .world-select-title {
@@ -668,6 +669,75 @@ html, body {
   text-align: center;
   margin-top: 4px;
 }
+
+.world-btn-new { border-style: dashed; border-color: var(--gold-dim); }
+.world-btn-new .world-btn-name { color: var(--parch-dim); font-size: 0.95rem; }
+
+.custom-campaign-card { flex-direction: row; align-items: center; gap: 10px; }
+.custom-campaign-info { flex: 1; display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.custom-campaign-info .world-btn-sub { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.campaign-delete-btn { background: none; border: none; color: var(--parch-dim); opacity: 0.4; cursor: pointer; font-size: 1rem; padding: 4px 6px; flex-shrink: 0; }
+.campaign-delete-btn:hover { opacity: 1; color: #c0392b; }
+
+/* ── World Creator Overlay ── */
+#world-creator {
+  display: none; position: fixed; inset: 0;
+  background: rgba(10,8,6,0.88);
+  align-items: center; justify-content: center; z-index: 2000;
+  padding: 16px;
+}
+#world-creator.active { display: flex; }
+
+.world-creator-box {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 14px; width: 100%; max-width: 440px;
+  max-height: 90vh; display: flex; flex-direction: column; overflow: hidden;
+}
+
+.world-creator-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 18px 20px 14px; border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.world-creator-title { font-family: var(--font-serif); color: var(--gold); font-size: 1rem; letter-spacing: 0.1em; }
+.wc-close-btn { background: none; border: none; color: var(--parch-dim); font-size: 1.1rem; cursor: pointer; padding: 4px 8px; }
+
+.world-creator-body { padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 20px; }
+
+.wc-field { display: flex; flex-direction: column; gap: 6px; }
+.wc-label { font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--parch-dim); }
+.wc-hint { font-size: 0.75rem; color: var(--parch-dim); opacity: 0.7; line-height: 1.4; margin: 0; }
+.wc-input { width: 100%; padding: 11px 14px; font-size: 0.9rem; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; color: var(--parch); font-family: var(--font-sans); box-sizing: border-box; }
+.wc-input:focus { border-color: var(--gold-dim); outline: none; }
+.wc-textarea { width: 100%; padding: 11px 14px; font-size: 0.85rem; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; color: var(--parch); font-family: var(--font-sans); resize: none; line-height: 1.5; box-sizing: border-box; }
+.wc-textarea:focus { border-color: var(--gold-dim); outline: none; }
+
+.wc-count-btns { display: flex; gap: 10px; }
+.wc-count-btn { flex: 1; padding: 12px; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; color: var(--parch-dim); font-size: 1.1rem; cursor: pointer; transition: all 0.15s; }
+.wc-count-btn.active { border-color: var(--gold); color: var(--gold); background: rgba(201,168,76,0.1); }
+
+.world-creator-footer {
+  display: flex; gap: 10px; padding: 16px 20px;
+  border-top: 1px solid var(--border); flex-shrink: 0;
+}
+.wc-cancel-btn { padding: 12px 20px; background: none; border: 1px solid var(--border); border-radius: 8px; color: var(--parch-dim); cursor: pointer; flex: 1; }
+.wc-create-btn { padding: 12px 20px; background: var(--gold); border: none; border-radius: 8px; color: #1a150a; font-weight: 700; cursor: pointer; flex: 2; font-size: 0.9rem; }
+.wc-create-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+/* ── Custom Campaign Map ── */
+.custom-map-panel { padding: 24px; display: flex; flex-direction: column; gap: 16px; }
+.custom-map-name { font-family: var(--font-serif); color: var(--gold); font-size: 1.2rem; letter-spacing: 0.15em; text-align: center; }
+.custom-map-location { font-size: 0.85rem; color: var(--parch); text-align: center; }
+.custom-map-meters { display: flex; flex-direction: column; gap: 10px; }
+.custom-map-meter { display: flex; align-items: center; gap: 8px; }
+.custom-map-meter-label { font-size: 0.72rem; color: var(--parch-dim); width: 60px; flex-shrink: 0; }
+.custom-map-bar { flex: 1; height: 8px; background: var(--surface2); border-radius: 4px; overflow: hidden; }
+.custom-map-bar-fill { height: 100%; border-radius: 4px; transition: width 0.5s; }
+.danger-fill { background: #c0392b; }
+.peril-fill  { background: #7f8c8d; }
+.custom-map-meter-val { font-size: 0.7rem; color: var(--parch-dim); width: 30px; text-align: right; flex-shrink: 0; }
+.custom-map-scars { border-top: 1px solid var(--border); padding-top: 12px; display: flex; flex-direction: column; gap: 6px; }
+.map-scar-entry { font-size: 0.75rem; color: var(--parch-dim); }
 
 /* ── Character Wizard ── */
 #character-wizard {

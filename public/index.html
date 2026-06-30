@@ -22,7 +22,46 @@
         <span class="world-btn-name">MANLANDIA</span>
         <span class="world-btn-sub">The Family Adventure</span>
       </button>
+      <div id="custom-campaigns-list"></div>
+      <button id="create-world-btn" class="world-btn world-btn-new">
+        <span class="world-btn-name">✨ New World</span>
+        <span class="world-btn-sub">Create your own adventure</span>
+      </button>
       <div class="world-select-hint">Your choice is remembered on this device</div>
+    </div>
+  </div>
+
+  <!-- World Creator Overlay -->
+  <div id="world-creator">
+    <div class="world-creator-box">
+      <div class="world-creator-header">
+        <span class="world-creator-title">✨ Create Your World</span>
+        <button id="wc-close-btn" class="wc-close-btn">✕</button>
+      </div>
+      <div class="world-creator-body">
+        <div class="wc-field">
+          <label class="wc-label">World Name</label>
+          <input id="wc-name" class="wc-input" type="text" placeholder="e.g. The Enchanted Forest" maxlength="40" autocomplete="off" />
+        </div>
+        <div class="wc-field">
+          <label class="wc-label">Describe your world</label>
+          <p class="wc-hint">Tell the AI Game Master about the setting, the quest, the creatures, and what makes it special. The more detail you give, the better the story!</p>
+          <textarea id="wc-theme" class="wc-textarea" maxlength="600" rows="6" placeholder="Example: Two sisters discover a secret portal to an underwater kingdom. The Sea Queen needs their help to find three lost pearls before the Shadow Eels steal them…"></textarea>
+        </div>
+        <div class="wc-field">
+          <label class="wc-label">How many heroes?</label>
+          <div class="wc-count-btns">
+            <button class="wc-count-btn" data-count="1">1</button>
+            <button class="wc-count-btn active" data-count="2">2</button>
+            <button class="wc-count-btn" data-count="3">3</button>
+            <button class="wc-count-btn" data-count="4">4</button>
+          </div>
+        </div>
+      </div>
+      <div class="world-creator-footer">
+        <button id="wc-cancel-btn" class="wc-cancel-btn">Cancel</button>
+        <button id="wc-create-btn" class="wc-create-btn">Create World →</button>
+      </div>
     </div>
   </div>
 

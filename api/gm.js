@@ -58,7 +58,7 @@ module.exports = async function handler(req, res) {
   const gameState = (await getState(key)) || getInitialState();
   let systemPrompt = buildSystemPrompt(gameState);
 
-  if (worldConfig.id === "manlandia" && tone && tone !== "adventure") {
+  if ((worldConfig.id === "manlandia" || worldConfig.type === "custom") && tone && tone !== "adventure") {
     if (tone === "silly") {
       systemPrompt += "\n\nTONE ADJUSTMENT: Make this session playful and silly. Creatures are goofy. Situations turn absurd. Use wordplay and light humor. Think funny children's movie energy. Keep the adventure real but wrap it in warmth and comedy.";
     } else if (tone === "epic") {
@@ -109,7 +109,11 @@ module.exports = async function handler(req, res) {
   }
 
   // Shared: LOCATION and SCAR tags
-  const matchLocationId = worldConfig.id === "manlandia" ? matchManlandiaLocationId : matchResonanceLocationId;
+  const matchLocationId = worldConfig.id === "manlandia"
+    ? matchManlandiaLocationId
+    : worldConfig.type === "custom"
+      ? () => null
+      : matchResonanceLocationId;
 
   const locationMatch = cleanResponse.match(/\[LOCATION: ([^\]]+)\]/);
   if (locationMatch) {
@@ -138,7 +142,7 @@ module.exports = async function handler(req, res) {
 
   let responseWorldState;
 
-  if (worldConfig.id === "manlandia") {
+  if (worldConfig.id === "manlandia" || worldConfig.type === "custom") {
     // Villain awareness
     const villainMatch = cleanResponse.match(/\[VILLAIN AWARENESS: (\d+) → (\d+)\]/);
     if (villainMatch) gameState.worldState.villain_awareness = parseInt(villainMatch[2]);
@@ -180,7 +184,7 @@ module.exports = async function handler(req, res) {
       session: gameState.session,
       villain_awareness: gameState.worldState.villain_awareness,
       curse_level: gameState.worldState.curse_level,
-      stones_found: gameState.worldState.stones_found || [],
+      ...(worldConfig.id === "manlandia" && { stones_found: gameState.worldState.stones_found || [] }),
       location: gameState.worldState.location,
       visited_locations: gameState.worldState.visited_locations || [],
       location_scars: gameState.worldState.location_scars || [],
