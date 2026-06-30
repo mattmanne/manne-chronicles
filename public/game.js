@@ -819,6 +819,42 @@ function setupHelp() {
   document.getElementById("help-input").addEventListener("keydown", (e) => {
     if (e.key === "Enter") sendHelpQuestion();
   });
+
+  // Voice input for help
+  const helpVoiceBtn = document.getElementById("help-voice-btn");
+  const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRec) {
+    if (helpVoiceBtn) helpVoiceBtn.style.display = "none";
+  } else if (helpVoiceBtn) {
+    let helpRec = null;
+    helpVoiceBtn.addEventListener("click", () => {
+      if (helpRec) {
+        try { helpRec.stop(); } catch(_) {}
+        helpRec = null;
+        helpVoiceBtn.textContent = "🎤";
+        helpVoiceBtn.classList.remove("listening");
+        return;
+      }
+      helpRec = new SpeechRec();
+      helpRec.continuous = false;
+      helpRec.interimResults = false;
+      helpRec.lang = "en-US";
+      helpVoiceBtn.textContent = "⏹";
+      helpVoiceBtn.classList.add("listening");
+      helpRec.onresult = (e) => {
+        document.getElementById("help-input").value = e.results[0][0].transcript;
+        helpVoiceBtn.textContent = "🎤";
+        helpVoiceBtn.classList.remove("listening");
+        helpRec = null;
+      };
+      helpRec.onerror = helpRec.onend = () => {
+        helpVoiceBtn.textContent = "🎤";
+        helpVoiceBtn.classList.remove("listening");
+        helpRec = null;
+      };
+      helpRec.start();
+    });
+  }
 }
 
 async function sendHelpQuestion() {
@@ -932,7 +968,8 @@ function stripGMTags(content) {
     .replace(/\[CHARACTER \d: [A-Za-z]+ → [A-Za-z]+\]/g, "")
     .replace(/\[LOCATION: [^\]]+\]/g, "")
     .replace(/\[SCAR: [^\]]+\]/g, "")
-    .replace(/\[(LYRA|FEN): [A-Za-z]+ → [A-Za-z]+\]/g, "").trim();
+    .replace(/\[(LYRA|FEN): [A-Za-z]+ → [A-Za-z]+\]/g, "")
+    .replace(/\[ABILITY \d: used\]/gi, "").trim();
 }
 
 function formatCampaignExport(state) {

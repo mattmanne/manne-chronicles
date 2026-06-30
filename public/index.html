@@ -107,6 +107,7 @@
       </div>
       <div class="help-input-row">
         <input type="text" id="help-input" class="help-input" placeholder="Ask anything about the game…" maxlength="300" autocomplete="off" autocorrect="off" />
+        <button id="help-voice-btn" class="help-voice-btn" title="Speak your question">🎤</button>
         <button id="help-send-btn" class="help-send-btn">Ask</button>
       </div>
     </div>
@@ -121,9 +122,18 @@
         <span id="session-label">Session 1</span>
       </div>
       <div id="header-right">
-        <button id="help-btn" class="icon-btn" title="Ask for help">?</button>
-        <button id="world-switch-btn" class="icon-btn" title="Switch world">⇌</button>
-        <button id="auto-read-btn" class="icon-btn" title="Auto-read new narrations">🔊</button>
+        <button id="help-btn" class="header-btn" title="Ask for help">
+          <span class="header-btn-icon">?</span>
+          <span class="header-btn-label">Help</span>
+        </button>
+        <button id="world-switch-btn" class="header-btn" title="Switch world">
+          <span class="header-btn-icon">⇌</span>
+          <span class="header-btn-label">World</span>
+        </button>
+        <button id="auto-read-btn" class="header-btn" title="Auto-read new narrations">
+          <span class="header-btn-icon">🔊</span>
+          <span class="header-btn-label">Audio</span>
+        </button>
         <span id="awareness-badge" class="resonance-only" title="Conclave Awareness">⚡ 0</span>
         <span id="villain-badge" class="manlandia-only" title="Villain Awareness">👁 0</span>
       </div>

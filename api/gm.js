@@ -160,6 +160,14 @@ module.exports = async function handler(req, res) {
       if (gameState.characters[charKey]) gameState.characters[charKey].harm = charHarmMatch[3];
     }
 
+    // Ability used: [ABILITY N: used]
+    const abilityUsedRegex = /\[ABILITY (\d): used\]/gi;
+    let abilityUsedMatch;
+    while ((abilityUsedMatch = abilityUsedRegex.exec(cleanResponse)) !== null) {
+      const charKey = `player${abilityUsedMatch[1]}`;
+      if (gameState.characters[charKey]) gameState.characters[charKey].ability_used = true;
+    }
+
     responseWorldState = {
       session: gameState.session,
       villain_awareness: gameState.worldState.villain_awareness,
