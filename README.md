@@ -38,6 +38,18 @@ Each world has its own separate story and saved progress. To switch:
 | **≡ Archive** | Full logs from completed sessions — tap **⬇ Export** to download the campaign as a text file |
 | **⊕ Map** | **Resonance:** city map of Varek, Conclave Awareness meter · **Manlandia:** world map, Villain Awareness, Greying Curse meter, and 5-stone tracker |
 
+### Getting help
+
+If you're not sure what to do, what a word means, or how the rules work — tap the **?** button in the top-right header.
+
+A chat sheet opens where you can ask anything in plain language:
+- *"What does Agility mean?"*
+- *"My character got Wounded — what happens now?"*
+- *"What are the Hollow Court?"*
+- *"What does a 7–9 dice result mean?"*
+
+The helper knows the full rules and your current game state. Works for both worlds. Safe for kids to use on their own.
+
 ### Voice input
 
 - Tap the mic once to start, tap again to stop (or it stops automatically after a pause)
@@ -115,9 +127,17 @@ Write a one-sentence summary when prompted. This archives the full session log p
 
 ### Manlandia
 
-Four characters play together — one per player device. Characters will be named and described once the girls decide.
+Four characters play together — one per player device.
 
-**Select your hero** using the HERO 1 / HERO 2 / HERO 3 / HERO 4 buttons at the bottom of the Story tab. Everyone plays the same session at their own pace — the story syncs every 8 seconds across all devices.
+**Creating your hero:** Go to the **⚔ Characters** tab. Each player taps **✨ Create My Hero** on their card and follows the 4-step wizard:
+1. **Name** — type your hero's name
+2. **Best at** — choose your archetype (Fighting, Magic, Sneaking, Leading, or Talking)
+3. **Special power** — pick your once-per-session ability
+4. **Photo** — optional picture that shows on your device only
+
+Each archetype gives your hero different strengths that affect dice rolls. Once created, heroes can be edited at any time from the Characters tab.
+
+**Select your hero** using the player name buttons at the bottom of the Story tab. Everyone plays the same session at their own pace — the story syncs every 8 seconds across all devices.
 
 **Your quest:** Collect the five magical stones to break the Greying Curse — a creeping enchantment cast by The Hollow Court that slowly drains the colour, magic, and life from Manlandia.
 
