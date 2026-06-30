@@ -560,17 +560,9 @@ html, body {
 .awareness-fill.danger  { background: var(--red); }
 .awareness-status { font-size: 0.72rem; color: var(--parch-dim); font-style: italic; }
 
-#map-container {
-  background: var(--surface2);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  overflow: hidden;
-  padding: 6px;
-}
 .map-svg { width: 100%; display: block; cursor: default; }
 .map-location { cursor: pointer; }
 
-#location-info { min-height: 20px; }
 .loc-info-card {
   background: var(--surface2);
   border: 1px solid var(--border);
@@ -601,3 +593,339 @@ html, body {
 #log-area::-webkit-scrollbar-thumb,
 .tab-scroll::-webkit-scrollbar-thumb,
 .archive-log::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+/* ── World Selector ── */
+#world-selector {
+  display: none;
+  position: fixed; inset: 0;
+  background: var(--bg);
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+#world-selector.active { display: flex; }
+
+.world-select-box {
+  display: flex; flex-direction: column;
+  align-items: stretch; gap: 14px;
+  padding: 40px 28px;
+  max-width: 380px; width: 100%;
+}
+
+.world-select-title {
+  font-family: var(--font-serif);
+  color: var(--gold);
+  font-size: 0.85rem;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  text-align: center;
+  margin-bottom: 8px;
+}
+
+.world-btn {
+  padding: 18px 20px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.2s;
+  display: flex; flex-direction: column; gap: 5px;
+}
+.world-btn:hover { border-color: var(--gold-dim); background: rgba(201,168,76,0.06); }
+.world-btn:active { transform: scale(0.98); }
+
+.world-btn-name {
+  font-family: var(--font-serif);
+  font-size: 1.15rem;
+  letter-spacing: 0.2em;
+  color: var(--gold);
+  display: block;
+}
+
+.world-btn-sub {
+  font-size: 0.72rem;
+  color: var(--parch-dim);
+  display: block;
+}
+
+.world-select-hint {
+  font-size: 0.62rem;
+  color: var(--parch-dim);
+  opacity: 0.4;
+  text-align: center;
+  margin-top: 4px;
+}
+
+/* ── Character Wizard ── */
+#character-wizard {
+  display: none;
+  position: fixed; inset: 0;
+  background: rgba(9,9,18,0.97);
+  align-items: flex-start;
+  justify-content: center;
+  z-index: 1000;
+  overflow-y: auto;
+  padding: 20px 0 40px;
+}
+#character-wizard.active { display: flex; }
+
+.wizard-box {
+  display: flex; flex-direction: column; align-items: stretch; gap: 16px;
+  padding: 28px 22px;
+  max-width: 420px; width: 100%;
+}
+
+.wizard-progress {
+  display: flex; gap: 8px; justify-content: center; margin-bottom: 4px;
+}
+.wiz-dot {
+  width: 10px; height: 10px; border-radius: 50%;
+  background: var(--border);
+  transition: background 0.3s;
+}
+.wiz-dot.active { background: var(--gold); }
+
+.wiz-step { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+.wiz-step.hidden { display: none; }
+
+.wiz-icon { font-size: 2.4rem; line-height: 1; }
+.wiz-done-burst { font-size: 3.5rem; animation: popIn 0.4s ease-out; }
+@keyframes popIn { from { transform: scale(0.5); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+.wiz-title {
+  font-family: var(--font-serif); font-size: 1.25rem;
+  color: var(--gold); text-align: center; line-height: 1.3;
+}
+.wiz-subtitle {
+  font-size: 0.78rem; color: var(--parch-dim); text-align: center; margin-top: -8px;
+}
+.wiz-input {
+  width: 100%; padding: 14px 16px; font-size: 1.1rem;
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 10px; color: var(--parchment); text-align: center;
+  outline: none;
+}
+.wiz-input:focus { border-color: var(--gold-dim); }
+
+.wiz-btn {
+  width: 100%; padding: 14px; font-size: 1rem; font-weight: 600;
+  background: var(--gold); color: var(--bg);
+  border: none; border-radius: 10px; cursor: pointer;
+  transition: all 0.2s;
+}
+.wiz-btn:hover { background: #d9b85c; }
+.wiz-btn:active { transform: scale(0.97); }
+
+.wiz-photo-btn {
+  display: block; text-align: center;
+  background: var(--surface2); color: var(--parchment);
+  border: 1px solid var(--border);
+}
+.wiz-photo-btn:hover { border-color: var(--gold-dim); background: var(--surface2); color: var(--parchment); }
+
+.wiz-link {
+  background: none; border: none; color: var(--parch-dim);
+  font-size: 0.8rem; cursor: pointer; text-decoration: underline;
+  padding: 4px 0;
+}
+
+.wiz-cards {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%;
+}
+.wiz-card {
+  display: flex; flex-direction: column; align-items: center; gap: 5px;
+  padding: 14px 8px; background: var(--surface2);
+  border: 2px solid var(--border); border-radius: 12px;
+  cursor: pointer; transition: all 0.15s; text-align: center;
+}
+.wiz-card:hover { border-color: var(--gold-dim); background: rgba(201,168,76,0.06); }
+.wiz-card:active { transform: scale(0.95); }
+.wiz-card.selected { border-color: var(--gold); background: rgba(201,168,76,0.12); }
+
+.wiz-card-ico  { font-size: 1.8rem; line-height: 1; }
+.wiz-card-label { font-size: 0.88rem; font-weight: 700; color: var(--parchment); }
+.wiz-card-sub  { font-size: 0.68rem; color: var(--parch-dim); line-height: 1.3; }
+
+.wiz-photo-preview { width: 100px; height: 100px; }
+.wiz-photo-preview img {
+  width: 100px; height: 100px; border-radius: 50%;
+  object-fit: cover; border: 3px solid var(--gold);
+}
+
+.wiz-done-summary {
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 10px; padding: 12px 16px;
+  font-size: 0.82rem; color: var(--parch-dim);
+  text-align: center; line-height: 1.8; width: 100%;
+}
+
+/* ── Manlandia character card avatar & ability ── */
+.manlandia-char-header { display: flex; align-items: center; gap: 10px; }
+.char-meta { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+
+.char-avatar {
+  width: 44px; height: 44px; flex-shrink: 0;
+  border-radius: 50%; overflow: hidden;
+  background: var(--surface2); border: 2px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+}
+.char-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.char-avatar-initials {
+  font-family: var(--font-serif); font-size: 1.1rem;
+  color: var(--gold); font-weight: bold; line-height: 1;
+}
+
+.create-hero-btn, .edit-hero-btn {
+  width: 100%; padding: 8px; font-size: 0.78rem;
+  background: none; border: 1px dashed var(--gold-dim);
+  border-radius: 8px; color: var(--gold-dim); cursor: pointer;
+  margin-top: 6px; transition: all 0.2s;
+}
+.create-hero-btn:hover, .edit-hero-btn:hover {
+  border-color: var(--gold); color: var(--gold);
+  background: rgba(201,168,76,0.06);
+}
+
+.manlandia-ability-btn {
+  width: 100%; padding: 7px; font-size: 0.74rem;
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 7px; color: var(--parch-dim); cursor: pointer;
+  text-align: left; transition: all 0.2s;
+}
+.manlandia-ability-btn.available { border-color: var(--gold-dim); color: var(--parchment); }
+.manlandia-ability-btn.used { opacity: 0.4; text-decoration: line-through; cursor: default; }
+
+/* ── World visibility ── */
+.resonance-only { display: none; }
+.manlandia-only { display: none; }
+
+body.world-resonance .resonance-only { display: block; }
+body.world-manlandia .manlandia-only { display: block; }
+
+/* Override for inline/flex items */
+body.world-resonance .player-btn.resonance-only { display: flex; }
+body.world-manlandia .player-btn.manlandia-only { display: flex; }
+body.world-resonance #awareness-badge { display: inline-block; }
+body.world-manlandia #villain-badge   { display: inline-block; }
+
+/* Map containers need block */
+#map-container-resonance,
+#map-container-manlandia { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; padding: 6px; }
+
+#location-info-resonance,
+#location-info-manlandia { min-height: 20px; }
+
+/* ── Manlandia: villain badge ── */
+#villain-badge {
+  font-size: 0.75rem;
+  color: var(--parch-dim);
+  cursor: default;
+  transition: color 0.3s;
+}
+#villain-badge.warning { color: var(--amber); }
+#villain-badge.danger  { color: var(--red); }
+
+/* ── Manlandia: 2×2 character grid ── */
+.manlandia-chars-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.manlandia-card { gap: 8px; }
+.manlandia-card .char-name { font-size: 0.9rem; }
+
+/* ── Manlandia player button active states ── */
+.player-btn[data-player="player1"].active { background: rgba(127,179,211,0.12); border-color: var(--blue-dim);  color: var(--blue);  }
+.player-btn[data-player="player2"].active { background: rgba(201,168,76,0.12);  border-color: var(--gold-dim);  color: var(--gold);  }
+.player-btn[data-player="player3"].active { background: rgba(39,174,96,0.12);   border-color: var(--green);     color: var(--green); }
+.player-btn[data-player="player4"].active { background: rgba(230,126,34,0.12);  border-color: var(--amber);     color: var(--amber); }
+
+/* ── Manlandia story log entries ── */
+.log-entry.player-player1 .entry-content {
+  font-size: 0.88rem; color: var(--blue);
+  background: rgba(127,179,211,0.06); border: 1px solid var(--blue-dim);
+  padding: 8px 12px; border-radius: 8px 4px 4px 8px;
+  align-self: flex-start; max-width: 90%;
+}
+.log-entry.player-player2 .entry-content {
+  font-size: 0.88rem; color: var(--gold);
+  background: rgba(201,168,76,0.06); border: 1px solid var(--gold-dim);
+  padding: 8px 12px; border-radius: 4px 8px 8px 4px;
+  align-self: flex-end; max-width: 90%;
+}
+.log-entry.player-player3 .entry-content {
+  font-size: 0.88rem; color: var(--green);
+  background: rgba(39,174,96,0.06); border: 1px solid var(--green);
+  padding: 8px 12px; border-radius: 8px 4px 4px 8px;
+  align-self: flex-start; max-width: 90%;
+}
+.log-entry.player-player4 .entry-content {
+  font-size: 0.88rem; color: var(--amber);
+  background: rgba(230,126,34,0.06); border: 1px solid var(--amber);
+  padding: 8px 12px; border-radius: 4px 8px 8px 4px;
+  align-self: flex-end; max-width: 90%;
+}
+
+/* ── Manlandia archive entry colors ── */
+.archive-log-entry.player-player1 .archive-log-text { color: var(--blue); }
+.archive-log-entry.player-player2 .archive-log-text { color: var(--gold); }
+.archive-log-entry.player-player3 .archive-log-text { color: var(--green); }
+.archive-log-entry.player-player4 .archive-log-text { color: var(--amber); }
+
+/* ── Stone tracker ── */
+.stone-tracker {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 14px;
+}
+
+.stone-tracker-label {
+  font-size: 0.65rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--parch-dim);
+  margin-bottom: 10px;
+}
+
+.stone-slots {
+  display: flex;
+  justify-content: space-around;
+  gap: 6px;
+}
+
+.stone-slot {
+  display: flex; flex-direction: column;
+  align-items: center; gap: 4px;
+  cursor: default; user-select: none;
+  transition: all 0.4s;
+}
+
+.stone-icon {
+  font-size: 1.4rem;
+  color: var(--border);
+  transition: color 0.4s, text-shadow 0.4s;
+  line-height: 1;
+}
+
+.stone-name {
+  font-size: 0.6rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--border);
+  transition: color 0.4s;
+}
+
+.stone-slot.found .stone-icon {
+  text-shadow: 0 0 10px currentColor, 0 0 20px currentColor;
+}
+.stone-slot.found .stone-name {
+  color: var(--parch-dim);
+}
+
+/* ── Curse fill color ── */
+.awareness-fill.curse-fill { background: #6a6a6a; }
+.awareness-fill.curse-fill.warning { background: #888; }
+.awareness-fill.curse-fill.danger  { background: #4a4a4a; }
+

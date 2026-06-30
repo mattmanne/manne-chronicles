@@ -1,17 +1,23 @@
 /* ── State ── */
-let currentPlayer = "fen";
-let isLoading = false;
-let isListening = false;
-let autoRead = false;
-let recognition = null;
-let pollTimer = null;
-let lastTimestamp = 0;
-let cachedGameState = null;
-let gameSecret = null;
+let currentPlayer    = "fen";
+let currentWorld     = "resonance";
+let isLoading        = false;
+let isListening      = false;
+let autoRead         = false;
+let recognition      = null;
+let pollTimer        = null;
+let lastTimestamp    = 0;
+let cachedGameState  = null;
+let gameSecret       = null;
+let continueInitDone = false;
 
 const STATS = {
   fen:  { force: 0, acuity: 1, agility: 1, will: 3, presence: 0 },
-  lyra: { force: 1, acuity: 3, agility: 2, will: 2, presence: 1 }
+  lyra: { force: 1, acuity: 3, agility: 2, will: 2, presence: 1 },
+  player1: { force: 0, acuity: 0, agility: 0, will: 0, presence: 0 },
+  player2: { force: 0, acuity: 0, agility: 0, will: 0, presence: 0 },
+  player3: { force: 0, acuity: 0, agility: 0, will: 0, presence: 0 },
+  player4: { force: 0, acuity: 0, agility: 0, will: 0, presence: 0 },
 };
 const HARM_LEVELS = ["Unhurt", "Scratched", "Hurt", "Wounded", "Broken", "Dying"];
 
@@ -42,22 +48,75 @@ const LOCATIONS = [
     lx: 0,   ly: -12 },
 ];
 
+const MANLANDIA_LOCATIONS = [
+  { id: "hidden-village",  name: "Hidden Village",   x: 160, y: 130, type: "home",
+    desc: "The last safe place in Manlandia. Your home, hidden from the Hollow Court by old magic.",
+    lx: 0,  ly: 17,  la: "middle" },
+  { id: "sky-realm",       name: "Sky Realm",         x: 200, y: 48,  type: "sky",
+    desc: "Floating islands in the clouds. Sky whales hum old songs. The Skystone drifts here on the wind.",
+    lx: 0,  ly: -8,  la: "middle" },
+  { id: "frost-lands",     name: "Frost Lands",       x: 82,  y: 68,  type: "land",
+    desc: "Eternal winter. Ice sprites and glowing fish under frozen lakes. The Froststone waits in a glacier.",
+    lx: -8, ly: 4,   la: "end" },
+  { id: "mountain-peaks",  name: "Mountain Peaks",    x: 255, y: 73,  type: "land",
+    desc: "Stone giants sleep standing up here. Eagles the size of horses nest in crags. The Earthstone is buried deep.",
+    lx: 9,  ly: 4,   la: "start" },
+  { id: "the-swamp",       name: "The Swamp",         x: 75,  y: 190, type: "land",
+    desc: "Talking frogs, walking trees, fireflies with lanterns. The Lifestone rests in the oldest roots.",
+    lx: -8, ly: 4,   la: "end" },
+  { id: "dragons-cave",    name: "Dragon's Cave",     x: 272, y: 148, type: "land",
+    desc: "Home of Valora, the ancient dragon. She's kept the Firestone for centuries and is not easily impressed.",
+    lx: 9,  ly: 4,   la: "start" },
+  { id: "pirate-coast",    name: "Pirate Coast",      x: 248, y: 210, type: "land",
+    desc: "Wild shores where alien traders sell impossible things. Maps to strange places cost a song — literally.",
+    lx: 9,  ly: 4,   la: "start" },
+  { id: "underground-lair",name: "Underground Lair",  x: 155, y: 225, type: "villain",
+    desc: "The hidden home of the Hollow Court. Cold grey halls below everything. No one has found the entrance yet.",
+    lx: 0,  ly: -7,  la: "middle" },
+];
+
+const MANLANDIA_CONNECTIONS = [
+  ["frost-lands","mountain-peaks"],["frost-lands","hidden-village"],
+  ["mountain-peaks","hidden-village"],["mountain-peaks","dragons-cave"],
+  ["sky-realm","mountain-peaks"],["sky-realm","hidden-village"],
+  ["hidden-village","the-swamp"],["hidden-village","dragons-cave"],
+  ["hidden-village","underground-lair"],["the-swamp","underground-lair"],
+  ["the-swamp","pirate-coast"],["dragons-cave","pirate-coast"],
+  ["pirate-coast","underground-lair"],
+];
+
 /* ── DOM refs ── */
-const logEntries  = document.getElementById("log-entries");
-const actionInput = document.getElementById("action-input");
-const sendBtn     = document.getElementById("send-btn");
-const voiceBtn    = document.getElementById("voice-btn");
-const loadingBar  = document.getElementById("loading-bar");
-const voiceStatus = document.getElementById("voice-status");
-const diceOverlay = document.getElementById("dice-overlay");
+const logEntries   = document.getElementById("log-entries");
+const actionInput  = document.getElementById("action-input");
+const sendBtn      = document.getElementById("send-btn");
+const voiceBtn     = document.getElementById("voice-btn");
+const loadingBar   = document.getElementById("loading-bar");
+const voiceStatus  = document.getElementById("voice-status");
+const diceOverlay  = document.getElementById("dice-overlay");
 const sessionLabel = document.getElementById("session-label");
+
+/* ── URL helpers ── */
+function withWorld(url) {
+  const sep = url.includes("?") ? "&" : "?";
+  return `${url}${sep}world=${currentWorld}`;
+}
+
+function authPost(url, body) {
+  return fetch(withWorld(url), {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Game-Secret": gameSecret || "" },
+    body: JSON.stringify(body)
+  });
+}
 
 /* ── Secret ── */
 function initSecret() {
   const urlParam = new URLSearchParams(window.location.search).get("secret");
   if (urlParam) {
     localStorage.setItem("gameSecret", urlParam);
-    window.history.replaceState({}, "", window.location.pathname);
+    const url = new URL(window.location.href);
+    url.searchParams.delete("secret");
+    window.history.replaceState({}, "", url.toString());
   }
   gameSecret = localStorage.getItem("gameSecret");
   if (!gameSecret) {
@@ -73,17 +132,89 @@ function initSecret() {
   return true;
 }
 
-function authPost(url, body) {
-  return fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "X-Game-Secret": gameSecret || "" },
-    body: JSON.stringify(body)
+/* ── World Selection ── */
+function initWorld() {
+  const urlParam = new URLSearchParams(window.location.search).get("world");
+  if (urlParam === "resonance" || urlParam === "manlandia") {
+    currentWorld = urlParam;
+    localStorage.setItem("currentWorld", currentWorld);
+    return true;
+  }
+  const saved = localStorage.getItem("currentWorld");
+  if (saved === "resonance" || saved === "manlandia") {
+    currentWorld = saved;
+    return true;
+  }
+  return false;
+}
+
+function applyWorldUI() {
+  document.body.classList.remove("world-resonance", "world-manlandia");
+  document.body.classList.add(`world-${currentWorld}`);
+  document.title = currentWorld === "manlandia" ? "Manlandia" : "Resonance";
+  document.getElementById("game-title").textContent = currentWorld === "manlandia" ? "MANLANDIA" : "RESONANCE";
+  document.querySelectorAll(".player-btn").forEach(b => b.classList.remove("active"));
+  if (currentWorld === "manlandia") {
+    currentPlayer = "player1";
+    const btn = document.getElementById("btn-p1");
+    if (btn) btn.classList.add("active");
+  } else {
+    currentPlayer = "fen";
+    const btn = document.getElementById("btn-fen");
+    if (btn) btn.classList.add("active");
+  }
+}
+
+function setupWorldSelector() {
+  document.querySelectorAll(".world-btn").forEach(btn => {
+    btn.addEventListener("click", () => switchWorld(btn.dataset.world));
   });
+  const switchBtn = document.getElementById("world-switch-btn");
+  if (switchBtn) {
+    switchBtn.addEventListener("click", () => {
+      if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+      logEntries.innerHTML = "";
+      lastTimestamp = 0;
+      cachedGameState = null;
+      document.getElementById("world-selector").classList.add("active");
+    });
+  }
+}
+
+async function switchWorld(worldId) {
+  currentWorld = worldId;
+  localStorage.setItem("currentWorld", currentWorld);
+  document.getElementById("world-selector").classList.remove("active");
+  applyWorldUI();
+  if (!continueInitDone) {
+    continueInitDone = true;
+    await continueInit();
+  } else {
+    if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+    logEntries.innerHTML = "";
+    lastTimestamp = 0;
+    cachedGameState = null;
+    await loadExistingLog();
+    startPolling();
+    triggerOpeningIfNeeded();
+  }
 }
 
 /* ── Init ── */
 document.addEventListener("DOMContentLoaded", async () => {
   if (!initSecret()) return;
+  setupWorldSelector();
+  const worldReady = initWorld();
+  if (worldReady) {
+    applyWorldUI();
+    continueInitDone = true;
+    await continueInit();
+  } else {
+    document.getElementById("world-selector").classList.add("active");
+  }
+});
+
+async function continueInit() {
   setupTabs();
   setupPlayerButtons();
   setupVoice();
@@ -93,10 +224,11 @@ document.addEventListener("DOMContentLoaded", async () => {
   setupNewSession();
   setupAutoRead();
   setupExport();
+  setupWizard();
   await loadExistingLog();
   startPolling();
   triggerOpeningIfNeeded();
-});
+}
 
 /* ── Tabs ── */
 function setupTabs() {
@@ -117,7 +249,7 @@ function setUnreadBadge(val) {
   document.querySelector('.tab-btn[data-tab="story"]').classList.toggle("unread", val);
 }
 
-/* ── Auto-read Toggle ── */
+/* ── Auto-read ── */
 function setupAutoRead() {
   const btn = document.getElementById("auto-read-btn");
   btn.addEventListener("click", () => {
@@ -127,16 +259,28 @@ function setupAutoRead() {
   });
 }
 
-/* ── Player selection ── */
+/* ── Player buttons ── */
 function setupPlayerButtons() {
   document.querySelectorAll(".player-btn").forEach(btn => {
     btn.addEventListener("click", () => {
       document.querySelectorAll(".player-btn").forEach(b => b.classList.remove("active"));
       btn.classList.add("active");
       currentPlayer = btn.dataset.player;
-      actionInput.placeholder = `What does ${currentPlayer === "fen" ? "Fen" : "Lyra"} do?`;
+      const name = getPlayerDisplayName(currentPlayer);
+      actionInput.placeholder = `What does ${name} do?`;
     });
   });
+}
+
+function getPlayerDisplayName(player) {
+  if (player === "fen")  return "Fen";
+  if (player === "lyra") return "Lyra";
+  if (player && player.startsWith("player")) {
+    const n = player.slice(6);
+    const name = cachedGameState?.characters?.[player]?.name;
+    return (name && name !== `Hero ${n}`) ? name : `Hero ${n}`;
+  }
+  return player;
 }
 
 /* ── Voice Input ── */
@@ -188,9 +332,20 @@ function setupHarmRecovery() {
       if (data.ok) updateCharacterUI({ characters: data.characters });
     });
   });
+
+  document.querySelectorAll("[data-player]").forEach(el => {
+    const player = el.dataset.player;
+    if (!player || !player.startsWith("player")) return;
+    el.addEventListener("click", async () => {
+      if (el.classList.contains("Unhurt")) return;
+      const res = await authPost("/api/state", { action: "recover_harm", payload: { character: player } });
+      const data = await res.json();
+      if (data.ok) updateCharacterUI({ characters: data.characters });
+    });
+  });
 }
 
-/* ── Ability Toggles ── */
+/* ── Ability Toggles (Resonance only) ── */
 function setupAbilityToggles() {
   document.querySelectorAll(".ability[data-ability]").forEach(btn => {
     btn.addEventListener("click", async () => {
@@ -202,13 +357,16 @@ function setupAbilityToggles() {
     });
   });
 
-  document.getElementById("lyra-magic").addEventListener("click", async () => {
-    const count = parseInt(document.getElementById("magic-count").textContent);
-    if (count <= 0) return;
-    const res = await authPost("/api/state", { action: "use_magic", payload: {} });
-    const data = await res.json();
-    if (data.ok) updateCharacterUI({ characters: data.characters });
-  });
+  const lyraM = document.getElementById("lyra-magic");
+  if (lyraM) {
+    lyraM.addEventListener("click", async () => {
+      const count = parseInt(document.getElementById("magic-count").textContent);
+      if (count <= 0) return;
+      const res = await authPost("/api/state", { action: "use_magic", payload: {} });
+      const data = await res.json();
+      if (data.ok) updateCharacterUI({ characters: data.characters });
+    });
+  }
 }
 
 /* ── New Session ── */
@@ -229,21 +387,27 @@ function setupNewSession() {
   });
 }
 
-/* ── Load existing log on page open ── */
+/* ── Load existing log ── */
 async function loadExistingLog() {
   try {
-    const res = await fetch("/api/poll?since=0");
+    const res = await fetch(withWorld("/api/poll?since=0"));
     const data = await res.json();
     cachedGameState = { worldState: data.worldState, characters: data.characters };
     sessionLabel.textContent = `Session ${data.worldState.session}`;
     updateCharacterUI(data);
     for (const entry of data.entries) {
       if (entry.role === "gm") appendGMEntry(entry.content, false);
-      else appendPlayerEntry(entry.player || "fen", entry.content.replace(/^(Fen|Lyra): /, ""), false);
+      else appendPlayerEntry(entry.player || currentPlayer, stripPlayerPrefix(entry.content), false);
       if (entry.timestamp > lastTimestamp) lastTimestamp = entry.timestamp;
     }
     scrollToBottom();
-  } catch(_) {}
+  } catch(_) {
+    appendSystemMessage("Could not load story — check your connection and reload the page.");
+  }
+}
+
+function stripPlayerPrefix(content) {
+  return (content || "").replace(/^[A-Za-z][A-Za-z0-9]*: /, "");
 }
 
 /* ── Polling ── */
@@ -251,21 +415,18 @@ function startPolling() {
   pollTimer = setInterval(async () => {
     if (isLoading) return;
     try {
-      const res = await fetch(`/api/poll?since=${lastTimestamp}`);
+      const res = await fetch(withWorld(`/api/poll?since=${lastTimestamp}`));
       const data = await res.json();
       if (data.entries && data.entries.length > 0) {
         for (const entry of data.entries) {
           if (entry.role === "gm") appendGMEntry(entry.content, true);
-          else appendPlayerEntry(entry.player || "fen", entry.content.replace(/^(Fen|Lyra): /, ""), true);
+          else appendPlayerEntry(entry.player || currentPlayer, stripPlayerPrefix(entry.content), true);
           if (entry.timestamp > lastTimestamp) lastTimestamp = entry.timestamp;
         }
         cachedGameState = { worldState: data.worldState, characters: data.characters };
         updateCharacterUI(data);
-        if (document.getElementById("tab-story").classList.contains("active")) {
-          scrollToBottom();
-        } else {
-          setUnreadBadge(true);
-        }
+        if (document.getElementById("tab-story").classList.contains("active")) scrollToBottom();
+        else setUnreadBadge(true);
         if (document.getElementById("tab-map").classList.contains("active")) renderMap(cachedGameState);
       }
     } catch(_) {}
@@ -275,9 +436,9 @@ function startPolling() {
 /* ── Opening narration ── */
 async function triggerOpeningIfNeeded() {
   try {
-    const res = await fetch("/api/poll?since=0");
+    const res = await fetch(withWorld("/api/poll?since=0"));
     const data = await res.json();
-    if (data.entries.length === 0) await sendToGM("fen", "[SESSION BEGINS]", "begin");
+    if (data.entries.length === 0) await sendToGM(currentPlayer, "[SESSION BEGINS]", "begin");
   } catch(_) {}
 }
 
@@ -305,13 +466,11 @@ async function sendToGM(player, message, type) {
       await sendToGM(player, formatRollMessage(player, data.rollStat, rollResult), "roll_result");
     } else {
       const entry = appendGMEntry(data.response, true);
-      if (autoRead && entry) {
-        speakText(getCleanText(data.response), entry.querySelector(".speak-btn"));
-      }
+      if (autoRead && entry) speakText(getCleanText(data.response), entry.querySelector(".speak-btn"));
       if (data.gameState) {
         cachedGameState = data.gameState;
         updateCharacterUI(data.gameState);
-        lastTimestamp = Math.max(lastTimestamp, Date.now() - 1000);
+        lastTimestamp = data.serverTimestamp || Math.max(lastTimestamp, Date.now());
         if (document.getElementById("tab-map").classList.contains("active")) renderMap(cachedGameState);
       }
       scrollToBottom();
@@ -324,16 +483,16 @@ async function sendToGM(player, message, type) {
 }
 
 function formatRollMessage(player, stat, result) {
-  const name = player === "fen" ? "Fen" : "Lyra";
+  const name = getPlayerDisplayName(player);
   return `${name} rolls ${stat.toUpperCase()}: ${result.die1} + ${result.die2} + (${result.modifier}) = ${result.total}`;
 }
 
 /* ── Dice Animation ── */
 function animateRoll(player, stat, advantage = false) {
   return new Promise((resolve) => {
-    const modifier  = STATS[player]?.[stat.toLowerCase()] ?? 0;
-    const statName  = stat.toUpperCase();
-    const playerName = player === "fen" ? "FEN" : "LYRA";
+    const modifier   = STATS[player]?.[stat.toLowerCase()] ?? 0;
+    const statName   = stat.toUpperCase();
+    const playerName = getPlayerDisplayName(player).toUpperCase();
 
     document.getElementById("dice-title").textContent =
       `${playerName} — Rolling ${statName}${advantage ? " (Advantage)" : ""}`;
@@ -414,10 +573,8 @@ function speakText(text, btn) {
   const isSame = activeSpeech && activeSpeech.text === text;
   stopSpeech();
   if (isSame) return;
-
   btn.textContent = "⏹"; btn.classList.add("speaking");
   activeSpeech = { text, btn };
-
   const voices = window.speechSynthesis.getVoices();
   if (voices.length > 0) {
     doSpeak(text, getStoryVoice(), btn);
@@ -432,14 +589,11 @@ function speakText(text, btn) {
 function doSpeak(text, voice, btn) {
   const paragraphs = text.split(/\n\n+/).map(p => p.trim()).filter(Boolean);
   let idx = 0;
-
-  // iOS: prevent audio pausing after ~15s in background
   iosSpeechKeepalive = setInterval(() => {
     if (!activeSpeech) { clearInterval(iosSpeechKeepalive); iosSpeechKeepalive = null; return; }
     window.speechSynthesis.pause();
     window.speechSynthesis.resume();
   }, 10000);
-
   function speakNext() {
     if (!activeSpeech || idx >= paragraphs.length) { finishSpeech(btn); return; }
     const spoken = paragraphs[idx].replace(/—/g, ", ").replace(/\.{3,}/g, "... ");
@@ -463,20 +617,261 @@ function finishSpeech(btn) {
 function setupExport() {
   document.getElementById("export-btn").addEventListener("click", async () => {
     try {
-      const res = await fetch("/api/state");
+      const res = await fetch(withWorld("/api/state"));
       const state = await res.json();
       const text = formatCampaignExport(state);
       const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = "resonance-campaign.txt";
+      a.download = currentWorld === "manlandia" ? "manlandia-campaign.txt" : "resonance-campaign.txt";
       a.click();
       URL.revokeObjectURL(url);
-    } catch(_) {
-      alert("Export failed — try again.");
+    } catch(_) { alert("Export failed — try again."); }
+  });
+}
+
+/* ── Character Wizard ── */
+const ARCHETYPE_DISPLAY = {
+  fighter: { label: "Fighter",  icon: "⚔️" },
+  mage:    { label: "Mage",     icon: "✨" },
+  scout:   { label: "Scout",    icon: "🐾" },
+  leader:  { label: "Leader",   icon: "🛡️" },
+  charmer: { label: "Charmer",  icon: "🌟" },
+};
+const ABILITY_DISPLAY = {
+  animal_friend:  "Animal Friend",
+  lucky_break:    "Lucky Break",
+  protect_friend: "Protect a Friend",
+  ancient_magic:  "Ancient Magic",
+};
+
+let wizardPlayer = null;
+let wizardData   = {};
+
+function setupWizard() {
+  // Step 1 next button
+  document.getElementById("wiz-name-next").addEventListener("click", () => {
+    const name = document.getElementById("wiz-name").value.trim();
+    if (!name) { document.getElementById("wiz-name").focus(); return; }
+    wizardData.name = name;
+    wizSetStep(2);
+  });
+  document.getElementById("wiz-name").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") document.getElementById("wiz-name-next").click();
+  });
+
+  // Step 2: archetype cards — auto-advance
+  document.querySelectorAll("[data-archetype]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll("[data-archetype]").forEach(b => b.classList.remove("selected"));
+      btn.classList.add("selected");
+      wizardData.archetype = btn.dataset.archetype;
+      setTimeout(() => wizSetStep(3), 280);
+    });
+  });
+
+  // Step 3: ability cards — auto-advance
+  document.querySelectorAll("[data-ability]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll("[data-ability]").forEach(b => b.classList.remove("selected"));
+      btn.classList.add("selected");
+      wizardData.ability_id = btn.dataset.ability;
+      setTimeout(() => wizSetStep(4), 280);
+    });
+  });
+
+  // Step 4: photo input
+  document.getElementById("wiz-photo-input").addEventListener("change", (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    resizeForStorage(file, (dataUrl) => {
+      wizardData.photo = dataUrl;
+      const prev = document.getElementById("wiz-photo-preview");
+      prev.innerHTML = `<img src="${dataUrl}" alt="hero photo" />`;
+    });
+  });
+
+  document.getElementById("wiz-finish-btn").addEventListener("click", () => wizFinish());
+  document.getElementById("wiz-skip-photo").addEventListener("click", () => { wizardData.photo = null; wizFinish(); });
+  document.getElementById("wiz-close-btn").addEventListener("click", closeWizard);
+
+  // Delegated: create/edit hero buttons and manlandia ability buttons
+  document.getElementById("tab-characters").addEventListener("click", async (e) => {
+    const heroBtn = e.target.closest(".create-hero-btn, .edit-hero-btn");
+    if (heroBtn) { openWizard(heroBtn.dataset.player); return; }
+
+    const abilBtn = e.target.closest(".manlandia-ability-btn");
+    if (abilBtn && !abilBtn.classList.contains("used")) {
+      const p = abilBtn.dataset.player;
+      const res = await authPost("/api/state", { action: "toggle_ability", payload: { character: p, ability: "ability_used" } });
+      const data = await res.json();
+      if (data.ok) { cachedGameState = { ...cachedGameState, characters: data.characters }; updateCharacterUI({ characters: data.characters }); }
     }
   });
+}
+
+function openWizard(player) {
+  wizardPlayer = player;
+  wizardData   = {};
+  document.getElementById("wiz-name").value = "";
+  document.querySelectorAll("[data-archetype], [data-ability]").forEach(b => b.classList.remove("selected"));
+  document.getElementById("wiz-photo-preview").innerHTML = "";
+  // Pre-fill name if character already has one
+  const existing = cachedGameState?.characters?.[player];
+  if (existing?.name && !existing.name.startsWith("Hero ")) {
+    document.getElementById("wiz-name").value = existing.name;
+    wizardData.name = existing.name;
+  }
+  wizSetStep(1);
+  document.getElementById("character-wizard").classList.add("active");
+}
+
+function closeWizard() {
+  document.getElementById("character-wizard").classList.remove("active");
+}
+
+function wizSetStep(step) {
+  [1,2,3,4].forEach(n => {
+    const el = document.getElementById(`wiz-step-${n}`);
+    if (el) el.classList.toggle("hidden", n !== step);
+  });
+  document.getElementById("wiz-done").classList.add("hidden");
+  document.querySelectorAll(".wiz-dot").forEach((dot, i) => {
+    dot.classList.toggle("active", i < step);
+  });
+}
+
+async function wizFinish() {
+  if (!wizardData.name || !wizardData.archetype || !wizardData.ability_id) return;
+
+  // Save photo to localStorage (device-only)
+  if (wizardData.photo) {
+    localStorage.setItem(`manlandia_photo_${wizardPlayer}`, wizardData.photo);
+  }
+
+  // Save character data to server
+  let chars;
+  try {
+    const res = await authPost("/api/characters", {
+      player:     wizardPlayer,
+      name:       wizardData.name,
+      archetype:  wizardData.archetype,
+      ability_id: wizardData.ability_id,
+    });
+    const data = await res.json();
+    if (!data.ok) { alert("Oops — try again!"); return; }
+    chars = data.characters;
+  } catch(_) { alert("Connection problem — check your internet!"); return; }
+
+  // Update cached state and sync stats
+  if (cachedGameState) cachedGameState.characters = chars;
+  else cachedGameState = { characters: chars };
+  syncPlayerStats(chars);
+  updateCharacterUI({ characters: chars });
+
+  // Update Story tab player button
+  const n = wizardPlayer.slice(6);
+  const btn = document.getElementById(`btn-p${n}`);
+  if (btn) btn.textContent = wizardData.name.toUpperCase();
+
+  // Done screen
+  const archInfo = ARCHETYPE_DISPLAY[wizardData.archetype] || {};
+  const abilLabel = ABILITY_DISPLAY[wizardData.ability_id] || wizardData.ability_id;
+  document.getElementById("wiz-done-name").textContent = wizardData.name + " is ready!";
+  document.getElementById("wiz-done-summary").innerHTML =
+    `${archInfo.icon || "⭐"} <strong>${archInfo.label || wizardData.archetype}</strong><br>✦ Special power: ${abilLabel}`;
+  [1,2,3,4].forEach(n => { const el = document.getElementById(`wiz-step-${n}`); if (el) el.classList.add("hidden"); });
+  document.getElementById("wiz-done").classList.remove("hidden");
+  document.querySelectorAll(".wiz-dot").forEach(d => d.classList.add("active"));
+}
+
+function resizeForStorage(file, callback) {
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const img = new Image();
+    img.onload = () => {
+      const MAX = 200;
+      let w = img.width, h = img.height;
+      if (w > h && w > MAX) { h = Math.round(h * MAX / w); w = MAX; }
+      else if (h > MAX) { w = Math.round(w * MAX / h); h = MAX; }
+      const canvas = document.createElement("canvas");
+      canvas.width = w; canvas.height = h;
+      canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+      callback(canvas.toDataURL("image/jpeg", 0.72));
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function syncPlayerStats(characters) {
+  ["player1","player2","player3","player4"].forEach(p => {
+    if (characters[p]?.stats) STATS[p] = { ...characters[p].stats };
+  });
+}
+
+function renderManlandiaCard(n, char) {
+  const p     = `player${n}`;
+  const isSetup = !!(char?.archetype);
+
+  // Avatar (photo from localStorage, or initial letter)
+  const avatarEl = document.getElementById(`p${n}-avatar`);
+  if (avatarEl) {
+    const photo = localStorage.getItem(`manlandia_photo_${p}`);
+    if (photo) {
+      avatarEl.innerHTML = `<img src="${photo}" alt="${char?.name || "Hero"}" />`;
+    } else {
+      const initial = (char?.name || `H${n}`).charAt(0).toUpperCase();
+      avatarEl.innerHTML = `<div class="char-avatar-initials">${initial}</div>`;
+    }
+  }
+
+  // Archetype badge in role slot
+  const roleEl = document.getElementById(`p${n}-role`);
+  if (roleEl) {
+    if (isSetup) {
+      const d = ARCHETYPE_DISPLAY[char.archetype] || {};
+      roleEl.textContent = `${d.icon || "⭐"} ${d.label || char.archetype}`;
+    } else {
+      roleEl.textContent = `Player ${n}`;
+    }
+  }
+
+  // Ability button
+  const abilRow = document.getElementById(`p${n}-ability-row`);
+  if (abilRow) {
+    if (char?.ability_id) {
+      const label = ABILITY_DISPLAY[char.ability_id] || char.ability_id;
+      const used  = char.ability_used;
+      abilRow.innerHTML = `<button class="manlandia-ability-btn ${used ? "used" : "available"}" data-player="${p}" title="${used ? "Already used this session" : "Tap to mark used"}">✦ ${label}</button>`;
+    } else {
+      abilRow.innerHTML = "";
+    }
+  }
+
+  // Create/Edit button
+  const actionsEl = document.getElementById(`p${n}-card-actions`);
+  if (actionsEl) {
+    if (isSetup) {
+      actionsEl.innerHTML = `<button class="edit-hero-btn" data-player="${p}">✏️ Edit</button>`;
+    } else {
+      actionsEl.innerHTML = `<button class="create-hero-btn" data-player="${p}">✨ Create My Hero</button>`;
+    }
+  }
+}
+
+function stripGMTags(content) {
+  return (content || "")
+    .replace(/\[CONCLAVE AWARENESS: \d+ → \d+\]/g, "")
+    .replace(/\[DISSONANCE: \d+ → \d+\]/g, "")
+    .replace(/\[VILLAIN AWARENESS: \d+ → \d+\]/g, "")
+    .replace(/\[CURSE: \d+ → \d+\]/g, "")
+    .replace(/\[STONE FOUND: [^\]]+\]/g, "")
+    .replace(/\[CHARACTER \d: [A-Za-z]+ → [A-Za-z]+\]/g, "")
+    .replace(/\[LOCATION: [^\]]+\]/g, "")
+    .replace(/\[SCAR: [^\]]+\]/g, "")
+    .replace(/\[(LYRA|FEN): [A-Za-z]+ → [A-Za-z]+\]/g, "").trim();
 }
 
 function formatCampaignExport(state) {
@@ -490,7 +885,8 @@ function formatCampaignExport(state) {
 
   const sep  = "═".repeat(44);
   const dash = "─".repeat(44);
-  const lines = ["RESONANCE — A LEGACY CAMPAIGN", sep, ""];
+  const title = currentWorld === "manlandia" ? "MANLANDIA — A FAMILY ADVENTURE" : "RESONANCE — A LEGACY CAMPAIGN";
+  const lines = [title, sep, ""];
 
   for (const item of all) {
     lines.push(`SESSION ${item.session}`);
@@ -498,25 +894,13 @@ function formatCampaignExport(state) {
     lines.push(dash);
     if (item.log) {
       for (const e of item.log) {
-        const isGM = e.role === "gm";
-        const label = isGM ? "Story" : (e.player === "lyra" ? "Lyra" : "Fen");
-        let content = e.content || "";
-        if (isGM) {
-          content = content
-            .replace(/\[CONCLAVE AWARENESS: \d+ → \d+\]/g, "")
-            .replace(/\[DISSONANCE: \d+ → \d+\]/g, "")
-            .replace(/\[LOCATION: [^\]]+\]/g, "")
-            .replace(/\[SCAR: [^\]]+\]/g, "")
-            .replace(/\[(LYRA|FEN): [A-Za-z]+ → [A-Za-z]+\]/g, "").trim();
-        } else {
-          content = content.replace(/^(Fen|Lyra): /, "");
-        }
-        lines.push(`${label}: ${content}`);
-        lines.push("");
+        const isGM  = e.role === "gm";
+        const label = isGM ? "Story" : getPlayerDisplayName(e.player || currentPlayer);
+        const content = isGM ? stripGMTags(e.content) : stripPlayerPrefix(e.content);
+        lines.push(`${label}: ${content}`, "");
       }
     } else {
-      lines.push("(Full log not available for this session.)");
-      lines.push("");
+      lines.push("(Full log not available for this session.)", "");
     }
     lines.push(sep, "");
   }
@@ -528,7 +912,7 @@ function formatCampaignExport(state) {
 /* ── Archive ── */
 async function loadArchive() {
   try {
-    const res = await fetch("/api/state");
+    const res = await fetch(withWorld("/api/state"));
     const state = await res.json();
     renderArchive(state);
   } catch(_) {}
@@ -554,20 +938,11 @@ function renderArchive(state) {
   el.innerHTML = all.map(item => {
     const logHtml = item.log
       ? item.log.map(e => {
-          const isGM = e.role === "gm";
-          const cls  = isGM ? "gm" : `player-${e.player || "fen"}`;
-          const lbl  = isGM ? "Story" : (e.player === "lyra" ? "Lyra" : "Fen");
-          let content = e.content || "";
-          if (isGM) {
-            content = content
-              .replace(/\[CONCLAVE AWARENESS: \d+ → \d+\]/g, "")
-              .replace(/\[DISSONANCE: \d+ → \d+\]/g, "")
-              .replace(/\[LOCATION: [^\]]+\]/g, "")
-              .replace(/\[SCAR: [^\]]+\]/g, "")
-              .replace(/\[(LYRA|FEN): [A-Za-z]+ → [A-Za-z]+\]/g, "").trim();
-          } else {
-            content = content.replace(/^(Fen|Lyra): /, "");
-          }
+          const isGM    = e.role === "gm";
+          const player  = e.player || currentPlayer;
+          const cls     = isGM ? "gm" : `player-${player}`;
+          const lbl     = isGM ? "Story" : getPlayerDisplayName(player);
+          const content = isGM ? stripGMTags(e.content) : stripPlayerPrefix(e.content);
           return `<div class="archive-log-entry ${cls}"><span class="archive-log-label">${lbl}</span><span class="archive-log-text">${escapeHtml(content)}</span></div>`;
         }).join("")
       : `<div class="archive-log-entry"><span class="archive-log-text" style="color:var(--parch-dim);font-style:italic">Full log not available for this session.</span></div>`;
@@ -586,14 +961,18 @@ function renderArchive(state) {
 
 /* ── Map ── */
 function renderMap(state) {
-  const container = document.getElementById("map-container");
+  if (currentWorld === "manlandia") renderManlandiaMap(state);
+  else renderResonanceMap(state);
+}
+
+function renderResonanceMap(state) {
+  const container = document.getElementById("map-container-resonance");
   if (!container) return;
 
   const ws = state?.worldState || {};
   const awareness = ws.conclave_awareness || 0;
   const currentLocStr = ws.location || "";
 
-  // Awareness meter
   const fill  = document.getElementById("map-awareness-fill");
   const val   = document.getElementById("map-awareness-value");
   const astat = document.getElementById("map-awareness-status");
@@ -607,11 +986,10 @@ function renderMap(state) {
                         "Undetected — carry on normally";
   }
 
-  const currentId = matchLocation(currentLocStr);
+  const currentId = matchResonanceLocation(currentLocStr);
   const visited = ws.visited_locations || [];
   const scars   = ws.location_scars   || [];
 
-  // Street grid lines
   const streets = [
     [60,68,370,68],[60,138,370,138],[60,208,370,208],
     [65,52,65,280],[155,52,155,280],[245,52,245,280],[335,52,335,280]
@@ -620,7 +998,6 @@ function renderMap(state) {
     `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#1c1c3a" stroke-width="1.5"/>`
   ).join("");
 
-  // Dashed connections between locations
   const connections = [
     ["archive","scholars-row"],["scholars-row","salt-wick"],["salt-wick","market-square"],
     ["market-square","conclave-hall"],["market-square","warden-post"],
@@ -633,62 +1010,44 @@ function renderMap(state) {
     return `<line x1="${la.x}" y1="${la.y}" x2="${lb.x}" y2="${lb.y}" stroke="#28285a" stroke-width="1.2" stroke-dasharray="3,4"/>`;
   }).join("");
 
-  // Location dots + labels + pulse ring for current
   const locSvg = LOCATIONS.map(loc => {
-    const isCon      = loc.type === "conclave";
-    const isLand     = loc.type === "landmark";
-    const isCurrent  = loc.id === currentId;
-    const isVisited  = visited.includes(loc.id);
-    const locScars   = scars.filter(s => s.id === loc.id);
-    const hasScar    = locScars.length > 0;
-    const dotColor   = isCon ? "#c0392b" : isLand ? "#c9a84c" : "#8a7040";
-    const txtColor   = isCon ? "#c0392b" : isLand ? "#c9a84c" : "#6a5a30";
+    const isCon     = loc.type === "conclave";
+    const isLand    = loc.type === "landmark";
+    const isCurrent = loc.id === currentId;
+    const isVisited = visited.includes(loc.id);
+    const locScars  = scars.filter(s => s.id === loc.id);
+    const dotColor  = isCon ? "#c0392b" : isLand ? "#c9a84c" : "#8a7040";
+    const txtColor  = isCon ? "#c0392b" : isLand ? "#c9a84c" : "#6a5a30";
     const dotOpacity = (isCurrent || isVisited) ? 1 : 0.25;
     const txtOpacity = (isCurrent || isVisited) ? 1 : 0.3;
-    const r          = isLand ? 7 : 5;
-    const anchor     = loc.la || "middle";
-    const lx         = loc.x + (loc.lx || 0);
-    const ly         = loc.y + (loc.ly || 17);
+    const r         = isLand ? 7 : 5;
+    const anchor    = loc.la || "middle";
+    const lx        = loc.x + (loc.lx || 0);
+    const ly        = loc.y + (loc.ly || 17);
 
-    const pulse = isCurrent
-      ? `<circle cx="${loc.x}" cy="${loc.y}" r="${r + 8}" fill="none" stroke="${dotColor}" stroke-width="1.5" class="loc-pulse"/>`
-      : "";
-    const center = isCurrent
-      ? `<circle cx="${loc.x}" cy="${loc.y}" r="3" fill="white" opacity="0.85"/>`
-      : "";
-    const scarMark = hasScar
-      ? `<line x1="${loc.x + r - 1}" y1="${loc.y - r - 4}" x2="${loc.x + r + 4}" y2="${loc.y - r + 1}" stroke="#8b1a1a" stroke-width="1.3"/>
-         <line x1="${loc.x + r + 4}" y1="${loc.y - r - 4}" x2="${loc.x + r - 1}" y2="${loc.y - r + 1}" stroke="#8b1a1a" stroke-width="1.3"/>`
-      : "";
+    const pulse  = isCurrent ? `<circle cx="${loc.x}" cy="${loc.y}" r="${r + 8}" fill="none" stroke="${dotColor}" stroke-width="1.5" class="loc-pulse"/>` : "";
+    const center = isCurrent ? `<circle cx="${loc.x}" cy="${loc.y}" r="3" fill="white" opacity="0.85"/>` : "";
+    const scarMark = locScars.length
+      ? `<line x1="${loc.x+r-1}" y1="${loc.y-r-4}" x2="${loc.x+r+4}" y2="${loc.y-r+1}" stroke="#8b1a1a" stroke-width="1.3"/>
+         <line x1="${loc.x+r+4}" y1="${loc.y-r-4}" x2="${loc.x+r-1}" y2="${loc.y-r+1}" stroke="#8b1a1a" stroke-width="1.3"/>` : "";
 
-    return `
-      <g class="map-location" onclick="showLocationInfo('${loc.id}')">
-        ${pulse}
-        <circle cx="${loc.x}" cy="${loc.y}" r="${r}" fill="${dotColor}" opacity="${dotOpacity}"/>
-        ${center}
-        ${scarMark}
-        <text x="${lx}" y="${ly}" text-anchor="${anchor}" fill="${txtColor}" opacity="${txtOpacity}"
-              font-size="9" font-family="Georgia,serif">${loc.name}</text>
-      </g>`;
+    return `<g class="map-location" onclick="showLocationInfo('resonance','${loc.id}')">
+      ${pulse}
+      <circle cx="${loc.x}" cy="${loc.y}" r="${r}" fill="${dotColor}" opacity="${dotOpacity}"/>
+      ${center}${scarMark}
+      <text x="${lx}" y="${ly}" text-anchor="${anchor}" fill="${txtColor}" opacity="${txtOpacity}"
+            font-size="9" font-family="Georgia,serif">${loc.name}</text>
+    </g>`;
   }).join("");
 
   container.innerHTML = `
     <svg viewBox="50 48 320 248" xmlns="http://www.w3.org/2000/svg" class="map-svg">
-      <defs>
-        <style>
-          .loc-pulse {
-            animation: locPulse 2s ease-in-out infinite;
-            transform-box: fill-box;
-            transform-origin: center;
-          }
-          @keyframes locPulse {
-            0%,100% { opacity: 0.5; transform: scale(1); }
-            50%     { opacity: 0.1; transform: scale(1.7); }
-          }
-        </style>
-      </defs>
+      <defs><style>
+        .loc-pulse { animation: locPulse 2s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+        @keyframes locPulse { 0%,100% { opacity: 0.5; transform: scale(1); } 50% { opacity: 0.1; transform: scale(1.7); } }
+      </style></defs>
       <rect x="50" y="48" width="320" height="248" fill="#090912"/>
-      <rect x="55" y="52" width="94" height="80" fill="#0d0d1e" rx="1"/>
+      <rect x="55" y="52" width="94" height="80"  fill="#0d0d1e" rx="1"/>
       <rect x="149" y="52" width="90" height="80" fill="#0d0d1c" rx="1"/>
       <rect x="239" y="52" width="80" height="80" fill="#140a0a" rx="1"/>
       <rect x="55" y="132" width="94" height="70" fill="#0c0c1c" rx="1"/>
@@ -697,9 +1056,7 @@ function renderMap(state) {
       <rect x="55" y="202" width="94" height="68" fill="#0a0a18" rx="1"/>
       <rect x="149" y="202" width="90" height="68" fill="#0a0a18" rx="1"/>
       <rect x="239" y="202" width="80" height="68" fill="#0a0a18" rx="1"/>
-      ${streets}
-      ${connections}
-      ${locSvg}
+      ${streets}${connections}${locSvg}
       <text x="102" y="56" text-anchor="middle" fill="#1c1c36" font-size="6.5" letter-spacing="1.5" font-family="Georgia,serif">ARCHIVE DIST.</text>
       <text x="279" y="56" text-anchor="middle" fill="#281010" font-size="6.5" letter-spacing="1.5" font-family="Georgia,serif">ACCORD WARD</text>
       <path d="M 50 267 Q 118 260 195 264 Q 265 268 320 263 Q 348 260 370 264" stroke="#0c1a28" stroke-width="14" fill="none"/>
@@ -709,7 +1066,80 @@ function renderMap(state) {
     </svg>`;
 }
 
-function matchLocation(str) {
+function renderManlandiaMap(state) {
+  const container = document.getElementById("map-container-manlandia");
+  if (!container) return;
+
+  const ws = state?.worldState || {};
+  updateManlandiaMeterUI(ws);
+
+  const currentId = matchManlandiaLocation(ws.location || "");
+  const visited = ws.visited_locations || [];
+  const scars   = ws.location_scars   || [];
+
+  const connections = MANLANDIA_CONNECTIONS.map(([a, b]) => {
+    const la = MANLANDIA_LOCATIONS.find(l => l.id === a);
+    const lb = MANLANDIA_LOCATIONS.find(l => l.id === b);
+    if (!la || !lb) return "";
+    const isDark = a === "underground-lair" || b === "underground-lair";
+    const isAerial = a === "sky-realm" || b === "sky-realm";
+    const stroke = isDark ? "#2a1010" : isAerial ? "#1a2a3a" : "#0e2a0e";
+    const dash = isAerial ? "2,5" : "3,4";
+    return `<line x1="${la.x}" y1="${la.y}" x2="${lb.x}" y2="${lb.y}" stroke="${stroke}" stroke-width="1.2" stroke-dasharray="${dash}"/>`;
+  }).join("");
+
+  const DOT_COLORS = { home: "#c9a84c", sky: "#87b8d8", villain: "#8b1a1a", land: "#4a8a4a" };
+  const TXT_COLORS = { home: "#c9a84c", sky: "#87b8d8", villain: "#8b1a1a", land: "#3a6a3a" };
+
+  const locSvg = MANLANDIA_LOCATIONS.map(loc => {
+    const isCurrent = loc.id === currentId;
+    const isVisited = visited.includes(loc.id);
+    const locScars  = scars.filter(s => s.id === loc.id);
+    const dotColor  = DOT_COLORS[loc.type] || "#4a8a4a";
+    const txtColor  = TXT_COLORS[loc.type] || "#3a6a3a";
+    const dotOpacity = (isCurrent || isVisited) ? 1 : 0.22;
+    const txtOpacity = (isCurrent || isVisited) ? 1 : 0.28;
+    const r = loc.type === "home" ? 7 : loc.type === "villain" ? 6 : 5;
+    const anchor = loc.la || "middle";
+    const lx = loc.x + (loc.lx || 0);
+    const ly = loc.y + (loc.ly || 17);
+
+    const pulse  = isCurrent ? `<circle cx="${loc.x}" cy="${loc.y}" r="${r + 8}" fill="none" stroke="${dotColor}" stroke-width="1.5" class="loc-pulse"/>` : "";
+    const center = isCurrent ? `<circle cx="${loc.x}" cy="${loc.y}" r="3" fill="white" opacity="0.85"/>` : "";
+    const scarMark = locScars.length
+      ? `<line x1="${loc.x+r-1}" y1="${loc.y-r-4}" x2="${loc.x+r+4}" y2="${loc.y-r+1}" stroke="#8b1a1a" stroke-width="1.3"/>
+         <line x1="${loc.x+r+4}" y1="${loc.y-r-4}" x2="${loc.x+r-1}" y2="${loc.y-r+1}" stroke="#8b1a1a" stroke-width="1.3"/>` : "";
+    const villainhalo = loc.type === "villain"
+      ? `<circle cx="${loc.x}" cy="${loc.y}" r="${r+4}" fill="none" stroke="#5a1010" stroke-width="0.8" opacity="0.5"/>`
+      : "";
+
+    return `<g class="map-location" onclick="showLocationInfo('manlandia','${loc.id}')">
+      ${villainhalo}${pulse}
+      <circle cx="${loc.x}" cy="${loc.y}" r="${r}" fill="${dotColor}" opacity="${dotOpacity}"/>
+      ${center}${scarMark}
+      <text x="${lx}" y="${ly}" text-anchor="${anchor}" fill="${txtColor}" opacity="${txtOpacity}"
+            font-size="9" font-family="Georgia,serif">${loc.name}</text>
+    </g>`;
+  }).join("");
+
+  container.innerHTML = `
+    <svg viewBox="40 28 310 220" xmlns="http://www.w3.org/2000/svg" class="map-svg">
+      <defs><style>
+        .loc-pulse { animation: locPulse 2s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+        @keyframes locPulse { 0%,100% { opacity: 0.5; transform: scale(1); } 50% { opacity: 0.1; transform: scale(1.7); } }
+      </style></defs>
+      <rect x="40" y="28" width="310" height="220" fill="#080f08"/>
+      <rect x="40" y="28" width="150" height="100" fill="#09100a" rx="0"/>
+      <rect x="190" y="28" width="160" height="100" fill="#0a0f09" rx="0"/>
+      <rect x="40" y="155" width="130" height="93" fill="#081009" rx="0"/>
+      <rect x="170" y="185" width="180" height="63" fill="#090808" rx="0"/>
+      <rect x="100" y="175" width="200" height="73" fill="#090908" rx="0"/>
+      ${connections}${locSvg}
+      <text x="195" y="38" text-anchor="middle" fill="#1a2e1a" font-size="10" letter-spacing="4" font-family="Georgia,serif" opacity="0.5">MANLANDIA</text>
+    </svg>`;
+}
+
+function matchResonanceLocation(str) {
   if (!str) return "salt-wick";
   const s = str.toLowerCase();
   if (s.includes("salt") || s.includes("wick") || s.includes("pub"))   return "salt-wick";
@@ -723,20 +1153,93 @@ function matchLocation(str) {
   return "salt-wick";
 }
 
-function showLocationInfo(id) {
-  const loc = LOCATIONS.find(l => l.id === id);
-  if (!loc) return;
-  const danger = loc.type === "conclave";
+function matchManlandiaLocation(str) {
+  if (!str) return "hidden-village";
+  const s = str.toLowerCase();
+  if (s.includes("hidden") || s.includes("village")) return "hidden-village";
+  if (s.includes("sky"))                             return "sky-realm";
+  if (s.includes("frost"))                           return "frost-lands";
+  if (s.includes("mountain") || s.includes("peak"))  return "mountain-peaks";
+  if (s.includes("swamp"))                           return "the-swamp";
+  if (s.includes("dragon") || s.includes("cave"))    return "dragons-cave";
+  if (s.includes("pirate") || s.includes("coast"))   return "pirate-coast";
+  if (s.includes("underground") || s.includes("lair")) return "underground-lair";
+  return "hidden-village";
+}
+
+function showLocationInfo(world, id) {
+  const locs = world === "manlandia" ? MANLANDIA_LOCATIONS : LOCATIONS;
+  const infoEl = document.getElementById(`location-info-${world}`);
+  const loc = locs.find(l => l.id === id);
+  if (!loc || !infoEl) return;
+
+  const danger = loc.type === "conclave" || loc.type === "villain";
   const locScars = (cachedGameState?.worldState?.location_scars || []).filter(s => s.id === id);
   const scarsHtml = locScars.length
     ? `<div class="loc-scars">${locScars.map(s => `<span class="loc-scar">✕ ${escapeHtml(s.label)}</span>`).join("")}</div>`
     : "";
-  document.getElementById("location-info").innerHTML = `
+
+  infoEl.innerHTML = `
     <div class="loc-info-card">
-      <strong style="${danger ? "color:var(--red)" : ""}">${loc.name}${danger ? " ⚡" : ""}</strong>
+      <strong style="${danger ? "color:var(--red)" : ""}">${loc.name}${danger ? " ⚠" : ""}</strong>
       <span>${escapeHtml(loc.desc)}</span>
       ${scarsHtml}
     </div>`;
+}
+
+/* ── Manlandia meter UI ── */
+function updateManlandiaMeterUI(ws) {
+  if (!ws) return;
+  const va = ws.villain_awareness || 0;
+  const cl = ws.curse_level || 0;
+
+  const vFill = document.getElementById("map-villain-fill");
+  if (vFill) {
+    vFill.style.width = `${(va / 10) * 100}%`;
+    vFill.className = "awareness-fill" + (va >= 8 ? " danger" : va >= 5 ? " warning" : "");
+    const vVal = document.getElementById("map-villain-value");
+    const vStat = document.getElementById("map-villain-status");
+    if (vVal) vVal.textContent = `${va} / 10`;
+    if (vStat) vStat.textContent = va >= 8 ? "The Hollow Court hunts you" :
+                                   va >= 5 ? "The Hollow Court is searching" :
+                                   va >= 3 ? "The Hollow Court grows suspicious" :
+                                   "The Hollow Court hasn't noticed you";
+  }
+
+  const cFill = document.getElementById("map-curse-fill");
+  if (cFill) {
+    cFill.style.width = `${(cl / 5) * 100}%`;
+    cFill.className = "awareness-fill curse-fill" + (cl >= 4 ? " danger" : cl >= 2 ? " warning" : "");
+    const cVal = document.getElementById("map-curse-value");
+    const cStat = document.getElementById("map-curse-status");
+    if (cVal) cVal.textContent = `${cl} / 5`;
+    if (cStat) cStat.textContent = cl >= 4 ? "Manlandia is nearly consumed — hurry!" :
+                                   cl >= 3 ? "Magical creatures are losing their powers" :
+                                   cl >= 2 ? "The grey mist spreads through the land" :
+                                   cl >= 1 ? "Grey mist appeared at the forest edges" :
+                                   "Manlandia's magic is intact";
+  }
+
+  updateStoneTracker(ws.stones_found || []);
+}
+
+const STONE_COLORS = {
+  earthstone: "#a0732a",
+  froststone: "#87ceeb",
+  lifestone:  "#27ae60",
+  firestone:  "#e74c3c",
+  skystone:   "#7fb3d3",
+};
+
+function updateStoneTracker(stonesFound) {
+  Object.keys(STONE_COLORS).forEach(id => {
+    const el = document.getElementById(`stone-${id}`);
+    if (!el) return;
+    const found = stonesFound.includes(id);
+    el.classList.toggle("found", found);
+    const iconEl = el.querySelector(".stone-icon");
+    if (iconEl) iconEl.style.color = found ? STONE_COLORS[id] : "";
+  });
 }
 
 /* ── DOM Builders ── */
@@ -744,6 +1247,10 @@ function getCleanText(text) {
   return (text || "")
     .replace(/\[CONCLAVE AWARENESS: \d+ → \d+\]/g, "")
     .replace(/\[DISSONANCE: \d+ → \d+\]/g, "")
+    .replace(/\[VILLAIN AWARENESS: \d+ → \d+\]/g, "")
+    .replace(/\[CURSE: \d+ → \d+\]/g, "")
+    .replace(/\[STONE FOUND: [^\]]+\]/g, "")
+    .replace(/\[CHARACTER \d: [A-Za-z]+ → [A-Za-z]+\]/g, "")
     .replace(/\[LOCATION: [^\]]+\]/g, "")
     .replace(/\[SCAR: [^\]]+\]/g, "")
     .replace(/\[(LYRA|FEN): [A-Za-z]+ → [A-Za-z]+\]/g, "")
@@ -773,10 +1280,11 @@ function appendGMEntry(text, animate) {
 }
 
 function appendPlayerEntry(player, text, animate) {
+  const displayName = getPlayerDisplayName(player);
   const entry = document.createElement("div");
   entry.className = `log-entry player-${player}${animate ? "" : " no-anim"}`;
   entry.innerHTML = `
-    <span class="entry-label">${player === "fen" ? "Fen" : "Lyra"}</span>
+    <span class="entry-label">${displayName}</span>
     <div class="entry-content">${escapeHtml(text)}</div>`;
   logEntries.appendChild(entry);
 }
@@ -784,7 +1292,7 @@ function appendPlayerEntry(player, text, animate) {
 function appendRollResult(player, stat, result) {
   const entry = document.createElement("div");
   entry.className = "roll-result-entry";
-  const name = player === "fen" ? "Fen" : "Lyra";
+  const name = getPlayerDisplayName(player);
   const mod  = result.modifier >= 0 ? `+${result.modifier}` : `${result.modifier}`;
   entry.innerHTML = `
     <span>${name} rolled ${stat.toUpperCase()}: ${result.die1}+${result.die2}${mod} = <strong>${result.total}</strong></span>
@@ -801,14 +1309,31 @@ function appendSystemMessage(msg) {
 
 function extractStateChanges(text) {
   const changes = [];
-  const awareness = text.match(/\[CONCLAVE AWARENESS: (\d+) → (\d+)\]/);
-  if (awareness) changes.push({ text: `⚡ Conclave Awareness: ${awareness[1]} → ${awareness[2]}`, positive: false });
-  const dissonance = text.match(/\[DISSONANCE: (\d+) → (\d+)\]/);
-  if (dissonance) changes.push({ text: `◈ Dissonance Awakening: ${dissonance[1]} → ${dissonance[2]}`, positive: true });
-  for (const m of [...text.matchAll(/\[(LYRA|FEN): ([A-Za-z]+) → ([A-Za-z]+)\]/g)]) {
-    const worsened = HARM_LEVELS.indexOf(m[3]) > HARM_LEVELS.indexOf(m[2]);
-    changes.push({ text: `${m[1]}: ${m[2]} → ${m[3]}`, positive: !worsened });
+
+  if (currentWorld === "manlandia") {
+    const villain = text.match(/\[VILLAIN AWARENESS: (\d+) → (\d+)\]/);
+    if (villain) changes.push({ text: `👁 Villain Awareness: ${villain[1]} → ${villain[2]}`, positive: false });
+    const curse = text.match(/\[CURSE: (\d+) → (\d+)\]/);
+    if (curse) changes.push({ text: `🌫 Greying Curse: ${curse[1]} → ${curse[2]}`, positive: false });
+    for (const m of [...text.matchAll(/\[STONE FOUND: ([^\]]+)\]/g)]) {
+      changes.push({ text: `✦ Stone Found: ${m[1].trim()}`, positive: true });
+    }
+    for (const m of [...text.matchAll(/\[CHARACTER (\d): ([A-Za-z]+) → ([A-Za-z]+)\]/g)]) {
+      const worsened = HARM_LEVELS.indexOf(m[3]) > HARM_LEVELS.indexOf(m[2]);
+      const name = getPlayerDisplayName(`player${m[1]}`);
+      changes.push({ text: `${name}: ${m[2]} → ${m[3]}`, positive: !worsened });
+    }
+  } else {
+    const awareness = text.match(/\[CONCLAVE AWARENESS: (\d+) → (\d+)\]/);
+    if (awareness) changes.push({ text: `⚡ Conclave Awareness: ${awareness[1]} → ${awareness[2]}`, positive: false });
+    const dissonance = text.match(/\[DISSONANCE: (\d+) → (\d+)\]/);
+    if (dissonance) changes.push({ text: `◈ Dissonance Awakening: ${dissonance[1]} → ${dissonance[2]}`, positive: true });
+    for (const m of [...text.matchAll(/\[(LYRA|FEN): ([A-Za-z]+) → ([A-Za-z]+)\]/g)]) {
+      const worsened = HARM_LEVELS.indexOf(m[3]) > HARM_LEVELS.indexOf(m[2]);
+      changes.push({ text: `${m[1]}: ${m[2]} → ${m[3]}`, positive: !worsened });
+    }
   }
+
   const loc = text.match(/\[LOCATION: ([^\]]+)\]/);
   if (loc) changes.push({ text: `📍 ${loc[1].trim()}`, positive: true });
   return changes;
@@ -820,31 +1345,57 @@ function updateCharacterUI(data) {
   const ws    = data.worldState  || data.gameState?.worldState;
   if (!chars) return;
 
-  updateHarm("fen",  chars.fen?.harm);
-  updateHarm("lyra", chars.lyra?.harm);
+  if (currentWorld === "manlandia") {
+    syncPlayerStats(chars);
+    [1,2,3,4].forEach(n => {
+      const p = `player${n}`;
+      updateHarm(`p${n}`, chars[p]?.harm);
+      const nameEl = document.getElementById(`p${n}-name`);
+      if (nameEl && chars[p]?.name && chars[p].name !== `Hero ${n}`) {
+        nameEl.textContent = chars[p].name.toUpperCase();
+        const btn = document.getElementById(`btn-p${n}`);
+        if (btn) btn.textContent = chars[p].name.toUpperCase();
+      }
+      renderManlandiaCard(n, chars[p]);
+    });
 
-  if (chars.lyra?.magic_uses_remaining !== undefined) {
-    const count = chars.lyra.magic_uses_remaining;
-    document.getElementById("magic-count").textContent = count;
-    const magicBtn = document.getElementById("lyra-magic");
-    if (magicBtn) magicBtn.style.opacity = count === 0 ? "0.35" : "1";
+    const badge = document.getElementById("villain-badge");
+    if (badge && ws?.villain_awareness !== undefined) {
+      badge.textContent = `👁 ${ws.villain_awareness}`;
+      badge.className = "manlandia-only" + (ws.villain_awareness >= 8 ? " danger" : ws.villain_awareness >= 5 ? " warning" : "");
+    }
+
+    if (ws) updateManlandiaMeterUI(ws);
+  } else {
+    updateHarm("fen",  chars.fen?.harm);
+    updateHarm("lyra", chars.lyra?.harm);
+
+    if (chars.lyra?.magic_uses_remaining !== undefined) {
+      const count = chars.lyra.magic_uses_remaining;
+      document.getElementById("magic-count").textContent = count;
+      const magicBtn = document.getElementById("lyra-magic");
+      if (magicBtn) magicBtn.style.opacity = count === 0 ? "0.35" : "1";
+    }
+
+    updateAbility("fen-notmywatch", chars.fen?.not_on_my_watch_used);
+    updateAbility("fen-luckybreak",  chars.fen?.lucky_break_used);
+    updateAbility("lyra-knowing",    chars.lyra?.weight_of_knowing_used);
+
+    if (ws?.conclave_awareness !== undefined) {
+      const badge = document.getElementById("awareness-badge");
+      if (badge) {
+        badge.textContent = `⚡ ${ws.conclave_awareness}`;
+        badge.className = "resonance-only" + (ws.conclave_awareness >= 8 ? " danger" : ws.conclave_awareness >= 5 ? " warning" : "");
+      }
+    }
   }
 
-  updateAbility("fen-notmywatch", chars.fen?.not_on_my_watch_used);
-  updateAbility("fen-luckybreak",  chars.fen?.lucky_break_used);
-  updateAbility("lyra-knowing",    chars.lyra?.weight_of_knowing_used);
-
-  if (ws?.conclave_awareness !== undefined) {
-    const badge = document.getElementById("awareness-badge");
-    badge.textContent = `⚡ ${ws.conclave_awareness}`;
-    badge.className = ws.conclave_awareness >= 8 ? "danger" : ws.conclave_awareness >= 5 ? "warning" : "";
-  }
   if (ws?.session) sessionLabel.textContent = `Session ${ws.session}`;
 }
 
-function updateHarm(player, harm) {
+function updateHarm(id, harm) {
   if (!harm) return;
-  const el = document.getElementById(`${player}-harm`);
+  const el = document.getElementById(`${id}-harm`);
   if (el) {
     el.textContent = harm;
     el.className = `harm-value ${harm}`;

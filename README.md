@@ -1,8 +1,15 @@
-# Resonance: A Legacy Campaign
+# Resonance / Manlandia
 
-A two-player narrative RPG for Matt & Michelle. Open on your phones, speak your actions, the GM responds.
+Two narrative RPGs sharing one app. Open on your phone, speak your actions, the AI Game Master responds.
 
 **Play at:** https://resonance-dnd.vercel.app
+
+| World | Players | Story |
+|-------|---------|-------|
+| **Resonance** | Matt & Michelle | A two-player mystery in the city of Varek — magic is forbidden, Wardens are hunting you |
+| **Manlandia** | Matt, Michelle, and the girls | A family quest to collect five magical stones and break the Greying Curse before The Hollow Court wins |
+
+On your first visit the app asks which world to open. Your choice is saved to your device.
 
 ---
 
@@ -11,9 +18,16 @@ A two-player narrative RPG for Matt & Michelle. Open on your phones, speak your 
 ### Starting a session
 
 1. Open **https://resonance-dnd.vercel.app** on your phone — bookmark it
-2. The GM narrates the opening scene automatically on first load
-3. On the **Story** tab, select your character using the **FEN** or **LYRA** button at the bottom
-4. Tap the **🎤 microphone** and speak what you want to do, or type it
+2. If it's your first visit, choose **Resonance** or **Manlandia**
+3. The GM narrates the opening scene automatically on first load
+4. On the **Story** tab, select your character button at the bottom
+5. Tap the **🎤 microphone** and speak what you want to do, or type it
+
+### Switching worlds
+
+Each world has its own separate story and saved progress. To switch:
+- Tap the **⇌** button in the top-right header — this opens the world selector again
+- Or visit `https://resonance-dnd.vercel.app?world=resonance` or `?world=manlandia`
 
 ### The four tabs
 
@@ -22,7 +36,7 @@ A two-player narrative RPG for Matt & Michelle. Open on your phones, speak your 
 | **◈ Story** | The main narration log and your action input |
 | **⚔ Characters** | Character cards, abilities, harm — and End Session |
 | **≡ Archive** | Full logs from completed sessions — tap **⬇ Export** to download the campaign as a text file |
-| **⊕ Map** | City map of Varek, Conclave Awareness meter |
+| **⊕ Map** | **Resonance:** city map of Varek, Conclave Awareness meter · **Manlandia:** world map, Villain Awareness, Greying Curse meter, and 5-stone tracker |
 
 ### Voice input
 
@@ -55,8 +69,8 @@ When the GM calls for a roll, the dice appear and roll automatically.
 |--------|---------|
 | 10+ | Full success |
 | 7–9 | Success with a complication or cost |
-| 6 or less | Something goes wrong |
-| 2–3 | Disaster |
+| 4–6 | Something goes wrong |
+| 2–3 | Disaster — and something else happens too |
 
 ### Using abilities
 
@@ -89,6 +103,8 @@ Write a one-sentence summary when prompted. This archives the full session log p
 
 ## Your Characters
 
+### Resonance
+
 **FEN** — Waiter at the Salt & Wick pub. Witty, sarcastic, loyal to a fault. People have always overlooked him — he assumed it was just bad luck. It isn't.
 - Strongest stat: **Will +3**
 - Abilities: *Easily Overlooked* (advantage on stealth/eavesdropping), *Not On My Watch* (take a hit meant for Lyra once per session), *Lucky Break* (once per session, something inexplicably goes right when everything is going wrong)
@@ -97,9 +113,29 @@ Write a one-sentence summary when prompted. This archives the full session log p
 - Strongest stat: **Acuity +3**
 - Abilities: *Read Resonance* (sense truth/lies, emotional bonds, structural weaknesses), *Reluctant Blade* (end fights non-lethally at no penalty), *Weight of Knowing* (once per session, spend a harm condition for a critical insight)
 
+### Manlandia
+
+Four characters play together — one per player device. Characters will be named and described once the girls decide.
+
+**Select your hero** using the HERO 1 / HERO 2 / HERO 3 / HERO 4 buttons at the bottom of the Story tab. Everyone plays the same session at their own pace — the story syncs every 8 seconds across all devices.
+
+**Your quest:** Collect the five magical stones to break the Greying Curse — a creeping enchantment cast by The Hollow Court that slowly drains the colour, magic, and life from Manlandia.
+
+| Stone | Location | Colour |
+|-------|----------|--------|
+| Earthstone | Mountain Peaks | Warm bronze |
+| Froststone | Frost Lands | Ice blue |
+| Lifestone | The Swamp | Deep green |
+| Firestone | Dragon's Cave | Ember red |
+| Skystone | Sky Realm | Sky blue |
+
+The **Stone Tracker** in the Map tab lights up each stone when you find it.
+
 ---
 
 ## The World
+
+### Resonance
 
 The **Concord** rules everything. Its priests teach that magic is corruption — called "Discord" — and hunt those who carry it. The Conclave's enforcers, the **Accord Wardens**, patrol every city in grey cloaks. They carry tuning forks that hum near people like you.
 
@@ -116,6 +152,29 @@ The **⊕ Map** tab shows Varek — your current location pulses gold. The map u
 Locations you haven't visited yet appear dimmed. As you explore, they light up permanently.
 
 Some locations will eventually show a small crimson **✕** mark — a **location scar**, placed by the GM when something permanent and significant happened there. Tap the location to see what left its mark.
+
+### Manlandia
+
+**Manlandia** is a land of wonder full of creatures you'd never see on Earth — fairies, unicorns, dragons, alien visitors with unusual features, and enchanted animals with their own languages. Magic is everywhere: enchanted rocks, glowing portals, artifacts that grant special powers, and mystical beings with abilities all their own.
+
+Different lands make up the world:
+
+| Region | Description |
+|--------|-------------|
+| Hidden Village | Your home — the last safe place, hidden by old magic |
+| Frost Lands | Eternal winter; ice sprites and glowing fish under frozen lakes |
+| Mountain Peaks | Stone giants sleep standing up; eagles the size of horses |
+| The Swamp | Talking frogs, walking trees, fireflies carrying lanterns |
+| Dragon's Cave | Valora the ancient dragon guards a priceless secret |
+| Pirate Coast | Wild shores; alien traders sell impossible things for a song |
+| Sky Realm | Floating islands in the clouds; sky whales hum old songs |
+| Underground Lair | The Hollow Court's hidden fortress — no one knows the entrance |
+
+**The Villain:** The **Hollow Court** is an ancient group of sorcerers led by the **Pale Chancellor**. They cast the Greying Curse centuries ago to drain Manlandia's power into themselves. As the curse spreads, the world fades — first to grey, then to silence.
+
+**The two meters in the Map tab:**
+- **👁 Villain Awareness** — how much the Hollow Court knows about your group. At 5 they begin hunting you; at 8 they send their champions.
+- **🌫 Greying Curse** — how far the curse has spread. At 5, Manlandia's magic fails completely and the quest is lost.
 
 ---
 
@@ -150,7 +209,10 @@ The app requires a campaign secret to prevent strangers from resetting your prog
 
 **Start a completely fresh campaign:**
 Go to the **⚔ Characters** tab → "End Session & Save" to archive the session first. For a full wipe, open the browser console and run (replacing YOUR_SECRET with your `GAME_SECRET` value):
-`fetch('/api/state',{method:'POST',headers:{'Content-Type':'application/json','X-Game-Secret':'YOUR_SECRET'},body:JSON.stringify({action:'reset'})})`
+
+Resonance: `fetch('/api/state?world=resonance',{method:'POST',headers:{'Content-Type':'application/json','X-Game-Secret':'YOUR_SECRET'},body:JSON.stringify({action:'reset'})})`
+
+Manlandia: `fetch('/api/state?world=manlandia',{method:'POST',headers:{'Content-Type':'application/json','X-Game-Secret':'YOUR_SECRET'},body:JSON.stringify({action:'reset'})})`
 
 ---
 

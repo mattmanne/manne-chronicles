@@ -5,10 +5,95 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <title>Resonance</title>
+  <title>Loading…</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
+
+  <!-- World Selector Overlay -->
+  <div id="world-selector">
+    <div class="world-select-box">
+      <div class="world-select-title">Choose Your World</div>
+      <button class="world-btn" data-world="resonance">
+        <span class="world-btn-name">RESONANCE</span>
+        <span class="world-btn-sub">Matt &amp; Michelle's Campaign</span>
+      </button>
+      <button class="world-btn" data-world="manlandia">
+        <span class="world-btn-name">MANLANDIA</span>
+        <span class="world-btn-sub">The Family Adventure</span>
+      </button>
+      <div class="world-select-hint">Your choice is remembered on this device</div>
+    </div>
+  </div>
+
+  <!-- Character Creation Wizard (Manlandia) -->
+  <div id="character-wizard">
+    <div class="wizard-box">
+
+      <div class="wizard-progress">
+        <div class="wiz-dot active"></div>
+        <div class="wiz-dot"></div>
+        <div class="wiz-dot"></div>
+        <div class="wiz-dot"></div>
+      </div>
+
+      <!-- Step 1: Name -->
+      <div class="wiz-step" id="wiz-step-1">
+        <div class="wiz-icon">🦸</div>
+        <h2 class="wiz-title">What's your hero's name?</h2>
+        <input type="text" id="wiz-name" class="wiz-input" placeholder="Type your name here…" maxlength="20" autocomplete="off" />
+        <button class="wiz-btn" id="wiz-name-next">Next →</button>
+      </div>
+
+      <!-- Step 2: Archetype -->
+      <div class="wiz-step hidden" id="wiz-step-2">
+        <div class="wiz-icon">⭐</div>
+        <h2 class="wiz-title">What is your hero best at?</h2>
+        <div class="wiz-cards">
+          <button class="wiz-card" data-archetype="fighter"><span class="wiz-card-ico">⚔️</span><span class="wiz-card-label">Fighting</span><span class="wiz-card-sub">Strong and brave in battle</span></button>
+          <button class="wiz-card" data-archetype="mage"><span class="wiz-card-ico">✨</span><span class="wiz-card-label">Magic</span><span class="wiz-card-sub">Spells and magical powers</span></button>
+          <button class="wiz-card" data-archetype="scout"><span class="wiz-card-ico">🐾</span><span class="wiz-card-label">Sneaking</span><span class="wiz-card-sub">Fast, quiet, and clever</span></button>
+          <button class="wiz-card" data-archetype="leader"><span class="wiz-card-ico">🛡️</span><span class="wiz-card-label">Leading</span><span class="wiz-card-sub">Brave and protects the team</span></button>
+          <button class="wiz-card" data-archetype="charmer"><span class="wiz-card-ico">🌟</span><span class="wiz-card-label">Talking</span><span class="wiz-card-sub">Makes friends with anyone — even dragons!</span></button>
+        </div>
+      </div>
+
+      <!-- Step 3: Special Power -->
+      <div class="wiz-step hidden" id="wiz-step-3">
+        <div class="wiz-icon">🔮</div>
+        <h2 class="wiz-title">Pick your special power</h2>
+        <p class="wiz-subtitle">You can use this once per adventure</p>
+        <div class="wiz-cards">
+          <button class="wiz-card" data-ability="animal_friend"><span class="wiz-card-ico">🦋</span><span class="wiz-card-label">Animal Friend</span><span class="wiz-card-sub">A creature comes to help you at the perfect moment</span></button>
+          <button class="wiz-card" data-ability="lucky_break"><span class="wiz-card-ico">🍀</span><span class="wiz-card-label">Lucky Break</span><span class="wiz-card-sub">Something goes perfectly right when everything is going wrong</span></button>
+          <button class="wiz-card" data-ability="protect_friend"><span class="wiz-card-ico">💪</span><span class="wiz-card-label">Protect a Friend</span><span class="wiz-card-sub">Jump in and take a hit that was meant for another hero</span></button>
+          <button class="wiz-card" data-ability="ancient_magic"><span class="wiz-card-ico">⚡</span><span class="wiz-card-label">Ancient Magic</span><span class="wiz-card-sub">Use a magical power — glow, fly, or speak to spirits</span></button>
+        </div>
+      </div>
+
+      <!-- Step 4: Photo -->
+      <div class="wiz-step hidden" id="wiz-step-4">
+        <div class="wiz-icon">📸</div>
+        <h2 class="wiz-title">Add a picture of your hero!</h2>
+        <p class="wiz-subtitle">Optional — only shows on your device</p>
+        <div id="wiz-photo-preview" class="wiz-photo-preview"></div>
+        <label for="wiz-photo-input" class="wiz-btn wiz-photo-btn">📷 Choose a Picture</label>
+        <input type="file" id="wiz-photo-input" accept="image/*" style="display:none" />
+        <button class="wiz-btn" id="wiz-finish-btn">🎉 Create My Hero!</button>
+        <button class="wiz-link" id="wiz-skip-photo">Skip — no picture</button>
+      </div>
+
+      <!-- Done! -->
+      <div class="wiz-step hidden" id="wiz-done">
+        <div class="wiz-done-burst">🎉</div>
+        <h2 class="wiz-title" id="wiz-done-name">Hero Name</h2>
+        <p class="wiz-subtitle">Your hero is ready for adventure!</p>
+        <div class="wiz-done-summary" id="wiz-done-summary"></div>
+        <button class="wiz-btn" id="wiz-close-btn">Let's go! →</button>
+      </div>
+
+    </div>
+  </div>
 
   <div id="app">
 
@@ -19,12 +104,14 @@
         <span id="session-label">Session 1</span>
       </div>
       <div id="header-right">
+        <button id="world-switch-btn" class="icon-btn" title="Switch world">⇌</button>
         <button id="auto-read-btn" class="icon-btn" title="Auto-read new narrations">🔊</button>
-        <span id="awareness-badge" title="Conclave Awareness">⚡ 0</span>
+        <span id="awareness-badge" class="resonance-only" title="Conclave Awareness">⚡ 0</span>
+        <span id="villain-badge" class="manlandia-only" title="Villain Awareness">👁 0</span>
       </div>
     </header>
 
-    <!-- Dice Overlay (always on top) -->
+    <!-- Dice Overlay -->
     <div id="dice-overlay" class="hidden">
       <div id="dice-box">
         <div id="dice-title">Rolling…</div>
@@ -53,8 +140,12 @@
         </div>
         <footer id="input-area">
           <div id="player-select">
-            <button class="player-btn active" data-player="fen" id="btn-fen">FEN</button>
-            <button class="player-btn" data-player="lyra" id="btn-lyra">LYRA</button>
+            <button class="player-btn resonance-only active" data-player="fen" id="btn-fen">FEN</button>
+            <button class="player-btn resonance-only" data-player="lyra" id="btn-lyra">LYRA</button>
+            <button class="player-btn manlandia-only" data-player="player1" id="btn-p1">HERO 1</button>
+            <button class="player-btn manlandia-only" data-player="player2" id="btn-p2">HERO 2</button>
+            <button class="player-btn manlandia-only" data-player="player3" id="btn-p3">HERO 3</button>
+            <button class="player-btn manlandia-only" data-player="player4" id="btn-p4">HERO 4</button>
           </div>
           <div id="action-row">
             <input type="text" id="action-input" placeholder="What do you do?" autocomplete="off" autocorrect="off" />
@@ -69,54 +160,123 @@
       <div id="tab-characters" class="tab-panel">
         <div class="tab-scroll">
 
-          <div class="char-card" id="fen-card">
-            <div class="char-header">
-              <span class="char-name">FEN</span>
-              <span class="char-role">Waiter · Dissonant?</span>
+          <!-- Resonance characters -->
+          <div class="resonance-only">
+            <div class="char-card" id="fen-card">
+              <div class="char-header">
+                <span class="char-name">FEN</span>
+                <span class="char-role">Waiter · Dissonant?</span>
+              </div>
+              <div class="harm-row">
+                <span class="harm-label">Harm:</span>
+                <span id="fen-harm" class="harm-value Unhurt">Unhurt</span>
+              </div>
+              <div class="ability-row">
+                <button class="ability used-indicator available" id="fen-notmywatch"
+                  data-character="fen" data-ability="not_on_my_watch_used"
+                  title="Take a hit meant for Lyra — tap to mark used">🛡 Not On My Watch</button>
+                <button class="ability used-indicator available" id="fen-luckybreak"
+                  data-character="fen" data-ability="lucky_break_used"
+                  title="Something goes right when everything is wrong — tap to mark used">✦ Lucky Break</button>
+              </div>
+              <div class="stat-row">
+                <span class="stat">FOR +0</span>
+                <span class="stat">ACU +1</span>
+                <span class="stat">AGI +1</span>
+                <span class="stat highlight">WIL +3</span>
+                <span class="stat">PRE +0</span>
+              </div>
             </div>
-            <div class="harm-row">
-              <span class="harm-label">Harm:</span>
-              <span id="fen-harm" class="harm-value Unhurt">Unhurt</span>
-            </div>
-            <div class="ability-row">
-              <button class="ability used-indicator available" id="fen-notmywatch"
-                data-character="fen" data-ability="not_on_my_watch_used"
-                title="Take a hit meant for Lyra — tap to mark used">🛡 Not On My Watch</button>
-              <button class="ability used-indicator available" id="fen-luckybreak"
-                data-character="fen" data-ability="lucky_break_used"
-                title="Something goes right when everything is wrong — tap to mark used">✦ Lucky Break</button>
-            </div>
-            <div class="stat-row">
-              <span class="stat">FOR +0</span>
-              <span class="stat">ACU +1</span>
-              <span class="stat">AGI +1</span>
-              <span class="stat highlight">WIL +3</span>
-              <span class="stat">PRE +0</span>
+
+            <div class="char-card" id="lyra-card">
+              <div class="char-header">
+                <span class="char-name">LYRA</span>
+                <span class="char-role">Scholar · Harmonic</span>
+              </div>
+              <div class="harm-row">
+                <span class="harm-label">Harm:</span>
+                <span id="lyra-harm" class="harm-value Unhurt">Unhurt</span>
+              </div>
+              <div class="ability-row">
+                <button class="ability magic-btn" id="lyra-magic"
+                  title="Resonance charges remaining — tap to spend one">◈ Magic: <span id="magic-count">3</span></button>
+                <button class="ability used-indicator available" id="lyra-knowing"
+                  data-character="lyra" data-ability="weight_of_knowing_used"
+                  title="Spend a harm condition for critical insight — tap to mark used">◉ Weight of Knowing</button>
+              </div>
+              <div class="stat-row">
+                <span class="stat">FOR +1</span>
+                <span class="stat highlight">ACU +3</span>
+                <span class="stat">AGI +2</span>
+                <span class="stat">WIL +2</span>
+                <span class="stat">PRE +1</span>
+              </div>
             </div>
           </div>
 
-          <div class="char-card" id="lyra-card">
-            <div class="char-header">
-              <span class="char-name">LYRA</span>
-              <span class="char-role">Scholar · Harmonic</span>
-            </div>
-            <div class="harm-row">
-              <span class="harm-label">Harm:</span>
-              <span id="lyra-harm" class="harm-value Unhurt">Unhurt</span>
-            </div>
-            <div class="ability-row">
-              <button class="ability magic-btn" id="lyra-magic"
-                title="Resonance charges remaining — tap to spend one">◈ Magic: <span id="magic-count">3</span></button>
-              <button class="ability used-indicator available" id="lyra-knowing"
-                data-character="lyra" data-ability="weight_of_knowing_used"
-                title="Spend a harm condition for critical insight — tap to mark used">◉ Weight of Knowing</button>
-            </div>
-            <div class="stat-row">
-              <span class="stat">FOR +1</span>
-              <span class="stat highlight">ACU +3</span>
-              <span class="stat">AGI +2</span>
-              <span class="stat">WIL +2</span>
-              <span class="stat">PRE +1</span>
+          <!-- Manlandia characters (2×2 grid) -->
+          <div class="manlandia-only">
+            <div class="manlandia-chars-grid">
+              <div class="char-card manlandia-card" id="p1-card">
+                <div class="char-header manlandia-char-header">
+                  <div class="char-avatar" id="p1-avatar"></div>
+                  <div class="char-meta">
+                    <span class="char-name" id="p1-name">HERO 1</span>
+                    <span class="char-role" id="p1-role">Player 1</span>
+                  </div>
+                </div>
+                <div class="harm-row">
+                  <span class="harm-label">Harm:</span>
+                  <span id="p1-harm" class="harm-value Unhurt" data-player="player1">Unhurt</span>
+                </div>
+                <div class="ability-row" id="p1-ability-row"></div>
+                <div class="card-actions" id="p1-card-actions"></div>
+              </div>
+              <div class="char-card manlandia-card" id="p2-card">
+                <div class="char-header manlandia-char-header">
+                  <div class="char-avatar" id="p2-avatar"></div>
+                  <div class="char-meta">
+                    <span class="char-name" id="p2-name">HERO 2</span>
+                    <span class="char-role" id="p2-role">Player 2</span>
+                  </div>
+                </div>
+                <div class="harm-row">
+                  <span class="harm-label">Harm:</span>
+                  <span id="p2-harm" class="harm-value Unhurt" data-player="player2">Unhurt</span>
+                </div>
+                <div class="ability-row" id="p2-ability-row"></div>
+                <div class="card-actions" id="p2-card-actions"></div>
+              </div>
+              <div class="char-card manlandia-card" id="p3-card">
+                <div class="char-header manlandia-char-header">
+                  <div class="char-avatar" id="p3-avatar"></div>
+                  <div class="char-meta">
+                    <span class="char-name" id="p3-name">HERO 3</span>
+                    <span class="char-role" id="p3-role">Player 3</span>
+                  </div>
+                </div>
+                <div class="harm-row">
+                  <span class="harm-label">Harm:</span>
+                  <span id="p3-harm" class="harm-value Unhurt" data-player="player3">Unhurt</span>
+                </div>
+                <div class="ability-row" id="p3-ability-row"></div>
+                <div class="card-actions" id="p3-card-actions"></div>
+              </div>
+              <div class="char-card manlandia-card" id="p4-card">
+                <div class="char-header manlandia-char-header">
+                  <div class="char-avatar" id="p4-avatar"></div>
+                  <div class="char-meta">
+                    <span class="char-name" id="p4-name">HERO 4</span>
+                    <span class="char-role" id="p4-role">Player 4</span>
+                  </div>
+                </div>
+                <div class="harm-row">
+                  <span class="harm-label">Harm:</span>
+                  <span id="p4-harm" class="harm-value Unhurt" data-player="player4">Unhurt</span>
+                </div>
+                <div class="ability-row" id="p4-ability-row"></div>
+                <div class="card-actions" id="p4-card-actions"></div>
+              </div>
             </div>
           </div>
 
@@ -138,18 +298,74 @@
       <!-- Map -->
       <div id="tab-map" class="tab-panel">
         <div class="tab-scroll">
-          <div class="awareness-meter">
-            <div class="awareness-header">
-              <span>⚡ CONCLAVE AWARENESS</span>
-              <span id="map-awareness-value">0 / 10</span>
+
+          <!-- Resonance map -->
+          <div class="resonance-only">
+            <div class="awareness-meter">
+              <div class="awareness-header">
+                <span>⚡ CONCLAVE AWARENESS</span>
+                <span id="map-awareness-value">0 / 10</span>
+              </div>
+              <div class="awareness-track">
+                <div class="awareness-fill" id="map-awareness-fill"></div>
+              </div>
+              <div class="awareness-status" id="map-awareness-status">Undetected — carry on normally</div>
             </div>
-            <div class="awareness-track">
-              <div class="awareness-fill" id="map-awareness-fill"></div>
-            </div>
-            <div class="awareness-status" id="map-awareness-status">Undetected — carry on normally</div>
+            <div id="map-container-resonance"></div>
+            <div id="location-info-resonance"></div>
           </div>
-          <div id="map-container"></div>
-          <div id="location-info"></div>
+
+          <!-- Manlandia map -->
+          <div class="manlandia-only">
+            <div class="awareness-meter">
+              <div class="awareness-header">
+                <span>👁 VILLAIN AWARENESS</span>
+                <span id="map-villain-value">0 / 10</span>
+              </div>
+              <div class="awareness-track">
+                <div class="awareness-fill" id="map-villain-fill"></div>
+              </div>
+              <div class="awareness-status" id="map-villain-status">The Hollow Court hasn't noticed you</div>
+            </div>
+            <div class="awareness-meter">
+              <div class="awareness-header">
+                <span>🌫 GREYING CURSE</span>
+                <span id="map-curse-value">0 / 5</span>
+              </div>
+              <div class="awareness-track">
+                <div class="awareness-fill" id="map-curse-fill"></div>
+              </div>
+              <div class="awareness-status" id="map-curse-status">Manlandia's magic is intact</div>
+            </div>
+            <div class="stone-tracker">
+              <div class="stone-tracker-label">THE FIVE MAGICAL STONES</div>
+              <div class="stone-slots">
+                <div class="stone-slot" id="stone-earthstone" title="Earthstone — Mountain Peaks">
+                  <span class="stone-icon">◆</span>
+                  <span class="stone-name">Earth</span>
+                </div>
+                <div class="stone-slot" id="stone-froststone" title="Froststone — Frost Lands">
+                  <span class="stone-icon">◆</span>
+                  <span class="stone-name">Frost</span>
+                </div>
+                <div class="stone-slot" id="stone-lifestone" title="Lifestone — The Swamp">
+                  <span class="stone-icon">◆</span>
+                  <span class="stone-name">Life</span>
+                </div>
+                <div class="stone-slot" id="stone-firestone" title="Firestone — Dragon's Cave">
+                  <span class="stone-icon">◆</span>
+                  <span class="stone-name">Fire</span>
+                </div>
+                <div class="stone-slot" id="stone-skystone" title="Skystone — Sky Realm">
+                  <span class="stone-icon">◆</span>
+                  <span class="stone-name">Sky</span>
+                </div>
+              </div>
+            </div>
+            <div id="map-container-manlandia"></div>
+            <div id="location-info-manlandia"></div>
+          </div>
+
         </div>
       </div>
 

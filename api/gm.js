@@ -1,12 +1,11 @@
 const { getState, setState } = require("../lib/redis");
 const { generateContent } = require("../lib/gemini");
-const { buildSystemPrompt } = require("../lib/prompt");
-const { getInitialState } = require("../lib/gamestate");
+const { getWorldConfig } = require("../lib/worldconfig");
+const { STONE_IDS } = require("../lib/gamestate-manlandia");
 
-const KEY = "resonance:gamestate";
 const MAX_HISTORY = 40;
 
-function matchLocationId(name) {
+function matchResonanceLocationId(name) {
   const s = name.toLowerCase();
   if (s.includes("salt") || s.includes("wick") || s.includes("pub")) return "salt-wick";
   if (s.includes("archive")) return "archive";
@@ -19,8 +18,27 @@ function matchLocationId(name) {
   return null;
 }
 
+function matchManlandiaLocationId(name) {
+  const s = name.toLowerCase();
+  if (s.includes("hidden") || s.includes("village")) return "hidden-village";
+  if (s.includes("mountain") || s.includes("peak")) return "mountain-peaks";
+  if (s.includes("frost") || s.includes("frost land")) return "frost-lands";
+  if (s.includes("swamp")) return "the-swamp";
+  if (s.includes("dragon") || s.includes("cave")) return "dragons-cave";
+  if (s.includes("pirate") || s.includes("coast")) return "pirate-coast";
+  if (s.includes("underground") || s.includes("lair")) return "underground-lair";
+  if (s.includes("sky")) return "sky-realm";
+  return null;
+}
+
+function matchStoneId(name) {
+  const s = name.toLowerCase().trim();
+  return STONE_IDS.includes(s) ? s : null;
+}
+
 module.exports = async function handler(req, res) {
-  res.setHeader("Access-Control-Allow-Origin", "*");
+  const allowedOrigin = process.env.ALLOWED_ORIGIN || "*";
+  res.setHeader("Access-Control-Allow-Origin", allowedOrigin);
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, X-Game-Secret");
   if (req.method === "OPTIONS") return res.status(200).end();
@@ -31,10 +49,13 @@ module.exports = async function handler(req, res) {
     return res.status(401).json({ error: "Unauthorized" });
   }
 
+  const worldConfig = getWorldConfig(req.query.world);
+  const { key, getInitialState, buildSystemPrompt } = worldConfig;
+
   const { player, message, type } = req.body;
   if (!player || !message) return res.status(400).json({ error: "Missing player or message" });
 
-  const gameState = (await getState(KEY)) || getInitialState();
+  const gameState = (await getState(key)) || getInitialState();
   const systemPrompt = buildSystemPrompt(gameState);
 
   const recentLog = gameState.sessionLog.slice(-MAX_HISTORY);
@@ -44,14 +65,13 @@ module.exports = async function handler(req, res) {
   }));
 
   const playerLabel = player.charAt(0).toUpperCase() + player.slice(1);
-  const userMessage =
-    type === "roll_result" ? message : `${playerLabel}: ${message}`;
+  const userMessage = type === "roll_result" ? message : `${playerLabel}: ${message}`;
 
   let gmResponse;
   try {
     gmResponse = await generateContent(systemPrompt, history, userMessage);
   } catch (err) {
-    console.error("Gemini error:", err);
+    console.error("GM error:", err);
     return res.status(500).json({ error: "The GM encountered an error: " + err.message });
   }
 
@@ -61,26 +81,27 @@ module.exports = async function handler(req, res) {
   const rollAdvantage = rollMatch ? !!rollMatch[2] : false;
   const cleanResponse = gmResponse.replace(/^ROLL:(FORCE|ACUITY|AGILITY|WILL|PRESENCE)(:ADVANTAGE)?$/m, "").trim();
 
-  gameState.sessionLog.push(
-    { role: "user", content: userMessage, player, timestamp: Date.now() },
-    { role: "gm", content: cleanResponse, timestamp: Date.now() }
-  );
+  // When completing a roll, un-flag the deferred entries saved on the prior call
+  if (type === "roll_result") {
+    const unmasked = Date.now();
+    gameState.sessionLog.forEach(e => {
+      if (e.rolling) { delete e.rolling; e.timestamp = unmasked - 2; }
+    });
+  }
+
+  const ts = Date.now();
+  const rolling = needsRoll && type !== "roll_result";
+  const userEntry = { role: "user", content: userMessage, player, timestamp: ts };
+  const gmEntry   = { role: "gm",   content: cleanResponse,           timestamp: ts };
+  if (rolling) { userEntry.rolling = true; gmEntry.rolling = true; }
+  gameState.sessionLog.push(userEntry, gmEntry);
+
   if (gameState.sessionLog.length > 100) {
     gameState.sessionLog = gameState.sessionLog.slice(-80);
   }
 
-  const awarenessMatch = cleanResponse.match(/\[CONCLAVE AWARENESS: (\d+) → (\d+)\]/);
-  if (awarenessMatch) gameState.worldState.conclave_awareness = parseInt(awarenessMatch[2]);
-
-  const dissonanceMatch = cleanResponse.match(/\[DISSONANCE: (\d+) → (\d+)\]/);
-  if (dissonanceMatch) gameState.worldState.fen_dissonance_awakening = parseInt(dissonanceMatch[2]);
-
-  const harmRegex = /\[(LYRA|FEN): ([A-Za-z]+) → ([A-Za-z]+)\]/g;
-  let harmMatch;
-  while ((harmMatch = harmRegex.exec(cleanResponse)) !== null) {
-    const who = harmMatch[1].toLowerCase();
-    if (gameState.characters[who]) gameState.characters[who].harm = harmMatch[3];
-  }
+  // Shared: LOCATION and SCAR tags
+  const matchLocationId = worldConfig.id === "manlandia" ? matchManlandiaLocationId : matchResonanceLocationId;
 
   const locationMatch = cleanResponse.match(/\[LOCATION: ([^\]]+)\]/);
   if (locationMatch) {
@@ -107,23 +128,83 @@ module.exports = async function handler(req, res) {
     }
   }
 
-  await setState(KEY, gameState);
+  let responseWorldState;
+
+  if (worldConfig.id === "manlandia") {
+    // Villain awareness
+    const villainMatch = cleanResponse.match(/\[VILLAIN AWARENESS: (\d+) → (\d+)\]/);
+    if (villainMatch) gameState.worldState.villain_awareness = parseInt(villainMatch[2]);
+
+    // Curse level
+    const curseMatch = cleanResponse.match(/\[CURSE: (\d+) → (\d+)\]/);
+    if (curseMatch) gameState.worldState.curse_level = parseInt(curseMatch[2]);
+
+    // Stone found
+    const stoneRegex = /\[STONE FOUND: ([^\]]+)\]/g;
+    let stoneMatch;
+    while ((stoneMatch = stoneRegex.exec(cleanResponse)) !== null) {
+      const stoneId = matchStoneId(stoneMatch[1]);
+      if (stoneId) {
+        if (!gameState.worldState.stones_found) gameState.worldState.stones_found = [];
+        if (!gameState.worldState.stones_found.includes(stoneId)) {
+          gameState.worldState.stones_found.push(stoneId);
+        }
+      }
+    }
+
+    // Character harm: [CHARACTER N: OldHarm → NewHarm]
+    const charHarmRegex = /\[CHARACTER (\d): ([A-Za-z]+) → ([A-Za-z]+)\]/g;
+    let charHarmMatch;
+    while ((charHarmMatch = charHarmRegex.exec(cleanResponse)) !== null) {
+      const charKey = `player${charHarmMatch[1]}`;
+      if (gameState.characters[charKey]) gameState.characters[charKey].harm = charHarmMatch[3];
+    }
+
+    responseWorldState = {
+      session: gameState.session,
+      villain_awareness: gameState.worldState.villain_awareness,
+      curse_level: gameState.worldState.curse_level,
+      stones_found: gameState.worldState.stones_found || [],
+      location: gameState.worldState.location,
+      visited_locations: gameState.worldState.visited_locations || [],
+      location_scars: gameState.worldState.location_scars || [],
+    };
+  } else {
+    // Resonance-specific parsing
+    const awarenessMatch = cleanResponse.match(/\[CONCLAVE AWARENESS: (\d+) → (\d+)\]/);
+    if (awarenessMatch) gameState.worldState.conclave_awareness = parseInt(awarenessMatch[2]);
+
+    const dissonanceMatch = cleanResponse.match(/\[DISSONANCE: (\d+) → (\d+)\]/);
+    if (dissonanceMatch) gameState.worldState.fen_dissonance_awakening = parseInt(dissonanceMatch[2]);
+
+    const harmRegex = /\[(LYRA|FEN): ([A-Za-z]+) → ([A-Za-z]+)\]/g;
+    let harmMatch;
+    while ((harmMatch = harmRegex.exec(cleanResponse)) !== null) {
+      const who = harmMatch[1].toLowerCase();
+      if (gameState.characters[who]) gameState.characters[who].harm = harmMatch[3];
+    }
+
+    responseWorldState = {
+      session: gameState.session,
+      conclave_awareness: gameState.worldState.conclave_awareness,
+      fen_dissonance_awakening: gameState.worldState.fen_dissonance_awakening,
+      location: gameState.worldState.location,
+      visited_locations: gameState.worldState.visited_locations || [],
+      location_scars: gameState.worldState.location_scars || [],
+    };
+  }
+
+  await setState(key, gameState);
 
   return res.json({
     response: cleanResponse,
     needsRoll,
     rollStat,
     rollAdvantage,
+    serverTimestamp: Date.now(),
     gameState: {
       characters: gameState.characters,
-      worldState: {
-        session: gameState.session,
-        conclave_awareness: gameState.worldState.conclave_awareness,
-        fen_dissonance_awakening: gameState.worldState.fen_dissonance_awakening,
-        location: gameState.worldState.location,
-        visited_locations: gameState.worldState.visited_locations,
-        location_scars: gameState.worldState.location_scars,
-      },
+      worldState: responseWorldState,
     },
   });
 };
