@@ -32,6 +32,7 @@ module.exports = async function handler(req, res) {
         name:        String(name).trim().slice(0, 40),
         theme:       String(theme).trim().slice(0, 600),
         playerCount: Math.min(4, Math.max(1, parseInt(playerCount) || 2)),
+        adult:       payload.adult === true,
       };
 
       await setState(`campaign:${id}:gamestate`, getInitialStateCustom(wc));
@@ -42,6 +43,7 @@ module.exports = async function handler(req, res) {
         name:        wc.name,
         subtitle:    wc.theme.slice(0, 70) + (wc.theme.length > 70 ? "…" : ""),
         playerCount: wc.playerCount,
+        adult:       wc.adult,
         createdAt:   Date.now(),
       };
       index.push(entry);

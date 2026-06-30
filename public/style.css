@@ -1193,3 +1193,96 @@ body.world-manlandia #villain-badge   { display: inline-block; }
 .awareness-fill.curse-fill.warning { background: #888; }
 .awareness-fill.curse-fill.danger  { background: #4a4a4a; }
 
+/* ── Adult Content Gate ── */
+body:not(.adult-unlocked) .adult-only { display: none !important; }
+
+/* Unlock button in world selector */
+.unlock-adult-btn {
+  padding: 14px 20px;
+  background: none;
+  border: 1px solid #2e2020;
+  border-radius: 10px;
+  cursor: pointer;
+  text-align: center;
+  color: var(--parch-dim);
+  font-size: 0.78rem;
+  letter-spacing: 0.06em;
+  transition: all 0.2s;
+  opacity: 0.6;
+}
+.unlock-adult-btn:hover { border-color: #5a3030; color: var(--parchment); opacity: 1; }
+.adult-unlocked .unlock-adult-btn { display: none; }
+
+/* Adult unlock PIN overlay */
+#unlock-overlay {
+  display: none;
+  position: fixed; inset: 0;
+  background: rgba(9,9,18,0.92);
+  align-items: center; justify-content: center;
+  z-index: 3000;
+  padding: 16px;
+}
+#unlock-overlay.active { display: flex; }
+
+.unlock-box {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  width: 100%; max-width: 320px;
+  padding: 32px 28px;
+  display: flex; flex-direction: column; gap: 16px;
+  text-align: center;
+}
+
+.unlock-title {
+  font-family: var(--font-serif);
+  color: var(--gold);
+  font-size: 1rem;
+  letter-spacing: 0.1em;
+}
+
+.unlock-subtitle {
+  font-size: 0.8rem;
+  color: var(--parch-dim);
+  line-height: 1.5;
+}
+
+.unlock-pin-input {
+  width: 100%; padding: 14px; font-size: 1.6rem;
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 10px; color: var(--parchment);
+  text-align: center; letter-spacing: 0.4em; outline: none;
+  -webkit-appearance: none; font-family: monospace;
+}
+.unlock-pin-input:focus { border-color: var(--gold-dim); }
+
+.unlock-error {
+  font-size: 0.8rem;
+  color: var(--red);
+  padding: 2px 0;
+}
+.unlock-error.hidden { display: none; }
+
+.unlock-actions { display: flex; gap: 10px; }
+
+/* Adult badge on campaign cards */
+.adult-badge {
+  display: inline-block;
+  font-size: 0.5rem;
+  font-family: var(--font-sans);
+  letter-spacing: 0.04em;
+  padding: 1px 4px;
+  background: rgba(192,57,43,0.12);
+  border: 1px solid #6a2010;
+  border-radius: 3px;
+  color: #c0392b;
+  vertical-align: middle;
+  margin-left: 5px;
+  font-weight: normal;
+}
+
+/* World creator adult toggle */
+.wc-adult-toggle { display: flex; align-items: flex-start; gap: 10px; }
+.wc-adult-checkbox { width: 18px; height: 18px; margin-top: 1px; accent-color: var(--gold); flex-shrink: 0; cursor: pointer; }
+.wc-adult-label { font-size: 0.8rem; color: var(--parch-dim); line-height: 1.45; cursor: pointer; }
+

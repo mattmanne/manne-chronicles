@@ -12,6 +12,7 @@ let gameSecret       = null;
 let continueInitDone = false;
 let manlandiaTone    = localStorage.getItem("manlandia_tone") || "adventure";
 let campaignList     = [];
+let adultUnlocked    = localStorage.getItem("adult_unlocked") === "true";
 
 const STATS = {
   fen:  { force: 0, acuity: 1, agility: 1, will: 3, presence: 0 },
@@ -189,9 +190,9 @@ function renderCampaignList() {
   if (!container) return;
   if (!campaignList.length) { container.innerHTML = ""; return; }
   container.innerHTML = campaignList.map(c => `
-    <div class="world-btn custom-campaign-card" data-world="${c.id}">
+    <div class="world-btn custom-campaign-card${c.adult ? " adult-only" : ""}" data-world="${c.id}">
       <div class="custom-campaign-info">
-        <span class="world-btn-name">${c.name.toUpperCase()}</span>
+        <span class="world-btn-name">${c.name.toUpperCase()}${c.adult ? ' <span class="adult-badge">18+</span>' : ""}</span>
         <span class="world-btn-sub">${c.playerCount} hero${c.playerCount > 1 ? "es" : ""} · ${c.subtitle || "Custom world"}</span>
       </div>
       <button class="campaign-delete-btn" data-id="${c.id}" title="Delete this world">🗑</button>
@@ -275,6 +276,7 @@ function setupWorldCreator() {
     const name        = document.getElementById("wc-name").value.trim();
     const theme       = document.getElementById("wc-theme").value.trim();
     const playerCount = parseInt(document.querySelector(".wc-count-btn.active")?.dataset.count || "2");
+    const adult       = document.getElementById("wc-adult-checkbox")?.checked === true;
     if (!name)  { document.getElementById("wc-name").focus();  return; }
     if (!theme) { document.getElementById("wc-theme").focus(); return; }
 
@@ -282,7 +284,7 @@ function setupWorldCreator() {
     btn.disabled = true;
     btn.textContent = "Creating…";
     try {
-      const res  = await authPost("/api/campaigns", { action: "create", payload: { name, theme, playerCount } });
+      const res  = await authPost("/api/campaigns", { action: "create", payload: { name, theme, playerCount, adult } });
       const data = await res.json();
       if (!data.ok) { btn.textContent = "Create World →"; btn.disabled = false; return; }
       campaignList.push(data.campaign);
@@ -301,6 +303,8 @@ function closeWorldCreator() {
   document.getElementById("wc-name").value = "";
   document.getElementById("wc-theme").value = "";
   document.querySelectorAll(".wc-count-btn").forEach(b => b.classList.toggle("active", b.dataset.count === "2"));
+  const adultCb = document.getElementById("wc-adult-checkbox");
+  if (adultCb) adultCb.checked = false;
 }
 
 async function switchWorld(worldId) {
@@ -329,9 +333,11 @@ async function switchWorld(worldId) {
 /* ── Init ── */
 document.addEventListener("DOMContentLoaded", async () => {
   if (!initSecret()) return;
+  if (adultUnlocked) document.body.classList.add("adult-unlocked");
   await loadCampaigns();
   setupWorldSelector();
   setupWorldCreator();
+  setupUnlockOverlay();
   const worldReady = initWorld();
   if (worldReady) {
     applyWorldUI();
@@ -1710,6 +1716,62 @@ function updateAbility(id, used) {
   const el = document.getElementById(id);
   if (!el) return;
   el.className = `ability used-indicator ${used ? "used" : "available"}`;
+}
+
+/* ── Adult Unlock Overlay ── */
+function setupUnlockOverlay() {
+  const overlayEl = document.getElementById("unlock-overlay");
+  const pinInput  = document.getElementById("unlock-pin-input");
+  const errorEl   = document.getElementById("unlock-error");
+  if (!overlayEl) return;
+
+  document.getElementById("unlock-adult-btn")?.addEventListener("click", () => {
+    pinInput.value = "";
+    errorEl.classList.add("hidden");
+    overlayEl.classList.add("active");
+    setTimeout(() => pinInput.focus(), 100);
+  });
+
+  document.getElementById("unlock-cancel-btn")?.addEventListener("click", () => {
+    overlayEl.classList.remove("active");
+  });
+
+  async function tryUnlock() {
+    const pin = pinInput.value.trim();
+    if (!pin) { pinInput.focus(); return; }
+    const submitBtn = document.getElementById("unlock-submit-btn");
+    submitBtn.disabled = true;
+    submitBtn.textContent = "Checking…";
+    try {
+      const res = await fetch("/api/unlock", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pin }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        adultUnlocked = true;
+        localStorage.setItem("adult_unlocked", "true");
+        document.body.classList.add("adult-unlocked");
+        overlayEl.classList.remove("active");
+        renderCampaignList();
+      } else {
+        errorEl.textContent = "Wrong PIN — try again";
+        errorEl.classList.remove("hidden");
+        pinInput.value = "";
+        pinInput.focus();
+      }
+    } catch(_) {
+      errorEl.textContent = "Connection error — try again";
+      errorEl.classList.remove("hidden");
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.textContent = "Unlock →";
+    }
+  }
+
+  document.getElementById("unlock-submit-btn")?.addEventListener("click", tryUnlock);
+  pinInput.addEventListener("keydown", (e) => { if (e.key === "Enter") tryUnlock(); });
 }
 
 /* ── Utilities ── */
