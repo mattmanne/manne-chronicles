@@ -161,6 +161,16 @@ function applyWorldUI() {
   document.body.classList.remove("world-resonance", "world-manlandia");
   document.body.classList.add(isML ? "world-manlandia" : "world-resonance");
 
+  // Reset all player cards/buttons to visible; updateCharacterUI will hide extras once state loads
+  [1,2,3,4].forEach(n => {
+    const card = document.getElementById(`p${n}-card`);
+    if (card) card.style.display = "";
+    const btn = document.getElementById(`btn-p${n}`);
+    if (btn) { btn.style.display = ""; btn.textContent = `HERO ${n}`; }
+    const nameEl = document.getElementById(`p${n}-name`);
+    if (nameEl) nameEl.textContent = `HERO ${n}`;
+  });
+
   let title;
   if (currentWorld === "manlandia") title = "MANLANDIA";
   else if (currentWorld.startsWith("c_")) {
@@ -903,9 +913,10 @@ function wizSetStep(step) {
 async function wizFinish() {
   if (!wizardData.name || !wizardData.archetype || !wizardData.ability_id) return;
 
-  // Save photo to localStorage (device-only)
+  // Save photo to localStorage (device-only, per-world for custom campaigns)
   if (wizardData.photo) {
-    localStorage.setItem(`manlandia_photo_${wizardPlayer}`, wizardData.photo);
+    const photoKey = currentWorld.startsWith("c_") ? `photo_${currentWorld}_${wizardPlayer}` : `manlandia_photo_${wizardPlayer}`;
+    localStorage.setItem(photoKey, wizardData.photo);
   }
 
   // Save character data to server
@@ -1090,7 +1101,8 @@ function renderManlandiaCard(n, char) {
   // Avatar (photo from localStorage, or initial letter)
   const avatarEl = document.getElementById(`p${n}-avatar`);
   if (avatarEl) {
-    const photo = localStorage.getItem(`manlandia_photo_${p}`);
+    const photoKey = currentWorld.startsWith("c_") ? `photo_${currentWorld}_${p}` : `manlandia_photo_${p}`;
+    const photo = localStorage.getItem(photoKey);
     if (photo) {
       avatarEl.innerHTML = `<img src="${photo}" alt="${char?.name || "Hero"}" />`;
     } else {
@@ -1656,14 +1668,24 @@ function updateCharacterUI(data) {
 
   if (isManlandiaLike()) {
     syncPlayerStats(chars);
+    const playerCount = currentWorld.startsWith("c_")
+      ? (cachedGameState?.worldConfig?.playerCount || 4)
+      : 4;
     [1,2,3,4].forEach(n => {
+      const visible = n <= playerCount;
+      const card = document.getElementById(`p${n}-card`);
+      if (card) card.style.display = visible ? "" : "none";
+      const btn = document.getElementById(`btn-p${n}`);
+      if (btn) btn.style.display = visible ? "" : "none";
+      if (!visible) return;
+
       const p = `player${n}`;
       updateHarm(`p${n}`, chars[p]?.harm);
       const nameEl = document.getElementById(`p${n}-name`);
-      if (nameEl && chars[p]?.name && chars[p].name !== `Hero ${n}`) {
-        nameEl.textContent = chars[p].name.toUpperCase();
-        const btn = document.getElementById(`btn-p${n}`);
-        if (btn) btn.textContent = chars[p].name.toUpperCase();
+      if (nameEl && chars[p]?.name) {
+        const displayName = chars[p].name !== `Hero ${n}` ? chars[p].name.toUpperCase() : `HERO ${n}`;
+        nameEl.textContent = displayName;
+        if (btn) btn.textContent = displayName;
       }
       renderManlandiaCard(n, chars[p]);
     });
