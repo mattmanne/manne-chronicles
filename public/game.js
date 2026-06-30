@@ -169,7 +169,8 @@ function applyWorldUI() {
     title = "RESONANCE";
   }
   document.title = title.charAt(0) + title.slice(1).toLowerCase();
-  document.getElementById("game-title").textContent = title;
+  const gtEl = document.getElementById("game-title");
+  if (gtEl) gtEl.textContent = title;
 
   document.querySelectorAll(".player-btn").forEach(b => b.classList.remove("active"));
   if (isML) {
@@ -207,7 +208,8 @@ function setupWorldSelector() {
   });
 
   // Delegated: custom campaigns + delete
-  document.getElementById("custom-campaigns-list").addEventListener("click", e => {
+  const ccl = document.getElementById("custom-campaigns-list");
+  if (ccl) ccl.addEventListener("click", e => {
     const delBtn = e.target.closest(".campaign-delete-btn");
     if (delBtn) {
       e.stopPropagation();
@@ -259,12 +261,9 @@ async function deleteCampaign(id) {
 }
 
 function setupWorldCreator() {
-  let selectedCount = 2;
-
   // Player count buttons
   document.querySelectorAll(".wc-count-btn").forEach(btn => {
     btn.addEventListener("click", () => {
-      selectedCount = parseInt(btn.dataset.count);
       document.querySelectorAll(".wc-count-btn").forEach(b => b.classList.toggle("active", b === btn));
     });
   });
@@ -273,8 +272,9 @@ function setupWorldCreator() {
   document.getElementById("wc-cancel-btn").addEventListener("click", closeWorldCreator);
 
   document.getElementById("wc-create-btn").addEventListener("click", async () => {
-    const name  = document.getElementById("wc-name").value.trim();
-    const theme = document.getElementById("wc-theme").value.trim();
+    const name        = document.getElementById("wc-name").value.trim();
+    const theme       = document.getElementById("wc-theme").value.trim();
+    const playerCount = parseInt(document.querySelector(".wc-count-btn.active")?.dataset.count || "2");
     if (!name)  { document.getElementById("wc-name").focus();  return; }
     if (!theme) { document.getElementById("wc-theme").focus(); return; }
 
@@ -282,7 +282,7 @@ function setupWorldCreator() {
     btn.disabled = true;
     btn.textContent = "Creating…";
     try {
-      const res  = await authPost("/api/campaigns", { action: "create", payload: { name, theme, playerCount: selectedCount } });
+      const res  = await authPost("/api/campaigns", { action: "create", payload: { name, theme, playerCount } });
       const data = await res.json();
       if (!data.ok) { btn.textContent = "Create World →"; btn.disabled = false; return; }
       campaignList.push(data.campaign);
@@ -1247,14 +1247,12 @@ function renderMap(state) {
 }
 
 function renderCustomMap(state) {
-  const ws = state?.worldState || {};
+  const ws   = state?.worldState || {};
   const camp = campaignList.find(c => c.id === currentWorld) || {};
-  const mapEl = document.getElementById("map-container-resonance");
-  const manEl = document.getElementById("map-container-manlandia");
-  if (manEl) manEl.style.display = "none";
-  if (!mapEl) return;
-  mapEl.style.display = "";
-  mapEl.innerHTML = `
+  const el   = document.getElementById("map-container-custom");
+  if (!el) return;
+  el.style.display = "block";
+  el.innerHTML = `
     <div class="custom-map-panel">
       <div class="custom-map-name">${camp.name || "Your World"}</div>
       <div class="custom-map-location">📍 ${ws.location || "The Beginning"}</div>
@@ -1276,6 +1274,8 @@ function renderCustomMap(state) {
 }
 
 function renderResonanceMap(state) {
+  const customEl = document.getElementById("map-container-custom");
+  if (customEl) customEl.style.display = "none";
   const container = document.getElementById("map-container-resonance");
   if (!container) return;
 
@@ -1377,6 +1377,8 @@ function renderResonanceMap(state) {
 }
 
 function renderManlandiaMap(state) {
+  const customEl = document.getElementById("map-container-custom");
+  if (customEl) customEl.style.display = "none";
   const container = document.getElementById("map-container-manlandia");
   if (!container) return;
 

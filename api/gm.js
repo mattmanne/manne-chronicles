@@ -151,15 +151,17 @@ module.exports = async function handler(req, res) {
     const curseMatch = cleanResponse.match(/\[CURSE: (\d+) → (\d+)\]/);
     if (curseMatch) gameState.worldState.curse_level = parseInt(curseMatch[2]);
 
-    // Stone found
-    const stoneRegex = /\[STONE FOUND: ([^\]]+)\]/g;
-    let stoneMatch;
-    while ((stoneMatch = stoneRegex.exec(cleanResponse)) !== null) {
-      const stoneId = matchStoneId(stoneMatch[1]);
-      if (stoneId) {
-        if (!gameState.worldState.stones_found) gameState.worldState.stones_found = [];
-        if (!gameState.worldState.stones_found.includes(stoneId)) {
-          gameState.worldState.stones_found.push(stoneId);
+    // Stone found (Manlandia only)
+    if (worldConfig.id === "manlandia") {
+      const stoneRegex = /\[STONE FOUND: ([^\]]+)\]/g;
+      let stoneMatch;
+      while ((stoneMatch = stoneRegex.exec(cleanResponse)) !== null) {
+        const stoneId = matchStoneId(stoneMatch[1]);
+        if (stoneId) {
+          if (!gameState.worldState.stones_found) gameState.worldState.stones_found = [];
+          if (!gameState.worldState.stones_found.includes(stoneId)) {
+            gameState.worldState.stones_found.push(stoneId);
+          }
         }
       }
     }
