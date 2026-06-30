@@ -158,8 +158,10 @@ function initWorld() {
 
 function applyWorldUI() {
   const isML = isManlandiaLike();
-  document.body.classList.remove("world-resonance", "world-manlandia");
+  const isCustom = currentWorld.startsWith("c_");
+  document.body.classList.remove("world-resonance", "world-manlandia", "world-custom");
   document.body.classList.add(isML ? "world-manlandia" : "world-resonance");
+  if (isCustom) document.body.classList.add("world-custom");
 
   // Reset player cards/buttons, then immediately hide beyond playerCount for custom campaigns
   const immediatePC = currentWorld.startsWith("c_")

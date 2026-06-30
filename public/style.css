@@ -1281,6 +1281,9 @@ body:not(.adult-unlocked) .adult-only { display: none !important; }
   font-weight: normal;
 }
 
+/* Hide Manlandia-specific lore (villain awareness, greying curse, stones) in custom campaigns */
+body.world-custom .manlandia-lore { display: none !important; }
+
 /* World creator adult toggle */
 .wc-adult-toggle { display: flex; align-items: flex-start; gap: 10px; }
 .wc-adult-checkbox { width: 18px; height: 18px; margin-top: 1px; accent-color: var(--gold); flex-shrink: 0; cursor: pointer; }
