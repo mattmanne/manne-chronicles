@@ -97,6 +97,7 @@ const loadingBar   = document.getElementById("loading-bar");
 const voiceStatus  = document.getElementById("voice-status");
 const diceOverlay  = document.getElementById("dice-overlay");
 const sessionLabel = document.getElementById("session-label");
+const suggestionChips = document.getElementById("suggestion-chips");
 
 /* ── URL helpers ── */
 function withWorld(url) {
@@ -397,6 +398,7 @@ async function continueInit() {
   setupNewSession();
   setupAutoRead();
   setupExport();
+  setupRecap();
   setupWizard();
   setupHelp();
   setupToneSelector();
@@ -643,9 +645,45 @@ async function submitAction() {
   if (!text || isLoading) return;
   actionInput.value = "";
   setLoading(true);
+  hideSuggestionChips();
   appendPlayerEntry(currentPlayer, text, true);
   scrollToBottom();
   await sendToGM(currentPlayer, text, "action");
+}
+
+/* ── Suggestion chips ── */
+function hideSuggestionChips() {
+  suggestionChips.classList.add("hidden");
+  suggestionChips.innerHTML = "";
+}
+
+function renderSuggestionChips(suggestions) {
+  if (!suggestions || !suggestions.length) { hideSuggestionChips(); return; }
+
+  suggestionChips.innerHTML = "";
+  suggestions.forEach((text) => {
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = "suggestion-chip";
+    chip.textContent = text;
+    chip.addEventListener("click", () => {
+      actionInput.value = text;
+      actionInput.focus();
+    });
+    suggestionChips.appendChild(chip);
+  });
+
+  const other = document.createElement("button");
+  other.type = "button";
+  other.className = "suggestion-chip other";
+  other.textContent = "Other…";
+  other.addEventListener("click", () => {
+    actionInput.value = "";
+    actionInput.focus();
+  });
+  suggestionChips.appendChild(other);
+
+  suggestionChips.classList.remove("hidden");
 }
 
 async function sendToGM(player, message, type) {
@@ -656,12 +694,14 @@ async function sendToGM(player, message, type) {
     if (data.error) { appendSystemMessage("Error: " + data.error); return; }
 
     if (data.needsRoll) {
+      hideSuggestionChips();
       const rollResult = await animateRoll(player, data.rollStat, data.rollAdvantage);
       appendRollResult(player, data.rollStat, rollResult);
       await sendToGM(player, formatRollMessage(player, data.rollStat, rollResult), "roll_result");
     } else {
       const entry = appendGMEntry(data.response, true);
       if (autoRead && entry) speakText(getCleanText(data.response), entry.querySelector(".speak-btn"));
+      renderSuggestionChips(data.suggestions);
       if (data.gameState) {
         cachedGameState = data.gameState;
         updateCharacterUI(data.gameState);
@@ -824,6 +864,28 @@ function setupExport() {
       URL.revokeObjectURL(url);
     } catch(_) { alert("Export failed — try again."); }
   });
+}
+
+/* ── Recap ── */
+function setupRecap() {
+  document.getElementById("recap-btn").addEventListener("click", loadRecap);
+  document.getElementById("recap-close-btn").addEventListener("click", () => {
+    document.getElementById("recap-overlay").classList.remove("active");
+  });
+}
+
+async function loadRecap() {
+  const overlay = document.getElementById("recap-overlay");
+  const textEl  = document.getElementById("recap-text");
+  textEl.textContent = "Loading recap…";
+  overlay.classList.add("active");
+  try {
+    const res  = await fetch(withWorld("/api/recap"));
+    const data = await res.json();
+    textEl.textContent = data.recap || data.error || "Could not load a recap right now.";
+  } catch(_) {
+    textEl.textContent = "Connection error. Check your internet and try again.";
+  }
 }
 
 /* ── Character Wizard ── */
@@ -1198,7 +1260,8 @@ function stripGMTags(content) {
     .replace(/\[SCAR: [^\]]+\]/g, "")
     .replace(/\[(LYRA|FEN): [A-Za-z]+ → [A-Za-z]+\]/g, "")
     .replace(/\[ABILITY \d: used\]/gi, "")
-    .replace(/\[ABILITY (FEN|LYRA): [a-z_]+\]/gi, "").trim();
+    .replace(/\[ABILITY (FEN|LYRA): [a-z_]+\]/gi, "")
+    .replace(/\[SUGGESTIONS: [^\]]+\]/gi, "").trim();
 }
 
 function formatCampaignExport(state) {

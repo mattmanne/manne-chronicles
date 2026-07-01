@@ -85,6 +85,17 @@
     </div>
   </div>
 
+  <!-- Recap Overlay -->
+  <div id="recap-overlay">
+    <div class="recap-box">
+      <div class="recap-title">The Story So Far</div>
+      <p id="recap-text" class="recap-text"></p>
+      <div class="recap-actions">
+        <button id="recap-close-btn" class="wc-cancel-btn">Close</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Adult Unlock Overlay -->
   <div id="unlock-overlay">
     <div class="unlock-box">
@@ -247,6 +258,9 @@
 
       <!-- Story -->
       <div id="tab-story" class="tab-panel active">
+        <div id="recap-bar">
+          <button id="recap-btn" class="secondary-btn">📜 Recap</button>
+        </div>
         <main id="log-area">
           <div id="log-entries"></div>
         </main>
@@ -263,6 +277,7 @@
             <button class="player-btn manlandia-only" data-player="player3" id="btn-p3">HERO 3</button>
             <button class="player-btn manlandia-only" data-player="player4" id="btn-p4">HERO 4</button>
           </div>
+          <div id="suggestion-chips" class="hidden"></div>
           <div id="action-row">
             <input type="text" id="action-input" placeholder="What do you do?" autocomplete="off" autocorrect="off" />
             <button id="voice-btn" title="Speak your action">🎤</button>

@@ -452,6 +452,17 @@ html, body {
 #voice-status { font-size: 0.72rem; color: var(--red); text-align: center; animation: pulse 1s infinite; }
 #voice-status.hidden { display: none; }
 
+#suggestion-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+#suggestion-chips.hidden { display: none; }
+.suggestion-chip {
+  padding: 7px 12px; font-size: 0.76rem;
+  background: none; border: 1px solid var(--border);
+  border-radius: 14px; color: var(--parch-dim);
+  cursor: pointer; transition: all 0.2s; text-align: center;
+}
+.suggestion-chip:hover { border-color: var(--gold-dim); color: var(--parchment); }
+.suggestion-chip.other { border-style: dashed; }
+
 /* ── Archive Tab ── */
 .archive-header {
   display: flex;
@@ -1328,6 +1339,51 @@ body.world-custom .manlandia-lore { display: none !important; }
 }
 
 .delete-confirm-actions { display: flex; gap: 10px; justify-content: flex-end; }
+
+/* Recap */
+#recap-bar { padding: 10px 14px 0; }
+
+#recap-overlay {
+  display: none;
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.7);
+  z-index: 3000;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+#recap-overlay.active { display: flex; }
+
+.recap-box {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 24px 20px;
+  max-width: 420px;
+  width: 100%;
+  max-height: 80vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.recap-title {
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  color: var(--gold);
+  letter-spacing: 0.06em;
+}
+
+.recap-text {
+  font-size: 0.9rem;
+  color: var(--parchment);
+  margin: 0;
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+
+.recap-actions { display: flex; gap: 10px; justify-content: flex-end; }
 
 .delete-confirm-delete-btn {
   background: var(--red);

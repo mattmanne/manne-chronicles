@@ -1,0 +1,34 @@
+const { getState } = require("../lib/redis");
+const { generateContent } = require("../lib/gemini");
+const { getWorldConfig } = require("../lib/worldconfig");
+const { formatTranscript, buildRecapSystemPrompt } = require("../lib/recap");
+
+module.exports = async function handler(req, res) {
+  const allowedOrigin = process.env.ALLOWED_ORIGIN || "*";
+  res.setHeader("Access-Control-Allow-Origin", allowedOrigin);
+  res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  if (req.method === "OPTIONS") return res.status(200).end();
+  if (req.method !== "GET") return res.status(405).json({ error: "Method not allowed" });
+
+  const worldConfig = getWorldConfig(req.query.world);
+  const gameState = (await getState(worldConfig.key)) || worldConfig.getInitialState();
+
+  const transcript = formatTranscript(gameState);
+  if (!transcript) {
+    return res.json({ recap: "The adventure hasn't begun yet — there's nothing to recap!" });
+  }
+
+  const isKidWorld = worldConfig.id === "manlandia" ||
+    (worldConfig.type === "custom" && gameState.worldConfig?.adult !== true);
+
+  const systemPrompt = buildRecapSystemPrompt(isKidWorld);
+
+  try {
+    const recap = await generateContent(systemPrompt, [], transcript);
+    return res.json({ recap: recap.trim() });
+  } catch (err) {
+    console.error("Recap error:", err);
+    return res.status(500).json({ error: "Could not put together a recap right now. Please try again!" });
+  }
+};

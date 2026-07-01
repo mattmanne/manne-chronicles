@@ -16,14 +16,17 @@ Run `node --check` on every JS file:
 
 ```
 api/campaigns.js  api/characters.js  api/gm.js  api/help.js
-api/poll.js  api/state.js  api/unlock.js
+api/poll.js  api/recap.js  api/state.js  api/unlock.js
 lib/gamestate-custom.js  lib/gamestate-manlandia.js  lib/gamestate.js
 lib/gemini.js  lib/prompt-custom.js  lib/prompt-manlandia.js
-lib/prompt.js  lib/redis.js  lib/worldconfig.js
+lib/prompt.js  lib/recap.js  lib/redis.js  lib/suggestions.js
+lib/worldconfig.js
 public/game.js
 ```
 
 Report any failures immediately. If any fail, fix them before continuing.
+
+Also run `npm test` (plain Node unit tests under `tests/`, no framework) — all must pass.
 
 ---
 
@@ -57,6 +60,9 @@ Run these checks in order:
 **Poll**
 - GET `/api/poll?since=0&world=resonance` → expect `entries` array and `worldState` object
 - GET `/api/poll?since=0&world=manlandia` → expect `entries` array and `worldState` object
+
+**Recap**
+- GET `/api/recap?world=manlandia` (or any world with existing sessionLog entries) → expect a `recap` string
 
 **GM (live call — pick whichever world has entries)**
 - If manlandia has 0 entries: POST `/api/gm?world=manlandia` with `{"player":"player1","message":"[SESSION BEGINS]","type":"begin"}` → expect `response` string or `needsRoll: true`

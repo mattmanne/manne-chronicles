@@ -1,5 +1,8 @@
 {
   "name": "resonance-dnd",
   "version": "1.0.0",
-  "description": "Resonance: A Legacy Campaign — two-player narrative RPG"
+  "description": "Resonance: A Legacy Campaign — two-player narrative RPG",
+  "scripts": {
+    "test": "node --experimental-test-module-mocks --test tests/*.test.js"
+  }
 }

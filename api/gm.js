@@ -2,6 +2,7 @@ const { getState, setState } = require("../lib/redis");
 const { generateContent } = require("../lib/gemini");
 const { getWorldConfig } = require("../lib/worldconfig");
 const { STONE_IDS } = require("../lib/gamestate-manlandia");
+const { extractSuggestions } = require("../lib/suggestions");
 
 const MAX_HISTORY = 40;
 
@@ -87,7 +88,10 @@ module.exports = async function handler(req, res) {
   const needsRoll = !!rollMatch;
   const rollStat = rollMatch ? rollMatch[1].toLowerCase() : null;
   const rollAdvantage = rollMatch ? !!rollMatch[2] : false;
-  const cleanResponse = gmResponse.replace(/^ROLL:(FORCE|ACUITY|AGILITY|WILL|PRESENCE)(:ADVANTAGE)?$/m, "").trim();
+  const rollStripped = gmResponse.replace(/^ROLL:(FORCE|ACUITY|AGILITY|WILL|PRESENCE)(:ADVANTAGE)?$/m, "").trim();
+  const extracted = extractSuggestions(rollStripped);
+  const cleanResponse = extracted.clean;
+  const suggestions = (type === "roll_result" || needsRoll) ? [] : extracted.suggestions;
 
   // When completing a roll, un-flag the deferred entries saved on the prior call
   if (type === "roll_result") {
@@ -238,6 +242,7 @@ module.exports = async function handler(req, res) {
     needsRoll,
     rollStat,
     rollAdvantage,
+    suggestions,
     serverTimestamp: Date.now(),
     gameState: {
       characters: gameState.characters,
