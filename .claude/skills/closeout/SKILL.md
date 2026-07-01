@@ -28,6 +28,8 @@ Report any failures immediately. If any fail, fix them before continuing.
 
 Also run `npm test` (plain Node unit tests under `tests/`, no framework) — all must pass.
 
+Then always run the GM tag-drift check — `GAME_SECRET=<value> ADULT_PIN=<value> npm run check-drift` — regardless of whether anything seems broken. This pulls every live campaign's real transcript and reports its actual bracket-tag formatting; every GM tag-parsing bug found in this app so far was caught this way, and the model's compliance drifts over time even when nothing else changes. Eyeball the output against `lib/gm-tags.js`'s expected formats (table in `CLAUDE.md`) and flag anything that looks unrecognized, even if it isn't causing a visible problem yet.
+
 ---
 
 ## STEP 2 — Git Status
@@ -87,7 +89,8 @@ These are logic checks using the existing state, not new calls:
 2. **Custom campaign playerCount**: If any custom campaigns exist, GET their state and confirm `worldConfig.playerCount` is set.
 3. **Character isolation**: Confirm kid campaigns (manlandia) have `characters.player1` through `player4`; resonance has `fen` and `lyra` only.
 4. **No cross-contamination**: Resonance state has no `villain_awareness`; Manlandia state has no `conclave_awareness`.
-5. **GM tag drift** (do this if there's time — this is how every parsing bug fixed so far was actually found): `GET /api/state` for each live campaign with real history, grep the `sessionLog` for `gm` entries containing `[`, and eyeball whether the model's actual bracket-tag formatting still looks like what `lib/gm-tags.js` expects. The model's compliance drifts; this catches it before a player does.
+
+(GM tag drift is checked in Step 1 via `npm run check-drift`, not here.)
 
 ---
 

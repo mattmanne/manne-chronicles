@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "Resonance & Manlandia — narrative RPGs with an AI Game Master, plus unlimited custom worlds",
   "scripts": {
-    "test": "node --experimental-test-module-mocks --test tests/*.test.js"
+    "test": "node --experimental-test-module-mocks --test tests/*.test.js",
+    "check-drift": "node scripts/check-tag-drift.js"
   }
 }
