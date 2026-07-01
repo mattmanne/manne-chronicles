@@ -71,3 +71,68 @@ test("generateContent returns the message content on success", async (t) => {
   const result = await generateContent("sys", [], "hi");
   assert.equal(result, "hello");
 });
+
+test("a 429's thrown error carries retryAfterSeconds from the Retry-After header when present", async (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const originalFetch = global.fetch;
+  global.fetch = async () => ({
+    status: 429,
+    headers: { get: (name) => (name === "retry-after" ? "12" : null) },
+    json: async () => ({ error: { message: "Rate limit reached. Please try again in 3.6s.", code: "rate_limit_exceeded" } }),
+  });
+  t.after(() => { global.fetch = originalFetch; });
+
+  const { generateContent } = freshRequire("../lib/gemini.js");
+  const promise = generateContent("sys", [], "hi");
+  await flushMicrotasks();
+  await t.mock.timers.tick(1500);
+
+  try {
+    await promise;
+    assert.fail("expected generateContent to reject");
+  } catch (err) {
+    assert.equal(err.retryAfterSeconds, 12); // header wins over the text in the message
+  }
+});
+
+test("a 429's thrown error falls back to parsing 'try again in X.Xs' from the message when there's no header", async (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const originalFetch = global.fetch;
+  global.fetch = async () => ({
+    status: 429,
+    headers: { get: () => null },
+    json: async () => ({ error: { message: "Rate limit reached. Please try again in 3.6s.", code: "rate_limit_exceeded" } }),
+  });
+  t.after(() => { global.fetch = originalFetch; });
+
+  const { generateContent } = freshRequire("../lib/gemini.js");
+  const promise = generateContent("sys", [], "hi");
+  await flushMicrotasks();
+  await t.mock.timers.tick(1500);
+
+  try {
+    await promise;
+    assert.fail("expected generateContent to reject");
+  } catch (err) {
+    assert.equal(err.retryAfterSeconds, 3.6);
+  }
+});
+
+test("a 429's thrown error has a null retryAfterSeconds when neither a header nor message text is available", async (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const originalFetch = global.fetch;
+  global.fetch = async () => ({ status: 429, json: async () => ({ error: { message: "Rate limited.", code: "rate_limit_exceeded" } }) });
+  t.after(() => { global.fetch = originalFetch; });
+
+  const { generateContent } = freshRequire("../lib/gemini.js");
+  const promise = generateContent("sys", [], "hi");
+  await flushMicrotasks();
+  await t.mock.timers.tick(1500);
+
+  try {
+    await promise;
+    assert.fail("expected generateContent to reject");
+  } catch (err) {
+    assert.equal(err.retryAfterSeconds, null);
+  }
+});

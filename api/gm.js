@@ -38,6 +38,18 @@ async function releaseGmLock(worldId) {
   await redisCommand("DEL", `gmlock:${worldId}`).catch(() => {});
 }
 
+// Groq tells us how long it actually wants us to wait (via a Retry-After
+// header or "try again in X.Xs" in its own error text — see lib/gemini.js).
+// Below 5 seconds that precision doesn't help a human, so just say "a few
+// seconds"; above that, giving the real number saves the player from
+// guessing (and re-mashing send) too early.
+function formatWaitMessage(retryAfterSeconds) {
+  const seconds = typeof retryAfterSeconds === "number" && !Number.isNaN(retryAfterSeconds)
+    ? Math.ceil(retryAfterSeconds)
+    : null;
+  return seconds !== null && seconds >= 5 ? `wait about ${seconds} seconds` : "wait a few seconds";
+}
+
 function matchResonanceLocationId(name) {
   const s = name.toLowerCase();
   if (s.includes("salt") || s.includes("wick") || s.includes("pub")) return "salt-wick";
@@ -148,7 +160,7 @@ module.exports = async function handler(req, res) {
 
   const needsLock = type !== "roll_result";
   if (needsLock && !(await acquireGmLock(worldConfig.id))) {
-    return res.status(429).json({ error: "Another turn just came in for this world — wait a moment and try again." });
+    return res.status(429).json({ error: `Another turn just came in for this world — ${formatWaitMessage(null)} and try again.` });
   }
 
   let gmResponse;
@@ -158,7 +170,7 @@ module.exports = async function handler(req, res) {
     console.error("GM error:", err);
     if (needsLock) await releaseGmLock(worldConfig.id);
     if (err.status === 429) {
-      return res.status(429).json({ error: "The GM is handling a lot of requests right now — wait a few seconds and try again." });
+      return res.status(429).json({ error: `The GM is handling a lot of requests right now — ${formatWaitMessage(err.retryAfterSeconds)} and try again.` });
     }
     return res.status(500).json({ error: "The GM encountered an error: " + err.message });
   }

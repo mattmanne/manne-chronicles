@@ -126,6 +126,51 @@ test("a Groq 429 surfaces as a 429 with a friendly, non-leaky message", async (t
   assert.doesNotMatch(res.body.error, /tokens per minute/i);
 });
 
+test("a Groq 429 with a known short retryAfterSeconds still says 'a few seconds', not a specific number", async (t) => {
+  t.mock.module("../lib/redis.js", { exports: { getState: async () => null, setState: async () => {}, redisCommand: mockRedisCommand() } });
+  t.mock.module("../lib/gemini.js", {
+    exports: {
+      generateContent: async () => {
+        const err = new Error("Groq error: Rate limit reached. Please try again in 3.2s.");
+        err.status = 429;
+        err.retryAfterSeconds = 3.2;
+        throw err;
+      },
+    },
+  });
+
+  const handler = freshHandler("../api/gm.js");
+  const req = { method: "POST", headers: {}, query: { world: "manlandia" }, body: { player: "player1", message: "I arrive", type: "action" } };
+  const res = mockRes();
+  await handler(req, res);
+
+  assert.equal(res.statusCode, 429);
+  assert.match(res.body.error, /wait a few seconds/i);
+  assert.doesNotMatch(res.body.error, /\d+ seconds/); // no leaked specific number under 5s
+});
+
+test("a Groq 429 with a longer known retryAfterSeconds tells the player about how long to wait", async (t) => {
+  t.mock.module("../lib/redis.js", { exports: { getState: async () => null, setState: async () => {}, redisCommand: mockRedisCommand() } });
+  t.mock.module("../lib/gemini.js", {
+    exports: {
+      generateContent: async () => {
+        const err = new Error("Groq error: Rate limit reached. Please try again in 17.4s.");
+        err.status = 429;
+        err.retryAfterSeconds = 17.4;
+        throw err;
+      },
+    },
+  });
+
+  const handler = freshHandler("../api/gm.js");
+  const req = { method: "POST", headers: {}, query: { world: "manlandia" }, body: { player: "player1", message: "I arrive", type: "action" } };
+  const res = mockRes();
+  await handler(req, res);
+
+  assert.equal(res.statusCode, 429);
+  assert.match(res.body.error, /wait about 18 seconds/i); // rounded up from 17.4
+});
+
 test("a non-429 Groq error still surfaces as a 500 with the underlying message", async (t) => {
   t.mock.module("../lib/redis.js", { exports: { getState: async () => null, setState: async () => {}, redisCommand: mockRedisCommand() } });
   t.mock.module("../lib/gemini.js", {
@@ -183,7 +228,7 @@ test("a second action turn for the same world while the first is still in flight
   const res2 = mockRes();
   await handler(makeReq(), res2);
   assert.equal(res2.statusCode, 429);
-  assert.match(res2.body.error, /wait a moment/i);
+  assert.match(res2.body.error, /wait a few seconds/i);
 
   release();
   await firstCall;
