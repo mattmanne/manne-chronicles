@@ -728,7 +728,11 @@ async function submitAction() {
   hideSuggestionChips();
   appendPlayerEntry(currentPlayer, text, true);
   scrollToBottom();
-  await sendToGM(currentPlayer, text, "action");
+  const ok = await sendToGM(currentPlayer, text, "action");
+  // On failure (rate limit, server error, dropped connection), put the
+  // player's own words back in the box so they can just hit send again
+  // instead of retyping the whole thing.
+  if (!ok) actionInput.value = text;
 }
 
 /* ── Suggestion chips ── */
@@ -766,19 +770,21 @@ function renderSuggestionChips(suggestions) {
   suggestionChips.classList.remove("hidden");
 }
 
+// Returns true on success, false on any failure — callers use this to decide
+// whether to put the player's original message back in the input box.
 async function sendToGM(player, message, type) {
   setLoading(true);
   try {
     const res = await authPost("/api/gm", { player, message, type, ...(isManlandiaLike() && { tone: manlandiaTone }) });
-    if (handleLockedResponse(res.status)) return;
+    if (handleLockedResponse(res.status)) return false;
     const data = await res.json();
-    if (data.error) { appendSystemMessage("Error: " + data.error); return; }
+    if (data.error) { appendSystemMessage("Error: " + data.error); return false; }
 
     if (data.needsRoll) {
       hideSuggestionChips();
       const rollResult = await animateRoll(player, data.rollStat, data.rollAdvantage);
       appendRollResult(player, data.rollStat, rollResult);
-      await sendToGM(player, formatRollMessage(player, data.rollStat, rollResult), "roll_result");
+      return await sendToGM(player, formatRollMessage(player, data.rollStat, rollResult), "roll_result");
     } else {
       const entry = appendGMEntry(data.response, true);
       if (autoRead && entry) speakText(getCleanText(data.response), entry.querySelector(".speak-btn"));
@@ -790,9 +796,11 @@ async function sendToGM(player, message, type) {
         if (document.getElementById("tab-map").classList.contains("active")) renderMap(cachedGameState);
       }
       scrollToBottom();
+      return true;
     }
   } catch(_) {
     appendSystemMessage("Connection error. Check your internet and try again.");
+    return false;
   } finally {
     setLoading(false);
   }

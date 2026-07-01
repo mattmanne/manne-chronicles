@@ -1,4 +1,4 @@
-const { getState, setState } = require("../lib/redis");
+const { getState, setState, redisCommand } = require("../lib/redis");
 const { generateContent } = require("../lib/gemini");
 const { getWorldConfig } = require("../lib/worldconfig");
 const { STONE_IDS } = require("../lib/gamestate-manlandia");
@@ -15,6 +15,28 @@ const { selectNotifyTargets, buildNotificationPayload } = require("../lib/push")
 const webpush = require("web-push");
 
 const MAX_HISTORY = 40; // entries of context sent to the LLM per turn — bounds prompt cost; full log is still stored
+
+// Generous upper bound on how long a single Groq round trip (including our
+// own one retry) should ever take — if a lock is somehow never released
+// (a crashed invocation), it self-clears instead of wedging a world forever.
+const GM_LOCK_TTL_MS = 20000;
+
+// True concurrency guard, not a fixed cooldown: two players in the same
+// world submitting within the same instant can both hit Groq at once and
+// trip its shared per-account rate limit. This only blocks a second call
+// while a FIRST call to Groq for this exact world is still in flight, so a
+// single fast player (Groq often responds in ~1s) is never blocked from
+// immediately taking their next turn — the lock is already released by
+// the time their next submission arrives. A roll_result is the second half
+// of one player's own turn (the dice can't even be rolled until the first
+// call returns), so it's exempt — never a new/competing submission.
+async function acquireGmLock(worldId) {
+  const result = await redisCommand("SET", `gmlock:${worldId}`, "1", "NX", "PX", GM_LOCK_TTL_MS);
+  return result === "OK";
+}
+async function releaseGmLock(worldId) {
+  await redisCommand("DEL", `gmlock:${worldId}`).catch(() => {});
+}
 
 function matchResonanceLocationId(name) {
   const s = name.toLowerCase();
@@ -124,16 +146,23 @@ module.exports = async function handler(req, res) {
   const playerLabel = player.charAt(0).toUpperCase() + player.slice(1);
   const userMessage = type === "roll_result" ? message : `${playerLabel}: ${message}`;
 
+  const needsLock = type !== "roll_result";
+  if (needsLock && !(await acquireGmLock(worldConfig.id))) {
+    return res.status(429).json({ error: "Another turn just came in for this world — wait a moment and try again." });
+  }
+
   let gmResponse;
   try {
     gmResponse = await generateContent(systemPrompt, history, userMessage);
   } catch (err) {
     console.error("GM error:", err);
+    if (needsLock) await releaseGmLock(worldConfig.id);
     if (err.status === 429) {
       return res.status(429).json({ error: "The GM is handling a lot of requests right now — wait a few seconds and try again." });
     }
     return res.status(500).json({ error: "The GM encountered an error: " + err.message });
   }
+  if (needsLock) await releaseGmLock(worldConfig.id);
 
   const { clean: rollStripped, needsRoll, rollStat, rollAdvantage } = extractRoll(gmResponse);
   const extracted = extractSuggestions(rollStripped);

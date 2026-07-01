@@ -12,22 +12,67 @@ function mockRes() {
 
 function freshRequire(modPath) {
   delete require.cache[require.resolve(modPath)];
+  // lib/ratelimit.js destructures redisCommand out of lib/redis.js once, at
+  // require time — if it's still cached from an earlier test in this file,
+  // it keeps using that test's (possibly now-stale) mocked redisCommand
+  // instead of the one just registered via t.mock.module. Always clearing it
+  // here forces a rebind against whatever mock is currently active.
+  delete require.cache[require.resolve("../lib/ratelimit.js")];
   return require(modPath);
 }
 
-// Minimal INCR/EXPIRE backing so lib/ratelimit.js's checkRateLimit() works
-// against these mocks without every test needing to know about it — a fresh
-// counters map per mock instance means rate limiting never triggers unless a
-// test explicitly calls a handler enough times to hit it.
+// Minimal INCR/EXPIRE/SET/DEL/GET backing so lib/ratelimit.js's checkRateLimit()
+// and api/gm.js's SET-NX turn lock both work against these mocks without every
+// test needing to know about it — a fresh store per mock instance means
+// neither kicks in unless a test explicitly calls a handler enough times, or
+// concurrently enough, to hit it. TTLs (EXPIRE seconds, SET PX/EX) are tracked
+// against real wall-clock time — fine since no test needs to fast-forward past
+// one, only to see NX correctly fail while an entry is still live.
 function mockRedisCommand() {
-  const counters = new Map();
-  return async (cmd, key) => {
+  const store = new Map(); // key -> { value, expiresAt: epoch-ms|null }
+  const live = (key) => {
+    const entry = store.get(key);
+    if (!entry) return null;
+    if (entry.expiresAt !== null && entry.expiresAt <= Date.now()) { store.delete(key); return null; }
+    return entry;
+  };
+  return async (cmd, ...args) => {
     if (cmd === "INCR") {
-      const v = (counters.get(key) || 0) + 1;
-      counters.set(key, v);
-      return v;
+      const [key] = args;
+      const entry = live(key);
+      const next = (entry ? Number(entry.value) : 0) + 1;
+      store.set(key, { value: String(next), expiresAt: entry ? entry.expiresAt : null });
+      return next;
     }
-    if (cmd === "EXPIRE") return 1;
+    if (cmd === "EXPIRE") {
+      const [key, seconds] = args;
+      const entry = store.get(key);
+      if (entry) entry.expiresAt = Date.now() + Number(seconds) * 1000;
+      return 1;
+    }
+    if (cmd === "SET") {
+      const [key, value, ...opts] = args;
+      const nx = opts.includes("NX");
+      if (nx && live(key)) return null;
+      let expiresAt = null;
+      const pxIdx = opts.indexOf("PX");
+      const exIdx = opts.indexOf("EX");
+      if (pxIdx !== -1) expiresAt = Date.now() + Number(opts[pxIdx + 1]);
+      else if (exIdx !== -1) expiresAt = Date.now() + Number(opts[exIdx + 1]) * 1000;
+      store.set(key, { value: String(value), expiresAt });
+      return "OK";
+    }
+    if (cmd === "DEL") {
+      const [key] = args;
+      const existed = store.has(key);
+      store.delete(key);
+      return existed ? 1 : 0;
+    }
+    if (cmd === "GET") {
+      const [key] = args;
+      const entry = live(key);
+      return entry ? entry.value : null;
+    }
     throw new Error("unsupported command in mock: " + cmd);
   };
 }
@@ -60,4 +105,4 @@ function keyedRedisMock(initial = {}) {
   };
 }
 
-module.exports = { mockRes, freshRequire, statefulRedisMock, keyedRedisMock };
+module.exports = { mockRes, freshRequire, statefulRedisMock, keyedRedisMock, mockRedisCommand };

@@ -70,9 +70,15 @@ Two independent, orthogonal checks, both simple shared-secret headers (no sessio
 
 ## Rate limiting
 
-`lib/ratelimit.js`'s `checkRateLimit(key, limit, windowSeconds)` is a simple Redis `INCR`+`EXPIRE` fixed-window counter, applied per-`X-Forwarded-For` IP to the two endpoints that call the paid Groq API with **no** `X-Game-Secret` required: `api/help.js` and `api/recap.js` (both intentionally auth-free so kids can ask for help without a login). Limit is 10 requests/60s per IP per endpoint — generous for real use, tight enough to stop a loop from running up Groq costs. `api/gm.js` isn't rate-limited since it already requires `X-Game-Secret`.
+`lib/ratelimit.js`'s `checkRateLimit(key, limit, windowSeconds)` is a simple Redis `INCR`+`EXPIRE` fixed-window counter, applied per-`X-Forwarded-For` IP to the two endpoints that call the paid Groq API with **no** `X-Game-Secret` required: `api/help.js` and `api/recap.js` (both intentionally auth-free so kids can ask for help without a login). Limit is 10 requests/60s per IP per endpoint — generous for real use, tight enough to stop a loop from running up Groq costs. `api/gm.js` isn't rate-limited by IP since it already requires `X-Game-Secret` — it has its own mechanism below instead.
 
 `api/gm.js` also caps the `message` field at 1000 characters (mirrors the 500-char cap `api/help.js` already had on `question`) — there was previously no limit on the one field that reaches the LLM with no size check at all.
+
+**Groq's own rate limit** (a real quota shared across the whole account — every world draws from one `GROQ_API_KEY`) is handled two ways:
+- `lib/gemini.js` retries once, after a 1.5s delay, on a 429 from Groq before giving up — absorbs most transient spikes silently.
+- If it still fails, `api/gm.js` returns a 429 with player-facing copy ("wait a few seconds and try again") instead of leaking Groq's raw quota-error text.
+- Separately, `api/gm.js` holds a short-lived Redis lock (`gmlock:<worldId>`, `SET NX PX 20000`, released as soon as the Groq call resolves) around every non-`roll_result` call, so two players in the *same* world submitting at literally the same instant don't both hit Groq concurrently — the second gets a 429 ("Another turn just came in for this world") instead. This is a true in-flight lock, not a fixed cooldown: a solo player whose turn resolves quickly can submit their very next action immediately, since the lock is already released by then. It's scoped per-world, not global, so different family members playing different campaigns at the same time are never affected by each other.
+- On any error response from `/api/gm`, `public/game.js`'s `submitAction()` puts the player's typed message back in the input box (via `sendToGM()`'s boolean return) so they can just hit send again instead of retyping.
 
 ## Push notifications
 
