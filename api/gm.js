@@ -41,13 +41,21 @@ async function releaseGmLock(worldId) {
 // Groq tells us how long it actually wants us to wait (via a Retry-After
 // header or "try again in X.Xs" in its own error text — see lib/gemini.js).
 // Below 5 seconds that precision doesn't help a human, so just say "a few
-// seconds"; above that, giving the real number saves the player from
-// guessing (and re-mashing send) too early.
+// seconds". Above that, a daily/hourly quota (not just a per-minute burst)
+// can report a wait in the thousands of seconds — live example: 3750s —
+// so scale the unit instead of ever printing a raw seconds count that big.
 function formatWaitMessage(retryAfterSeconds) {
   const seconds = typeof retryAfterSeconds === "number" && !Number.isNaN(retryAfterSeconds)
     ? Math.ceil(retryAfterSeconds)
     : null;
-  return seconds !== null && seconds >= 5 ? `wait about ${seconds} seconds` : "wait a few seconds";
+  if (seconds === null || seconds < 5) return "wait a few seconds";
+  if (seconds < 60) return `wait about ${seconds} seconds`;
+  if (seconds < 3600) {
+    const minutes = Math.round(seconds / 60);
+    return `wait about ${minutes} minute${minutes === 1 ? "" : "s"}`;
+  }
+  const hours = Math.round(seconds / 3600);
+  return `wait about ${hours} hour${hours === 1 ? "" : "s"}`;
 }
 
 function matchResonanceLocationId(name) {

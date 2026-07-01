@@ -171,6 +171,46 @@ test("a Groq 429 with a longer known retryAfterSeconds tells the player about ho
   assert.match(res.body.error, /wait about 18 seconds/i); // rounded up from 17.4
 });
 
+function mockGroq429(t, retryAfterSeconds) {
+  t.mock.module("../lib/redis.js", { exports: { getState: async () => null, setState: async () => {}, redisCommand: mockRedisCommand() } });
+  t.mock.module("../lib/gemini.js", {
+    exports: {
+      generateContent: async () => {
+        const err = new Error("Groq error: Rate limit reached.");
+        err.status = 429;
+        err.retryAfterSeconds = retryAfterSeconds;
+        throw err;
+      },
+    },
+  });
+}
+
+test("a Groq 429 with a wait measured in minutes reports minutes, not raw seconds", async (t) => {
+  mockGroq429(t, 125); // 2m 5s
+  const handler = freshHandler("../api/gm.js");
+  const req = { method: "POST", headers: {}, query: { world: "manlandia" }, body: { player: "player1", message: "I arrive", type: "action" } };
+  const res = mockRes();
+  await handler(req, res);
+
+  assert.equal(res.statusCode, 429);
+  assert.match(res.body.error, /wait about 2 minutes/i);
+  assert.doesNotMatch(res.body.error, /125 seconds/);
+});
+
+// Live example: a daily/hourly Groq quota (not just a per-minute burst) once
+// reported exactly this — printing "3750 seconds" would be unreadable.
+test("a Groq 429 with a wait measured in hours reports hours, not a huge seconds count", async (t) => {
+  mockGroq429(t, 3750); // ~1h 2.5m
+  const handler = freshHandler("../api/gm.js");
+  const req = { method: "POST", headers: {}, query: { world: "manlandia" }, body: { player: "player1", message: "I arrive", type: "action" } };
+  const res = mockRes();
+  await handler(req, res);
+
+  assert.equal(res.statusCode, 429);
+  assert.match(res.body.error, /wait about 1 hour\b/i);
+  assert.doesNotMatch(res.body.error, /3750/);
+});
+
 test("a non-429 Groq error still surfaces as a 500 with the underlying message", async (t) => {
   t.mock.module("../lib/redis.js", { exports: { getState: async () => null, setState: async () => {}, redisCommand: mockRedisCommand() } });
   t.mock.module("../lib/gemini.js", {
