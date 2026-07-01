@@ -129,6 +129,9 @@ module.exports = async function handler(req, res) {
     gmResponse = await generateContent(systemPrompt, history, userMessage);
   } catch (err) {
     console.error("GM error:", err);
+    if (err.status === 429) {
+      return res.status(429).json({ error: "The GM is handling a lot of requests right now — wait a few seconds and try again." });
+    }
     return res.status(500).json({ error: "The GM encountered an error: " + err.message });
   }
 

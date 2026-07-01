@@ -97,3 +97,43 @@ test("accepts a message exactly at the 1000 character limit", async (t) => {
 
   assert.equal(res.statusCode, 200);
 });
+
+test("a Groq 429 surfaces as a 429 with a friendly, non-leaky message", async (t) => {
+  t.mock.module("../lib/redis.js", { exports: { getState: async () => null, setState: async () => {} } });
+  t.mock.module("../lib/gemini.js", {
+    exports: {
+      generateContent: async () => {
+        const err = new Error("Groq error: Rate limit reached for model in organization on tokens per minute (TPM)");
+        err.status = 429;
+        err.code = "rate_limit_exceeded";
+        throw err;
+      },
+    },
+  });
+
+  const handler = freshHandler("../api/gm.js");
+  const req = { method: "POST", headers: {}, query: { world: "manlandia" }, body: { player: "player1", message: "I arrive", type: "action" } };
+  const res = mockRes();
+  await handler(req, res);
+
+  assert.equal(res.statusCode, 429);
+  assert.match(res.body.error, /wait a few seconds/i);
+  assert.doesNotMatch(res.body.error, /tokens per minute/i);
+});
+
+test("a non-429 Groq error still surfaces as a 500 with the underlying message", async (t) => {
+  t.mock.module("../lib/redis.js", { exports: { getState: async () => null, setState: async () => {} } });
+  t.mock.module("../lib/gemini.js", {
+    exports: {
+      generateContent: async () => { throw new Error("Groq error: invalid API key"); },
+    },
+  });
+
+  const handler = freshHandler("../api/gm.js");
+  const req = { method: "POST", headers: {}, query: { world: "manlandia" }, body: { player: "player1", message: "I arrive", type: "action" } };
+  const res = mockRes();
+  await handler(req, res);
+
+  assert.equal(res.statusCode, 500);
+  assert.match(res.body.error, /invalid API key/);
+});
