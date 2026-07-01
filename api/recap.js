@@ -2,17 +2,25 @@ const { getState } = require("../lib/redis");
 const { generateContent } = require("../lib/gemini");
 const { getWorldConfig } = require("../lib/worldconfig");
 const { formatTranscript, buildRecapSystemPrompt } = require("../lib/recap");
+const { checkAdultAccess } = require("../lib/adultgate");
+const { checkRateLimit } = require("../lib/ratelimit");
 
 module.exports = async function handler(req, res) {
   const allowedOrigin = process.env.ALLOWED_ORIGIN || "*";
   res.setHeader("Access-Control-Allow-Origin", allowedOrigin);
   res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, X-Adult-Pin");
   if (req.method === "OPTIONS") return res.status(200).end();
   if (req.method !== "GET") return res.status(405).json({ error: "Method not allowed" });
 
+  const ip = (req.headers["x-forwarded-for"] || "unknown").split(",")[0].trim();
+  if (!(await checkRateLimit(`ratelimit:recap:${ip}`, 10, 60))) {
+    return res.status(429).json({ error: "Too many requests — please wait a moment and try again." });
+  }
+
   const worldConfig = getWorldConfig(req.query.world);
   const gameState = (await getState(worldConfig.key)) || worldConfig.getInitialState();
+  if (!checkAdultAccess(req, res, worldConfig, gameState)) return;
 
   const transcript = formatTranscript(gameState);
   if (!transcript) {

@@ -17,10 +17,10 @@ Run `node --check` on every JS file:
 ```
 api/campaigns.js  api/characters.js  api/gm.js  api/help.js
 api/poll.js  api/recap.js  api/state.js  api/unlock.js
-lib/gamestate-custom.js  lib/gamestate-manlandia.js  lib/gamestate.js
-lib/gemini.js  lib/prompt-custom.js  lib/prompt-manlandia.js
-lib/prompt.js  lib/recap.js  lib/redis.js  lib/suggestions.js
-lib/worldconfig.js
+lib/adultgate.js  lib/gamestate-custom.js  lib/gamestate-manlandia.js
+lib/gamestate.js  lib/gemini.js  lib/prompt-custom.js
+lib/prompt-manlandia.js  lib/prompt.js  lib/ratelimit.js
+lib/recap.js  lib/redis.js  lib/suggestions.js  lib/worldconfig.js
 public/game.js  public/pure.js
 ```
 
@@ -66,6 +66,11 @@ Run these checks in order:
 
 **Static assets**
 - GET `/pure.js` → expect 200 with JS content (this is a Vercel rewrite in vercel.json — if it's ever missing, the whole app breaks silently since game.js depends on functions defined there)
+
+**Adult gate (server-side enforcement)**
+- GET `/api/poll?since=0&world=resonance` with NO `X-Adult-Pin` header → expect `{"error": "This world is locked..."}` with 403
+- GET `/api/poll?since=0&world=resonance` with `X-Adult-Pin: 5414` → expect normal poll response (200)
+- GET `/api/poll?since=0&world=manlandia` with no adult-pin header → expect normal response (Manlandia is never gated)
 
 **GM (live call — pick whichever world has entries)**
 - If manlandia has 0 entries: POST `/api/gm?world=manlandia` with `{"player":"player1","message":"[SESSION BEGINS]","type":"begin"}` → expect `response` string or `needsRoll: true`

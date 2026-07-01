@@ -60,6 +60,20 @@ Never trust these tags to be well-formed — the model can omit them, duplicate 
 - **Roll flow**: when the GM calls for a roll, both the triggering user entry and the GM's response are pushed with `.rolling = true` and are excluded from `/api/poll` results. When the client submits the roll result (`type: "roll_result"`), those flagged entries are un-flagged and their timestamps are pushed back to `Date.now() - 2` (so they still sort before the new entries being added in that same call) — this is what keeps a roll's "before" and "after" entries appearing in the right order without a real multi-turn transaction.
 - **New session** (`api/state.js`, `action: "new_session"`): archives the current `sessionLog` + a player-written summary into `worldState.session_archive`, increments `session`, clears `sessionLog`, and resets per-world ability flags (Resonance: `lyra`/`fen`'s once-per-session abilities + `magic_uses_remaining`; Manlandia/custom: every `playerN.ability_used`).
 
+## Authorization: game secret vs. adult PIN
+
+Two independent, orthogonal checks, both simple shared-secret headers (no sessions, no tokens):
+
+- **`X-Game-Secret`** — required on state-mutating POSTs (`api/gm.js`, `api/state.js`, `api/characters.js`, `api/campaigns.js`). Fails **open** if `GAME_SECRET` is unset (`if (gameSecret && header !== gameSecret)`) — this is existing, long-standing behavior; don't "fix" it without checking whether anything relies on local/no-env-var dev use.
+- **`X-Adult-Pin`** — required on any request that touches an adult-gated world: Resonance always, or a custom campaign with `worldConfig.adult === true`. Enforced by `lib/adultgate.js`'s `checkAdultAccess(req, res, worldConfig, gameState)`, called after each handler loads state (so no extra Redis round-trip except in `api/state.js`'s POST branch, which loads state early specifically to check this). Wired into `api/gm.js`, `api/poll.js`, `api/recap.js`, `api/state.js`, `api/help.js` — every endpoint that can read or narrate world content. Unlike the game secret, this **fails closed**: if `ADULT_PIN` isn't configured, adult worlds stay locked rather than opening up. The client stores the raw PIN in `localStorage` (`adult_pin`) after a successful `/api/unlock` call and resends it on every request via `authPost()`/`authGet()` in `game.js` — same trust model as `X-Game-Secret`, just a second independent secret for a second boundary (family-wide vs. kids-vs-adult-content).
+- `api/campaigns.js` GET (the world-selector listing) and `api/unlock.js` itself are deliberately **not** gated — you need to see a campaign exists (name/theme/adult flag) before you could ever supply the right PIN for it, and unlock is how you obtain the PIN check in the first place.
+
+## Rate limiting
+
+`lib/ratelimit.js`'s `checkRateLimit(key, limit, windowSeconds)` is a simple Redis `INCR`+`EXPIRE` fixed-window counter, applied per-`X-Forwarded-For` IP to the two endpoints that call the paid Groq API with **no** `X-Game-Secret` required: `api/help.js` and `api/recap.js` (both intentionally auth-free so kids can ask for help without a login). Limit is 10 requests/60s per IP per endpoint — generous for real use, tight enough to stop a loop from running up Groq costs. `api/gm.js` isn't rate-limited since it already requires `X-Game-Secret`.
+
+`api/gm.js` also caps the `message` field at 1000 characters (mirrors the 500-char cap `api/help.js` already had on `question`) — there was previously no limit on the one field that reaches the LLM with no size check at all.
+
 ## Testing
 
 `npm test` runs `node --experimental-test-module-mocks --test tests/*.test.js` — plain `node:test`/`node:assert`, zero test-framework dependency.
@@ -78,5 +92,5 @@ All 6 that the code actually reads from `process.env`:
 | `UPSTASH_REDIS_REST_URL` | `lib/redis.js` | Redis REST endpoint |
 | `UPSTASH_REDIS_REST_TOKEN` | `lib/redis.js` | Redis REST auth |
 | `GAME_SECRET` | `api/gm.js`, `api/state.js`, `api/characters.js`, `api/campaigns.js` | Shared secret required on `X-Game-Secret` header for all state-mutating POSTs |
-| `ADULT_PIN` | `api/unlock.js` | PIN gating Resonance + adult custom campaigns |
+| `ADULT_PIN` | `api/unlock.js`, `lib/adultgate.js` (used by `api/gm.js`, `api/poll.js`, `api/recap.js`, `api/state.js`, `api/help.js`) | PIN gating Resonance + adult custom campaigns, enforced server-side on every endpoint that can read/narrate world content |
 | `ALLOWED_ORIGIN` | every `api/*.js` | CORS `Access-Control-Allow-Origin` (defaults to `*`) |

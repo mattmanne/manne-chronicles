@@ -15,6 +15,23 @@ function freshRequire(modPath) {
   return require(modPath);
 }
 
+// Minimal INCR/EXPIRE backing so lib/ratelimit.js's checkRateLimit() works
+// against these mocks without every test needing to know about it — a fresh
+// counters map per mock instance means rate limiting never triggers unless a
+// test explicitly calls a handler enough times to hit it.
+function mockRedisCommand() {
+  const counters = new Map();
+  return async (cmd, key) => {
+    if (cmd === "INCR") {
+      const v = (counters.get(key) || 0) + 1;
+      counters.set(key, v);
+      return v;
+    }
+    if (cmd === "EXPIRE") return 1;
+    throw new Error("unsupported command in mock: " + cmd);
+  };
+}
+
 // A stateful in-memory stand-in for lib/redis.js's getState/setState, so a
 // test can call a handler more than once and see state persisted between calls.
 function statefulRedisMock(initial = null) {
@@ -23,6 +40,7 @@ function statefulRedisMock(initial = null) {
     exports: {
       getState: async () => state,
       setState: async (key, value) => { state = value; },
+      redisCommand: mockRedisCommand(),
     },
     get state() { return state; },
   };
@@ -36,6 +54,7 @@ function keyedRedisMock(initial = {}) {
     exports: {
       getState: async (key) => (store.has(key) ? store.get(key) : null),
       setState: async (key, value) => { store.set(key, value); },
+      redisCommand: mockRedisCommand(),
     },
     get(key) { return store.get(key); },
   };

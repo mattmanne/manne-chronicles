@@ -13,6 +13,7 @@ let continueInitDone = false;
 let manlandiaTone    = localStorage.getItem("manlandia_tone") || "adventure";
 let campaignList     = [];
 let adultUnlocked    = localStorage.getItem("adult_unlocked") === "true";
+let adultPin         = localStorage.getItem("adult_pin") || "";
 
 const STATS = {
   fen:  { force: 0, acuity: 1, agility: 1, will: 3, presence: 0 },
@@ -101,9 +102,13 @@ const suggestionChips = document.getElementById("suggestion-chips");
 function authPost(url, body) {
   return fetch(withWorld(url), {
     method: "POST",
-    headers: { "Content-Type": "application/json", "X-Game-Secret": gameSecret || "" },
+    headers: { "Content-Type": "application/json", "X-Game-Secret": gameSecret || "", "X-Adult-Pin": adultPin || "" },
     body: JSON.stringify(body)
   });
+}
+
+function authGet(url) {
+  return fetch(withWorld(url), { headers: { "X-Adult-Pin": adultPin || "" } });
 }
 
 /* ── Secret ── */
@@ -564,7 +569,7 @@ function setupNewSession() {
 /* ── Load existing log ── */
 async function loadExistingLog() {
   try {
-    const res = await fetch(withWorld("/api/poll?since=0"));
+    const res = await authGet("/api/poll?since=0");
     const data = await res.json();
     cachedGameState = { worldState: data.worldState, characters: data.characters };
     sessionLabel.textContent = `Session ${data.worldState.session}`;
@@ -585,7 +590,7 @@ function startPolling() {
   pollTimer = setInterval(async () => {
     if (isLoading) return;
     try {
-      const res = await fetch(withWorld(`/api/poll?since=${lastTimestamp}`));
+      const res = await authGet(`/api/poll?since=${lastTimestamp}`);
       const data = await res.json();
       if (data.entries && data.entries.length > 0) {
         for (const entry of data.entries) {
@@ -606,7 +611,7 @@ function startPolling() {
 /* ── Opening narration ── */
 async function triggerOpeningIfNeeded() {
   try {
-    const res = await fetch(withWorld("/api/poll?since=0"));
+    const res = await authGet("/api/poll?since=0");
     const data = await res.json();
     if (data.entries.length === 0) await sendToGM(currentPlayer, "[SESSION BEGINS]", "begin");
   } catch(_) {}
@@ -820,7 +825,7 @@ function finishSpeech(btn) {
 function setupExport() {
   document.getElementById("export-btn").addEventListener("click", async () => {
     try {
-      const res = await fetch(withWorld("/api/state"));
+      const res = await authGet("/api/state");
       const state = await res.json();
       const text = formatCampaignExport(state);
       const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
@@ -848,7 +853,7 @@ async function loadRecap() {
   textEl.textContent = "Loading recap…";
   overlay.classList.add("active");
   try {
-    const res  = await fetch(withWorld("/api/recap"));
+    const res  = await authGet("/api/recap");
     const data = await res.json();
     textEl.textContent = data.recap || data.error || "Could not load a recap right now.";
   } catch(_) {
@@ -1126,7 +1131,7 @@ async function sendHelpQuestion() {
   try {
     const res = await fetch(withWorld("/api/help"), {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "X-Adult-Pin": adultPin || "" },
       body: JSON.stringify({ question }),
     });
     const data = await res.json();
@@ -1219,7 +1224,7 @@ function renderManlandiaCard(n, char) {
 /* ── Archive ── */
 async function loadArchive() {
   try {
-    const res = await fetch(withWorld("/api/state"));
+    const res = await authGet("/api/state");
     const state = await res.json();
     renderArchive(state);
   } catch(_) {}
@@ -1746,7 +1751,9 @@ function setupUnlockOverlay() {
       const data = await res.json();
       if (data.ok) {
         adultUnlocked = true;
+        adultPin = pin;
         localStorage.setItem("adult_unlocked", "true");
+        localStorage.setItem("adult_pin", pin);
         document.body.classList.add("adult-unlocked");
         overlayEl.classList.remove("active");
         renderCampaignList();

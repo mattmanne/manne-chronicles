@@ -3,6 +3,7 @@ const { generateContent } = require("../lib/gemini");
 const { getWorldConfig } = require("../lib/worldconfig");
 const { STONE_IDS } = require("../lib/gamestate-manlandia");
 const { extractSuggestions } = require("../lib/suggestions");
+const { checkAdultAccess } = require("../lib/adultgate");
 
 const MAX_HISTORY = 40; // entries of context sent to the LLM per turn — bounds prompt cost; full log is still stored
 
@@ -41,7 +42,7 @@ module.exports = async function handler(req, res) {
   const allowedOrigin = process.env.ALLOWED_ORIGIN || "*";
   res.setHeader("Access-Control-Allow-Origin", allowedOrigin);
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, X-Game-Secret");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, X-Game-Secret, X-Adult-Pin");
   if (req.method === "OPTIONS") return res.status(200).end();
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
@@ -55,8 +56,11 @@ module.exports = async function handler(req, res) {
 
   const { player, message, type, tone } = req.body;
   if (!player || !message) return res.status(400).json({ error: "Missing player or message" });
+  if (message.length > 1000) return res.status(400).json({ error: "Message too long" });
 
   const gameState = (await getState(key)) || getInitialState();
+  if (!checkAdultAccess(req, res, worldConfig, gameState)) return;
+
   let systemPrompt = buildSystemPrompt(gameState);
 
   if ((worldConfig.id === "manlandia" || worldConfig.type === "custom") && tone && tone !== "adventure") {

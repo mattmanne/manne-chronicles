@@ -73,3 +73,27 @@ test("no suggestions tag present yields an empty array", async (t) => {
 
   assert.deepEqual(res.body.suggestions, []);
 });
+
+test("rejects a message longer than 1000 characters without calling the model", async (t) => {
+  let generateContentCalls = 0;
+  t.mock.module("../lib/redis.js", { exports: { getState: async () => null, setState: async () => {} } });
+  t.mock.module("../lib/gemini.js", { exports: { generateContent: async () => { generateContentCalls++; return "x"; } } });
+
+  const handler = freshHandler("../api/gm.js");
+  const req = { method: "POST", headers: {}, query: { world: "manlandia" }, body: { player: "player1", message: "a".repeat(1001), type: "action" } };
+  const res = mockRes();
+  await handler(req, res);
+
+  assert.equal(res.statusCode, 400);
+  assert.equal(generateContentCalls, 0);
+});
+
+test("accepts a message exactly at the 1000 character limit", async (t) => {
+  mockRedisAndGemini(t, "Fine.");
+  const handler = freshHandler("../api/gm.js");
+  const req = { method: "POST", headers: {}, query: { world: "manlandia" }, body: { player: "player1", message: "a".repeat(1000), type: "action" } };
+  const res = mockRes();
+  await handler(req, res);
+
+  assert.equal(res.statusCode, 200);
+});

@@ -2,6 +2,11 @@ const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const { mockRes, freshRequire, statefulRedisMock } = require("./helpers");
 
+// Resonance is always adult-gated — set once so every resonance-world test
+// below (none of which are testing the gate itself) can pass the check.
+const ADULT_PIN = "0000";
+process.env.ADULT_PIN = ADULT_PIN;
+
 function mockGemini(t, responses) {
   const queue = [...responses];
   t.mock.module("../lib/gemini.js", {
@@ -11,7 +16,7 @@ function mockGemini(t, responses) {
 
 function callGm(body, world = "manlandia") {
   const handler = freshRequire("../api/gm.js");
-  const req = { method: "POST", headers: {}, query: { world }, body };
+  const req = { method: "POST", headers: { "x-adult-pin": ADULT_PIN }, query: { world }, body };
   const res = mockRes();
   return handler(req, res).then(() => res);
 }
@@ -161,4 +166,30 @@ test("sessionLog is trimmed to the most recent 80 entries once it exceeds 100", 
   await callGm({ player: "player1", message: "wait", type: "action" });
   assert.equal(redis.state.sessionLog.length, 80);
   assert.equal(redis.state.sessionLog[redis.state.sessionLog.length - 1].content, "Nothing tag-worthy happens.");
+});
+
+test("resonance is locked without the correct adult pin, even with a valid game turn", async (t) => {
+  const redis = statefulRedisMock(null);
+  t.mock.module("../lib/redis.js", redis);
+  mockGemini(t, ["This should never be reached."]);
+
+  const handler = freshRequire("../api/gm.js");
+  const req = { method: "POST", headers: {}, query: { world: "resonance" }, body: { player: "fen", message: "hello", type: "action" } };
+  const res = mockRes();
+  await handler(req, res);
+
+  assert.equal(res.statusCode, 403);
+});
+
+test("manlandia is never adult-gated, even with no pin header at all", async (t) => {
+  const redis = statefulRedisMock(null);
+  t.mock.module("../lib/redis.js", redis);
+  mockGemini(t, ["Fine."]);
+
+  const handler = freshRequire("../api/gm.js");
+  const req = { method: "POST", headers: {}, query: { world: "manlandia" }, body: { player: "player1", message: "hello", type: "action" } };
+  const res = mockRes();
+  await handler(req, res);
+
+  assert.equal(res.statusCode, 200);
 });

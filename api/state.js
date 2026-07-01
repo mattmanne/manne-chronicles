@@ -1,12 +1,13 @@
 const { getState, setState } = require("../lib/redis");
 const { HARM_LEVELS } = require("../lib/gamestate");
 const { getWorldConfig } = require("../lib/worldconfig");
+const { checkAdultAccess } = require("../lib/adultgate");
 
 module.exports = async function handler(req, res) {
   const allowedOrigin = process.env.ALLOWED_ORIGIN || "*";
   res.setHeader("Access-Control-Allow-Origin", allowedOrigin);
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, X-Game-Secret");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, X-Game-Secret, X-Adult-Pin");
   if (req.method === "OPTIONS") return res.status(200).end();
 
   const worldConfig = getWorldConfig(req.query.world);
@@ -14,6 +15,7 @@ module.exports = async function handler(req, res) {
 
   if (req.method === "GET") {
     const state = (await getState(key)) || getInitialState();
+    if (!checkAdultAccess(req, res, worldConfig, state)) return;
     return res.json(state);
   }
 
@@ -22,6 +24,9 @@ module.exports = async function handler(req, res) {
     if (gameSecret && req.headers["x-game-secret"] !== gameSecret) {
       return res.status(401).json({ error: "Unauthorized" });
     }
+
+    const stateForAdultCheck = (await getState(key)) || getInitialState();
+    if (!checkAdultAccess(req, res, worldConfig, stateForAdultCheck)) return;
 
     const { action, payload } = req.body;
 

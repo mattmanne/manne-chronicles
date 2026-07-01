@@ -2,11 +2,16 @@ const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const { mockRes, freshRequire, statefulRedisMock } = require("./helpers");
 
+// Resonance is always adult-gated — set once so the resonance-world test below
+// (which isn't testing the gate itself) can pass the check.
+const ADULT_PIN = "0000";
+process.env.ADULT_PIN = ADULT_PIN;
+
 function callPoll(stored, query) {
   return async (t) => {
     t.mock.module("../lib/redis.js", statefulRedisMock(stored));
     const handler = freshRequire("../api/poll.js");
-    const req = { method: "GET", query };
+    const req = { method: "GET", headers: { "x-adult-pin": ADULT_PIN }, query };
     const res = mockRes();
     await handler(req, res);
     return res;
@@ -61,4 +66,14 @@ test("since defaults to 0 when omitted, returning the full log (minus rolling en
   const stored = { session: 1, sessionLog: BASE_LOG, characters: {}, worldState: { villain_awareness: 0, curse_level: 0, location: "x", visited_locations: [], location_scars: [] } };
   const res = await callPoll(stored, { world: "manlandia" })(t);
   assert.equal(res.body.entries.length, 2);
+});
+
+test("resonance is locked to reads without the correct adult pin", async (t) => {
+  const stored = { session: 1, sessionLog: [], characters: {}, worldState: { conclave_awareness: 0 } };
+  t.mock.module("../lib/redis.js", statefulRedisMock(stored));
+  const handler = freshRequire("../api/poll.js");
+  const req = { method: "GET", headers: {}, query: { since: "0", world: "resonance" } };
+  const res = mockRes();
+  await handler(req, res);
+  assert.equal(res.statusCode, 403);
 });

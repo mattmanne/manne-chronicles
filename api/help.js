@@ -3,14 +3,21 @@ const { getState } = require("../lib/redis");
 const { getWorldConfig } = require("../lib/worldconfig");
 const { buildSystemPrompt } = require("../lib/prompt");
 const { buildSystemPromptManlandia } = require("../lib/prompt-manlandia");
+const { checkRateLimit } = require("../lib/ratelimit");
+const { checkAdultAccess } = require("../lib/adultgate");
 
 module.exports = async function handler(req, res) {
   const allowedOrigin = process.env.ALLOWED_ORIGIN || "*";
   res.setHeader("Access-Control-Allow-Origin", allowedOrigin);
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, X-Adult-Pin");
   if (req.method === "OPTIONS") return res.status(200).end();
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
+
+  const ip = (req.headers["x-forwarded-for"] || "unknown").split(",")[0].trim();
+  if (!(await checkRateLimit(`ratelimit:help:${ip}`, 10, 60))) {
+    return res.status(429).json({ error: "Too many questions at once — please wait a moment and try again." });
+  }
 
   const { question } = req.body || {};
   if (!question || typeof question !== "string" || !question.trim()) {
@@ -22,6 +29,7 @@ module.exports = async function handler(req, res) {
 
   const worldConfig = getWorldConfig(req.query.world);
   const gameState = (await getState(worldConfig.key)) || worldConfig.getInitialState();
+  if (!checkAdultAccess(req, res, worldConfig, gameState)) return;
 
   let gameContext;
   if (worldConfig.id === "manlandia") {
