@@ -18,7 +18,7 @@ Run `node --check` on every JS file:
 api/campaigns.js  api/characters.js  api/gm.js  api/help.js
 api/poll.js  api/recap.js  api/state.js  api/unlock.js
 lib/adultgate.js  lib/gamestate-custom.js  lib/gamestate-manlandia.js
-lib/gamestate.js  lib/gemini.js  lib/prompt-custom.js
+lib/gamestate.js  lib/gemini.js  lib/gm-tags.js  lib/prompt-custom.js
 lib/prompt-manlandia.js  lib/prompt.js  lib/ratelimit.js
 lib/recap.js  lib/redis.js  lib/suggestions.js  lib/worldconfig.js
 public/game.js  public/pure.js
@@ -87,6 +87,7 @@ These are logic checks using the existing state, not new calls:
 2. **Custom campaign playerCount**: If any custom campaigns exist, GET their state and confirm `worldConfig.playerCount` is set.
 3. **Character isolation**: Confirm kid campaigns (manlandia) have `characters.player1` through `player4`; resonance has `fen` and `lyra` only.
 4. **No cross-contamination**: Resonance state has no `villain_awareness`; Manlandia state has no `conclave_awareness`.
+5. **GM tag drift** (do this if there's time — this is how every parsing bug fixed so far was actually found): `GET /api/state` for each live campaign with real history, grep the `sessionLog` for `gm` entries containing `[`, and eyeball whether the model's actual bracket-tag formatting still looks like what `lib/gm-tags.js` expects. The model's compliance drifts; this catches it before a player does.
 
 ---
 
