@@ -12,8 +12,14 @@ let gameSecret       = null;
 let continueInitDone = false;
 let manlandiaTone    = localStorage.getItem("manlandia_tone") || "adventure";
 let campaignList     = [];
-let adultUnlocked    = localStorage.getItem("adult_unlocked") === "true";
 let adultPin         = localStorage.getItem("adult_pin") || "";
+// Devices that unlocked before adult worlds required an X-Adult-Pin header
+// have the old flag but never stored the actual pin — treat that as "not
+// really unlocked" so they get re-prompted instead of silently 403ing forever.
+let adultUnlocked    = localStorage.getItem("adult_unlocked") === "true" && !!adultPin;
+if (localStorage.getItem("adult_unlocked") === "true" && !adultPin) {
+  localStorage.removeItem("adult_unlocked");
+}
 
 const STATS = {
   fen:  { force: 0, acuity: 1, agility: 1, will: 3, presence: 0 },
@@ -109,6 +115,27 @@ function authPost(url, body) {
 
 function authGet(url) {
   return fetch(withWorld(url), { headers: { "X-Adult-Pin": adultPin || "" } });
+}
+
+// A 403 here means the stored pin is missing or wrong (most commonly: this
+// device unlocked before X-Adult-Pin enforcement existed, so it has the old
+// flag but never actually saved a pin). Clear the stale state and prompt
+// again, instead of leaving the user stuck on a generic connection error.
+function handleLockedResponse(status) {
+  if (status !== 403) return false;
+  adultUnlocked = false;
+  adultPin = "";
+  localStorage.removeItem("adult_unlocked");
+  localStorage.removeItem("adult_pin");
+  document.body.classList.remove("adult-unlocked");
+  const errorEl = document.getElementById("unlock-error");
+  if (errorEl) {
+    errorEl.textContent = "This world needs to be unlocked again — please re-enter the PIN.";
+    errorEl.classList.remove("hidden");
+  }
+  document.getElementById("unlock-overlay")?.classList.add("active");
+  setTimeout(() => document.getElementById("unlock-pin-input")?.focus(), 100);
+  return true;
 }
 
 /* ── Secret ── */
@@ -570,6 +597,7 @@ function setupNewSession() {
 async function loadExistingLog() {
   try {
     const res = await authGet("/api/poll?since=0");
+    if (handleLockedResponse(res.status)) return;
     const data = await res.json();
     cachedGameState = { worldState: data.worldState, characters: data.characters };
     sessionLabel.textContent = `Session ${data.worldState.session}`;
@@ -591,6 +619,7 @@ function startPolling() {
     if (isLoading) return;
     try {
       const res = await authGet(`/api/poll?since=${lastTimestamp}`);
+      if (res.status === 403) { clearInterval(pollTimer); pollTimer = null; handleLockedResponse(403); return; }
       const data = await res.json();
       if (data.entries && data.entries.length > 0) {
         for (const entry of data.entries) {
@@ -612,6 +641,7 @@ function startPolling() {
 async function triggerOpeningIfNeeded() {
   try {
     const res = await authGet("/api/poll?since=0");
+    if (handleLockedResponse(res.status)) return;
     const data = await res.json();
     if (data.entries.length === 0) await sendToGM(currentPlayer, "[SESSION BEGINS]", "begin");
   } catch(_) {}
@@ -668,6 +698,7 @@ async function sendToGM(player, message, type) {
   setLoading(true);
   try {
     const res = await authPost("/api/gm", { player, message, type, ...(isManlandiaLike() && { tone: manlandiaTone }) });
+    if (handleLockedResponse(res.status)) return;
     const data = await res.json();
     if (data.error) { appendSystemMessage("Error: " + data.error); return; }
 
@@ -826,6 +857,7 @@ function setupExport() {
   document.getElementById("export-btn").addEventListener("click", async () => {
     try {
       const res = await authGet("/api/state");
+      if (handleLockedResponse(res.status)) return;
       const state = await res.json();
       const text = formatCampaignExport(state);
       const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
@@ -1225,6 +1257,7 @@ function renderManlandiaCard(n, char) {
 async function loadArchive() {
   try {
     const res = await authGet("/api/state");
+    if (handleLockedResponse(res.status)) return;
     const state = await res.json();
     renderArchive(state);
   } catch(_) {}
@@ -1757,6 +1790,9 @@ function setupUnlockOverlay() {
         document.body.classList.add("adult-unlocked");
         overlayEl.classList.remove("active");
         renderCampaignList();
+        // If polling had been stopped by a locked-response (see handleLockedResponse),
+        // this picks it back up now that the pin is valid again.
+        if (continueInitDone && !pollTimer) startPolling();
       } else if (res.status === 500) {
         errorEl.textContent = "Not configured — ask Matt to set ADULT_PIN in Vercel";
         errorEl.classList.remove("hidden");

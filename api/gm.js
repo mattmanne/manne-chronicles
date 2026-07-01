@@ -88,11 +88,18 @@ module.exports = async function handler(req, res) {
     return res.status(500).json({ error: "The GM encountered an error: " + err.message });
   }
 
-  const rollMatch = gmResponse.match(/^ROLL:(FORCE|ACUITY|AGILITY|WILL|PRESENCE)(:ADVANTAGE)?$/m);
+  // Tolerate the model wrapping the stat in brackets (e.g. "ROLL:[AGILITY]") or
+  // getting the case wrong — the prompt says not to, but LLM output still varies.
+  const rollMatch = gmResponse.match(/^ROLL:\[?(FORCE|ACUITY|AGILITY|WILL|PRESENCE)\]?(:ADVANTAGE)?$/im);
   const needsRoll = !!rollMatch;
   const rollStat = rollMatch ? rollMatch[1].toLowerCase() : null;
   const rollAdvantage = rollMatch ? !!rollMatch[2] : false;
-  const rollStripped = gmResponse.replace(/^ROLL:(FORCE|ACUITY|AGILITY|WILL|PRESENCE)(:ADVANTAGE)?$/m, "").trim();
+  const rollStripped = gmResponse
+    .replace(/^ROLL:\[?(FORCE|ACUITY|AGILITY|WILL|PRESENCE)\]?(:ADVANTAGE)?$/im, "")
+    // Defensive cleanup: if the model used a stat name we don't recognize, no
+    // roll gets triggered, but the stray line still shouldn't leak into the story.
+    .replace(/^ROLL:.*$/im, "")
+    .trim();
   const extracted = extractSuggestions(rollStripped);
   const cleanResponse = extracted.clean;
   const suggestions = (type === "roll_result" || needsRoll) ? [] : extracted.suggestions;

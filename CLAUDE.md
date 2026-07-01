@@ -37,7 +37,7 @@ The GM's raw LLM response is plain narration plus optional bracket tags on their
 
 | Tag | Worlds | Effect |
 |---|---|---|
-| `ROLL:STAT[:ADVANTAGE]` | all | Not a bracket tag — a bare line. Triggers the dice-roll UI; client resubmits the result as `type: "roll_result"`. |
+| `ROLL:STAT[:ADVANTAGE]` | all | Not a bracket tag — a bare line. Triggers the dice-roll UI; client resubmits the result as `type: "roll_result"`. The prompts say no brackets around `STAT`, but the model still frequently writes `ROLL:[STAT]` anyway — the regex in `api/gm.js` tolerates an optional `[...]` and is case-insensitive. This bit the app for real once (4 rolls in a row silently failed to trigger in a live campaign before the tolerant regex existed) — don't tighten it back up. |
 | `[LOCATION: Name]` | all | Updates `worldState.location`; if the name matches a known location, adds it to `visited_locations` (deduped) |
 | `[SCAR: Location: Label]` | all | Adds `{ id, label }` to `worldState.location_scars` (deduped by id+label) |
 | `[SUGGESTIONS: a \| b \| c]` | all | Parsed by `lib/suggestions.js`, returned as the `suggestions` array; forced to `[]` server-side whenever `needsRoll` is true or `type === "roll_result"` |
