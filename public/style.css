@@ -45,16 +45,21 @@ html, body {
   background: var(--surface);
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
+  gap: 8px;
   z-index: 10;
 }
 
-#title-area { display: flex; align-items: baseline; gap: 10px; }
+/* The title is decorative — let it truncate on narrow phones. The button row
+   is functional and must never shrink or clip off-screen (see the 4-button
+   overflow that showed up on a 375px-wide viewport once Alert was added). */
+#title-area { display: flex; align-items: baseline; gap: 10px; min-width: 0; overflow: hidden; }
 
 #game-title {
   font-family: var(--font-serif);
   font-size: 1.1rem;
   letter-spacing: 0.2em;
   color: var(--gold);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 
 #session-label {
@@ -62,9 +67,11 @@ html, body {
   color: var(--parch-dim);
   letter-spacing: 0.1em;
   text-transform: uppercase;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
-#header-right { display: flex; align-items: center; gap: 10px; }
+#header-right { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
 
 #awareness-badge {
   font-size: 0.75rem;
@@ -96,13 +103,14 @@ html, body {
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
   background: none; border: 1px solid var(--border);
   color: var(--parch-dim); border-radius: 6px; cursor: pointer;
-  padding: 5px 8px; min-width: 46px; min-height: 44px;
+  padding: 5px 5px; min-width: 40px; min-height: 44px;
   transition: all 0.2s;
 }
 .header-btn:hover  { background: var(--surface2); border-color: var(--gold-dim); color: var(--parchment); }
 .header-btn.active { background: rgba(201,168,76,0.15); border-color: var(--gold-dim); color: var(--gold); }
+#notify-btn.hidden { display: none; }
 .header-btn-icon  { font-size: 1rem; line-height: 1; }
-.header-btn-label { font-size: 0.52rem; letter-spacing: 0.06em; text-transform: uppercase; color: inherit; line-height: 1; }
+.header-btn-label { font-size: 0.5rem; letter-spacing: 0.03em; text-transform: uppercase; color: inherit; line-height: 1; white-space: nowrap; }
 
 /* ── Tab Panels ── */
 #tab-panels {

@@ -5,9 +5,12 @@
     }
   },
   "rewrites": [
-    { "source": "/style.css", "destination": "/public/style.css" },
-    { "source": "/game.js",   "destination": "/public/game.js"   },
-    { "source": "/pure.js",   "destination": "/public/pure.js"   },
-    { "source": "/",          "destination": "/public/index.html" }
+    { "source": "/style.css",     "destination": "/public/style.css"     },
+    { "source": "/game.js",       "destination": "/public/game.js"       },
+    { "source": "/pure.js",       "destination": "/public/pure.js"       },
+    { "source": "/sw.js",         "destination": "/public/sw.js"         },
+    { "source": "/manifest.json", "destination": "/public/manifest.json" },
+    { "source": "/icon.svg",      "destination": "/public/icon.svg"      },
+    { "source": "/",              "destination": "/public/index.html"    }
   ]
 }

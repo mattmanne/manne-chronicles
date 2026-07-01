@@ -7,7 +7,7 @@ This is the developer-facing companion to `README.md` (which is written for play
 - **Vercel** — hosting + serverless functions (`api/*.js`), auto-deploys on push to `main`
 - **Groq API** — Llama 3.3 70B, called from `lib/gemini.js` (file is named `gemini.js` for historical reasons — it does **not** call Google's Gemini API; don't rename it, several places assume this path)
 - **Upstash Redis** — REST API only, no SDK (`lib/redis.js`); this is the only persistence layer
-- **Zero npm dependencies** in the shipped app — all external calls use native `fetch`. Test tooling (`node:test`) is Node-built-in; nothing gets installed.
+- **One npm dependency**: `web-push`, added deliberately for push notifications — everything else still uses native `fetch` (Redis, Groq). Web Push requires implementing a real cryptographic protocol (VAPID JWT signing + ECDH/HKDF/AES-128-GCM payload encryption, RFC 8291/8292) to actually send a notification, unlike Redis/Groq which are just plain REST calls — hand-rolling that protocol is easy to get subtly wrong with silent failures (notification just never arrives) and no way to verify correctness without a real device round-trip. That's different enough from "avoid an SDK when fetch works fine" to justify the one exception. Test tooling (`node:test`) is still Node-built-in.
 - **Frontend**: plain HTML/CSS/JS, no bundler, no framework. `public/index.html` loads `pure.js` then `game.js` as ordinary global-scope `<script>` tags (in that order — `game.js` calls functions defined in `pure.js`).
 
 ## World routing (`lib/worldconfig.js`)
@@ -74,24 +74,36 @@ Two independent, orthogonal checks, both simple shared-secret headers (no sessio
 
 `api/gm.js` also caps the `message` field at 1000 characters (mirrors the 500-char cap `api/help.js` already had on `question`) — there was previously no limit on the one field that reaches the LLM with no size check at all.
 
+## Push notifications
+
+Notifies the other player(s) in a world when someone takes a turn — the one item that was in the backlog long enough to have its own "large effort, defer until needed" note.
+
+- **Storage**: `push:<worldId>:subscriptions` in Redis — an array of `{ player, endpoint, keys: { p256dh, auth } }`. Multiple devices per player are fine; `api/push.js`'s `subscribe` action dedupes by `endpoint`.
+- **Client**: `public/sw.js` (service worker, registered by `setupPushNotifications()` in `game.js`) handles the `push` and `notificationclick` events. The header's "Alert" button (`#notify-btn`, hidden by default, shown once the service worker registers successfully) drives `Notification.requestPermission()` → `pushManager.subscribe()` → `POST /api/push`. The VAPID public key needed for `subscribe()` is fetched from `GET /api/vapid-public-key` rather than hardcoded client-side, so it stays a server-configured value like everything else.
+- **Sending**: `api/gm.js`'s `sendTurnNotifications()`, called after `setState()`, **only when the turn is fully resolved** (`!rolling` — the same flag that already hides in-progress roll entries from `/api/poll`, so nobody gets notified about content they can't see yet). Excludes the sender's own devices (`lib/push.js`'s `selectNotifyTargets()`). Notification text is deliberately generic ("X took a turn — tap to see what happens!") — never narration content, so there's no need to special-case the adult gate for what shows up in a lock-screen preview. Entirely best-effort: wrapped in try/catch, a push failure never breaks the GM response itself. A subscription that comes back 404/410 (the push service's way of saying "this one's dead") is removed from storage automatically.
+- **iOS caveat**: Apple only allows Web Push for a home-screen-installed PWA, not a regular Safari tab (since iOS 16.4). `public/manifest.json` + the `apple-touch-icon`/`manifest` links in `index.html`'s `<head>` make that installable, but there's no way to make Safari-tab notifications work on iPhone — this is a real platform limitation, documented for players in `README.md`.
+- **What can't be verified by tests**: everything up to "the correctly-addressed, correctly-encrypted request was handed to the push service" is covered (`tests/push.test.js`, `tests/api-push.test.js`, `tests/api-vapid.test.js`, the push-specific cases in `tests/api-gm-push.test.js`). Whether a real device actually *receives* it requires a real phone — there's no way to simulate a round trip through Apple's/Google's actual push infrastructure in an automated test.
+
 ## Testing
 
 `npm test` runs `node --experimental-test-module-mocks --test tests/*.test.js` — plain `node:test`/`node:assert`, zero test-framework dependency.
 
 - **Pure modules** (`lib/suggestions.js`, `lib/recap.js`, `lib/worldconfig.js`, `public/pure.js`) are `require()`'d directly — no mocking needed.
-- **API handlers** are tested by stubbing `lib/redis.js` (and `lib/gemini.js` where the handler calls the LLM) with `t.mock.module()`, then invoking the handler with a fake `req`/`res`. See `tests/helpers.js` for the shared `mockRes()`, `freshRequire()` (clears `require.cache` so a fresh mock takes effect), `statefulRedisMock()` (single-key, persists across calls within a test) and `keyedRedisMock()` (multi-key, for handlers like `api/campaigns.js` that touch more than one Redis key per request).
+- **API handlers** are tested by stubbing `lib/redis.js` (and `lib/gemini.js` where the handler calls the LLM, or `web-push` where it sends a notification) with `t.mock.module()`, then invoking the handler with a fake `req`/`res`. See `tests/helpers.js` for the shared `mockRes()`, `freshRequire()` (clears `require.cache` so a fresh mock takes effect), `statefulRedisMock()` (single-key, persists across calls within a test) and `keyedRedisMock()` (multi-key, for handlers like `api/campaigns.js`/`api/push.js` that touch more than one Redis key per request).
 - **`public/game.js`** itself is not unit-tested — it's a DOM-heavy browser script with no module system. The handful of genuinely reusable, logic-only functions it used to contain (`stripGMTags`, `getPlayerDisplayName`, `formatCampaignExport`, etc.) were moved into `public/pure.js`, which is loaded as a plain global-scope script before `game.js` and doubles as a CommonJS module for tests (see the `typeof module !== "undefined"` guard at the bottom of that file, and the `defaultWorld()`/`defaultGameState()`/etc. helpers that let its functions read the browser's globals while still being safely callable with explicit args from Node). Verify DOM-dependent changes by hand or with a real browser — a mock static server + Playwright script was used to smoke-test the app during development; there's no permanent browser test in this repo.
 - **`npm run check-drift`** (`scripts/check-tag-drift.js`) is a separate, live-network check — not part of `npm test`, since it hits production and needs `GAME_SECRET`/`ADULT_PIN` env vars (both optional; gated worlds are just skipped without them). It pulls every live campaign's real transcript and prints every bracket tag the GM has actually emitted, for eyeballing against `lib/gm-tags.js`'s expected formats. This is literally how every GM tag-parsing bug in this app was found — run it as a standard part of every testing pass, not just when something seems broken (the model's real-world compliance drifts over time on its own).
 
 ## Env vars
 
-All 6 that the code actually reads from `process.env`:
+All 8 that the code actually reads from `process.env`:
 
 | Var | Used by | Purpose |
 |---|---|---|
 | `GROQ_API_KEY` | `lib/gemini.js` | Groq API auth |
 | `UPSTASH_REDIS_REST_URL` | `lib/redis.js` | Redis REST endpoint |
 | `UPSTASH_REDIS_REST_TOKEN` | `lib/redis.js` | Redis REST auth |
-| `GAME_SECRET` | `api/gm.js`, `api/state.js`, `api/characters.js`, `api/campaigns.js` | Shared secret required on `X-Game-Secret` header for all state-mutating POSTs |
+| `GAME_SECRET` | `api/gm.js`, `api/state.js`, `api/characters.js`, `api/campaigns.js`, `api/push.js` | Shared secret required on `X-Game-Secret` header for all state-mutating POSTs |
 | `ADULT_PIN` | `api/unlock.js`, `lib/adultgate.js` (used by `api/gm.js`, `api/poll.js`, `api/recap.js`, `api/state.js`, `api/help.js`) | PIN gating Resonance + adult custom campaigns, enforced server-side on every endpoint that can read/narrate world content |
 | `ALLOWED_ORIGIN` | every `api/*.js` | CORS `Access-Control-Allow-Origin` (defaults to `*`) |
+| `VAPID_PUBLIC_KEY` | `api/vapid-public-key.js`, `api/gm.js` | Not secret — served to the client so it can call `pushManager.subscribe()` |
+| `VAPID_PRIVATE_KEY` | `api/gm.js` (`webpush.setVapidDetails()`) | Secret — signs the VAPID JWT proving this server sent the push. Generate a pair once with `node -e "console.log(require('web-push').generateVAPIDKeys())"`; if it's ever rotated, every existing subscription breaks and players need to re-enable notifications. |

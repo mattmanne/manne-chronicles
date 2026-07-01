@@ -11,6 +11,8 @@ const {
   extractResonanceHarmUpdates,
   extractAbilityUsedKeys,
 } = require("../lib/gm-tags");
+const { selectNotifyTargets, buildNotificationPayload } = require("../lib/push");
+const webpush = require("web-push");
 
 const MAX_HISTORY = 40; // entries of context sent to the LLM per turn — bounds prompt cost; full log is still stored
 
@@ -43,6 +45,41 @@ function matchManlandiaLocationId(name) {
 function matchStoneId(name) {
   const s = name.toLowerCase().trim();
   return STONE_IDS.includes(s) ? s : null;
+}
+
+// Never lets a push failure break the actual GM response — this is
+// best-effort. Skips entirely (not an error) if VAPID isn't configured yet,
+// or if nobody else is subscribed to this world.
+async function sendTurnNotifications(worldConfig, gameState, senderPlayer, senderDisplayName) {
+  if (!process.env.VAPID_PUBLIC_KEY || !process.env.VAPID_PRIVATE_KEY) return;
+  try {
+    const pushKey = `push:${worldConfig.id}:subscriptions`;
+    const subscriptions = (await getState(pushKey)) || [];
+    const targets = selectNotifyTargets(subscriptions, senderPlayer);
+    if (!targets.length) return;
+
+    webpush.setVapidDetails("mailto:mmanne@hbs.edu", process.env.VAPID_PUBLIC_KEY, process.env.VAPID_PRIVATE_KEY);
+    const worldDisplayName = worldConfig.id === "resonance" ? "Resonance"
+      : worldConfig.id === "manlandia" ? "Manlandia"
+      : (gameState.worldConfig?.name || "Your Adventure");
+    const payload = JSON.stringify(buildNotificationPayload(worldDisplayName, senderDisplayName));
+
+    const results = await Promise.allSettled(
+      targets.map((t) => webpush.sendNotification({ endpoint: t.endpoint, keys: t.keys }, payload))
+    );
+
+    // A 404/410 means the push service considers that subscription gone for
+    // good (uninstalled, permission revoked, etc.) — clean it up.
+    const deadEndpoints = results
+      .map((r, i) => (r.status === "rejected" && (r.reason?.statusCode === 404 || r.reason?.statusCode === 410) ? targets[i].endpoint : null))
+      .filter(Boolean);
+    if (deadEndpoints.length) {
+      const remaining = subscriptions.filter((s) => !deadEndpoints.includes(s.endpoint));
+      await setState(pushKey, remaining);
+    }
+  } catch (err) {
+    console.error("Push notification error:", err);
+  }
 }
 
 module.exports = async function handler(req, res) {
@@ -238,6 +275,14 @@ module.exports = async function handler(req, res) {
   }
 
   await setState(key, gameState);
+
+  // Only notify once the turn is fully resolved — while `rolling` is true the
+  // entries are hidden from /api/poll, so a notification now would send the
+  // other player to content they can't see yet.
+  if (!rolling) {
+    const senderDisplayName = gameState.characters[player]?.name || playerLabel;
+    await sendTurnNotifications(worldConfig, gameState, player, senderDisplayName);
+  }
 
   return res.json({
     response: cleanResponse,

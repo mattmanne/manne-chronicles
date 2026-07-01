@@ -417,6 +417,7 @@ async function continueInit() {
   setupHarmRecovery();
   setupNewSession();
   setupAutoRead();
+  setupPushNotifications();
   setupExport();
   setupRecap();
   setupWizard();
@@ -454,6 +455,77 @@ function setupAutoRead() {
     btn.classList.toggle("active", autoRead);
     btn.title = autoRead ? "Auto-read ON — tap to turn off" : "Auto-read new narrations";
   });
+}
+
+/* ── Push notifications ── */
+async function setupPushNotifications() {
+  const btn = document.getElementById("notify-btn");
+  if (!("serviceWorker" in navigator) || !("PushManager" in window)) return; // stays hidden
+
+  let registration;
+  try {
+    registration = await navigator.serviceWorker.register("/sw.js");
+  } catch (_) {
+    return; // stays hidden if registration fails for any reason
+  }
+
+  btn.classList.remove("hidden");
+  updateNotifyButton(!!(await registration.pushManager.getSubscription()));
+
+  btn.addEventListener("click", async () => {
+    const current = await registration.pushManager.getSubscription();
+    if (current) await unsubscribePush(current);
+    else await subscribePush(registration);
+  });
+}
+
+function updateNotifyButton(subscribed) {
+  const btn = document.getElementById("notify-btn");
+  btn.classList.toggle("active", subscribed);
+  btn.title = subscribed ? "Notifications ON — tap to turn off" : "Notify me when someone else takes a turn";
+}
+
+async function subscribePush(registration) {
+  if (Notification.permission === "denied") {
+    alert("Notifications are blocked for this site in your browser settings.");
+    return;
+  }
+  try {
+    const permission = await Notification.requestPermission();
+    if (permission !== "granted") return;
+
+    const res = await fetch("/api/vapid-public-key");
+    const data = await res.json();
+    if (!data.publicKey) { alert("Notifications aren't set up yet — ask Matt to configure them."); return; }
+
+    const subscription = await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(data.publicKey),
+    });
+    await authPost("/api/push", { action: "subscribe", payload: { player: currentPlayer, subscription: subscription.toJSON() } });
+    updateNotifyButton(true);
+  } catch (_) {
+    alert("Could not turn on notifications — try again.");
+  }
+}
+
+async function unsubscribePush(subscription) {
+  try {
+    await authPost("/api/push", { action: "unsubscribe", payload: { endpoint: subscription.endpoint } });
+    await subscription.unsubscribe();
+  } catch (_) {
+    // fall through — still reflect it as off locally even if the server call failed
+  }
+  updateNotifyButton(false);
+}
+
+function urlBase64ToUint8Array(base64String) {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const rawData = atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; ++i) outputArray[i] = rawData.charCodeAt(i);
+  return outputArray;
 }
 
 /* ── Player buttons ── */

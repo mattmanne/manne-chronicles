@@ -5,5 +5,8 @@
   "scripts": {
     "test": "node --experimental-test-module-mocks --test tests/*.test.js",
     "check-drift": "node scripts/check-tag-drift.js"
+  },
+  "dependencies": {
+    "web-push": "^3.6.7"
   }
 }

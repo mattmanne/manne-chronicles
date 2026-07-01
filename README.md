@@ -127,6 +127,14 @@ When you're on another tab (Map, Archive, Characters) and your partner takes an 
 
 Both of you open the same URL on your own phones. You take turns — each player's actions and the GM's responses are visible to both. The app syncs every 8 seconds, so there's a brief delay when playing from separate locations.
 
+### Getting notified when it's your turn
+
+Tap the **🔔 Alert** button in the top-right header to turn on notifications. Your browser will ask for permission — once you allow it, you'll get a notification whenever someone else takes a turn in a world you're subscribed to (not for your own turns). Tap the notification to jump back into the app.
+
+**On iPhone**, this only works if you've added the app to your Home Screen first (Safari → Share → Add to Home Screen, then open it from there) — Apple doesn't allow regular Safari tabs to send notifications, only installed home-screen apps. On Android/Chrome it works straight from the browser, no install needed.
+
+Tap **🔔 Alert** again any time to turn notifications back off.
+
 ### Story mood (Manlandia only)
 
 On the **⚔ Characters** tab, the **Story Mood** buttons let you choose how the GM narrates:
@@ -258,6 +266,9 @@ The Groq API key may have expired or hit a limit. Go to console.groq.com, create
 **App seems stuck / not loading new messages?**
 Pull down to refresh. The session log reloads from the server.
 
+**🔔 Alert button doesn't show up, or notifications never arrive?**
+The button only appears if your browser supports push notifications. On iPhone, it needs the app to be added to your Home Screen first (see "Getting notified" above). If you tapped Allow and still don't get notifications, try turning the Alert button off and back on — check your phone's system notification settings for the browser (or the installed app, on iPhone) if it still doesn't work.
+
 **Prompted for a secret on first load?**
 The app requires a campaign secret to prevent strangers from resetting your progress. Enter the value of `GAME_SECRET` from your Vercel environment variables. It's stored in your browser after the first entry — you won't be prompted again on that device. To share with Michelle, visit `https://resonance-dnd.vercel.app?secret=YOUR_SECRET_HERE` once on her phone and it will be saved automatically.
 
@@ -277,6 +288,7 @@ Manlandia: `fetch('/api/state?world=manlandia',{method:'POST',headers:{'Content-
 - **AI GM:** Groq API — Llama 3.3 70B model (free tier, no credit card required)
 - **Voice input:** Web Speech API (built into Chrome/Safari)
 - **Text-to-speech:** Web Speech Synthesis API (built into Chrome/Safari, no key needed)
+- **Push notifications:** Web Push (`web-push` npm package) — needs `VAPID_PUBLIC_KEY` and `VAPID_PRIVATE_KEY` in Vercel environment variables, generated once with `node -e "console.log(require('web-push').generateVAPIDKeys())"`
 - **GitHub repo:** https://github.com/mattmanne/resonance-dnd
 - **Vercel dashboard:** https://vercel.com (log in with Google)
 - **Upstash dashboard:** https://upstash.com (log in with Google)

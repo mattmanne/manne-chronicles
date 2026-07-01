@@ -16,10 +16,11 @@ Run `node --check` on every JS file:
 
 ```
 api/campaigns.js  api/characters.js  api/gm.js  api/help.js
-api/poll.js  api/recap.js  api/state.js  api/unlock.js
+api/poll.js  api/push.js  api/recap.js  api/state.js  api/unlock.js
+api/vapid-public-key.js
 lib/adultgate.js  lib/gamestate-custom.js  lib/gamestate-manlandia.js
 lib/gamestate.js  lib/gemini.js  lib/gm-tags.js  lib/prompt-custom.js
-lib/prompt-manlandia.js  lib/prompt.js  lib/ratelimit.js
+lib/prompt-manlandia.js  lib/prompt.js  lib/push.js  lib/ratelimit.js
 lib/recap.js  lib/redis.js  lib/suggestions.js  lib/worldconfig.js
 public/game.js  public/pure.js
 ```
@@ -68,6 +69,11 @@ Run these checks in order:
 
 **Static assets**
 - GET `/pure.js` → expect 200 with JS content (this is a Vercel rewrite in vercel.json — if it's ever missing, the whole app breaks silently since game.js depends on functions defined there)
+- GET `/sw.js`, `/manifest.json`, `/icon.svg` → expect 200 (same rewrite pattern; a missing one silently breaks push notification setup)
+
+**Push notifications**
+- GET `/api/vapid-public-key` → expect a `publicKey` string (if this 500s, `VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY` aren't set in Vercel — notifications are silently disabled app-wide, not broken, so this is easy to miss)
+- POST `/api/push?world=manlandia` with `{"action":"subscribe","payload":{"player":"player1","subscription":{"endpoint":"https://example.test/x","keys":{"p256dh":"a","auth":"b"}}}}` and `X-Game-Secret` → expect `{"ok":true}`; clean up by POSTing `{"action":"unsubscribe","payload":{"endpoint":"https://example.test/x"}}` afterward so a fake subscription doesn't linger and eat a real send attempt
 
 **Adult gate (server-side enforcement)**
 - GET `/api/poll?since=0&world=resonance` with NO `X-Adult-Pin` header → expect `{"error": "This world is locked..."}` with 403

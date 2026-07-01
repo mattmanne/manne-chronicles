@@ -5,6 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="theme-color" content="#0d0d1a" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="icon.svg" />
   <title>Loading…</title>
   <link rel="stylesheet" href="style.css" />
 </head>
@@ -232,6 +235,10 @@
         <button id="auto-read-btn" class="header-btn" title="Auto-read new narrations">
           <span class="header-btn-icon">🔊</span>
           <span class="header-btn-label">Audio</span>
+        </button>
+        <button id="notify-btn" class="header-btn hidden" title="Notify me when someone else takes a turn">
+          <span class="header-btn-icon">🔔</span>
+          <span class="header-btn-label">Alert</span>
         </button>
         <span id="awareness-badge" class="resonance-only" title="Conclave Awareness">⚡ 0</span>
         <span id="villain-badge" class="manlandia-only manlandia-lore" title="Villain Awareness">👁 0</span>
