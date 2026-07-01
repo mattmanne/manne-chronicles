@@ -39,6 +39,18 @@ test("stripGMTags removes every known bracket tag, including the newest SUGGESTI
   assert.equal(stripGMTags(raw), "Story text.");
 });
 
+test("stripGMTags also removes a named-hero harm tag (live: model wrote a hero's name instead of CHARACTER N)", () => {
+  assert.equal(stripGMTags("Ouch! [Globak: Unhurt → Scratched]"), "Ouch!");
+});
+
+test("stripGMTags tolerates an ASCII arrow, not just the Unicode one", () => {
+  assert.equal(stripGMTags("Uh oh. [CURSE: 0 -> 1]"), "Uh oh.");
+});
+
+test("stripGMTags removes an ability tag padded with extra descriptive text", () => {
+  assert.equal(stripGMTags("You did it! [ABILITY 1: Lucky Break used]"), "You did it!");
+});
+
 test("getCleanText strips tags and collapses excess blank lines", () => {
   const raw = "First line. [LOCATION: The Docks]\n\n\n\nSecond line.";
   // stripGMTags only removes the bracketed tag itself, so the space that preceded

@@ -33,25 +33,25 @@ Custom worlds carry their own config (`name`, `theme`, `playerCount`, `adult`) i
 
 ## GM bracket-tag notation
 
-The GM's raw LLM response is plain narration plus optional bracket tags on their own lines at the end. All parsing happens in one place: `api/gm.js`, after the response comes back from `lib/gemini.js`. Every prompt file (`lib/prompt.js`, `lib/prompt-manlandia.js`, `lib/prompt-custom.js`) instructs the model to emit whichever of these apply, in a "STATE NOTATION" block.
+The GM's raw LLM response is plain narration plus optional bracket tags on their own lines at the end. `api/gm.js` orchestrates parsing after the response comes back from `lib/gemini.js`; the actual tolerant regex logic lives in `lib/gm-tags.js` (pure functions, unit-tested directly — see `tests/gm-tags.test.js`). Every prompt file (`lib/prompt.js`, `lib/prompt-manlandia.js`, `lib/prompt-custom.js`) instructs the model to emit whichever of these apply, in a "STATE NOTATION" block.
 
 | Tag | Worlds | Effect |
 |---|---|---|
-| `ROLL:STAT[:ADVANTAGE]` | all | Not a bracket tag — a bare line. Triggers the dice-roll UI; client resubmits the result as `type: "roll_result"`. The prompts say no brackets around `STAT`, but the model still frequently writes `ROLL:[STAT]` anyway — the regex in `api/gm.js` tolerates an optional `[...]` and is case-insensitive. This bit the app for real once (4 rolls in a row silently failed to trigger in a live campaign before the tolerant regex existed) — don't tighten it back up. |
+| `ROLL:STAT[:ADVANTAGE]` | all | Not a bracket tag — a bare line. Triggers the dice-roll UI; client resubmits the result as `type: "roll_result"`. `lib/gm-tags.js`'s `extractRoll()` tolerates an optional `[...]` around `STAT`, a space after the colon (live: `"ROLL: [AGILITY]"`), trailing whitespace, and any case — plus strips *every* stray `ROLL:` line from the display (the model has been seen prefixing its own explanation sentence with `ROLL:` too, not just the real trigger). This bit the app for real, twice: first with bracketed stats silently failing to trigger a roll, then again with the colon-space variant still slipping past the first fix. Don't tighten this back up without re-checking `tests/gm-tags.test.js`'s live-captured fixtures. |
 | `[LOCATION: Name]` | all | Updates `worldState.location`; if the name matches a known location, adds it to `visited_locations` (deduped) |
 | `[SCAR: Location: Label]` | all | Adds `{ id, label }` to `worldState.location_scars` (deduped by id+label) |
 | `[SUGGESTIONS: a \| b \| c]` | all | Parsed by `lib/suggestions.js`, returned as the `suggestions` array; forced to `[]` server-side whenever `needsRoll` is true or `type === "roll_result"` |
-| `[CONCLAVE AWARENESS: X → Y]` | resonance | `worldState.conclave_awareness = Y` |
-| `[DISSONANCE: X → Y]` | resonance | `worldState.fen_dissonance_awakening = Y` |
-| `[LYRA\|FEN: OldHarm → NewHarm]` | resonance | Sets that character's `harm` |
-| `[ABILITY FEN\|LYRA: ability_name]` | resonance | Sets that boolean field true on the character (or decrements `lyra.magic_uses_remaining` when `ability_name === "magic"`) |
-| `[VILLAIN AWARENESS: X → Y]` | manlandia, custom | `worldState.villain_awareness = Y` |
-| `[CURSE: X → Y]` | manlandia, custom | `worldState.curse_level = Y` |
-| `[CHARACTER N: OldHarm → NewHarm]` | manlandia, custom | Sets `characters.playerN.harm` |
-| `[ABILITY N: used]` | manlandia, custom | Sets `characters.playerN.ability_used = true` |
+| `[CONCLAVE AWARENESS: X → Y]` | resonance | `worldState.conclave_awareness = Y`. `extractCounterUpdate()` tolerates an ASCII `->` in place of `→`, extra whitespace, and case — never empirically observed failing, but cheap insurance |
+| `[DISSONANCE: X → Y]` | resonance | `worldState.fen_dissonance_awakening = Y`. Same tolerance as above. |
+| `[LYRA\|FEN: OldHarm → NewHarm]` | resonance | Sets that character's `harm`, via `extractResonanceHarmUpdates()` — same arrow tolerance, plus the harm word is normalized case-insensitively against `HARM_LEVELS` (`lib/gamestate.js`) and dropped entirely if it isn't a real harm level, so a typo can't silently corrupt `recover_harm`'s `HARM_LEVELS.indexOf()` lookup |
+| `[ABILITY FEN\|LYRA: ability_name]` | resonance | Sets that boolean field true on the character (or decrements `lyra.magic_uses_remaining` when `ability_name === "magic"`). Not hardened against typos in `ability_name` — no live evidence of that failing yet, unlike everything else on this list |
+| `[VILLAIN AWARENESS: X → Y]` | manlandia, custom | `worldState.villain_awareness = Y`. Same `extractCounterUpdate()` tolerance as CONCLAVE AWARENESS. |
+| `[CURSE: X → Y]` | manlandia, custom | `worldState.curse_level = Y`. Same tolerance. |
+| `[CHARACTER N: OldHarm → NewHarm]` | manlandia, custom | Sets `characters.playerN.harm`, via `extractCharacterHarmUpdates()`. **Also accepts the hero's actual name in place of "CHARACTER N"** — confirmed live in a real campaign (`"[Globak: Unhurt → Scratched]"` for a hero who should have been `CHARACTER 2`; the model prefers narrating a named hero over an anonymous slot number despite the prompt's explicit instruction not to). Same harm-word normalization as the Resonance harm tag. `public/pure.js`'s `stripGMTags()` has a matching generic `[Name: Harm → Harm]` strip so the raw tag doesn't leak into what the player sees either way. |
+| `[ABILITY N: used]` | manlandia, custom | Sets `characters.playerN.ability_used = true`, via `extractAbilityUsedKeys()`. Tolerates the model padding in the ability's name (live: `"[ABILITY 1: Lucky Break used]"`) as long as the word "used" appears — but a negative lookahead means `"[ABILITY 1: Lucky Break - not used]"` (also seen live) correctly does **not** fire. |
 | `[STONE FOUND: stone_id]` | manlandia only | Adds to `worldState.stones_found` (deduped); `stone_id` must be one of `STONE_IDS` in `lib/gamestate-manlandia.js` |
 
-Never trust these tags to be well-formed — the model can omit them, duplicate them, or get creative with spacing. Every parser here is defensive (regex non-matches are silently ignored, dedup checks before pushing).
+Never trust these tags to be well-formed — the model can omit them, duplicate them, or get creative with spacing. Every parser here is defensive (regex non-matches are silently ignored, dedup checks before pushing). When investigating a "the GM said X happened but the state didn't update" report, the fastest diagnostic is pulling the real campaign's stored `sessionLog` via `GET /api/state` and grepping for `[` — that's how every bug in this table was actually found (real transcripts, not speculation).
 
 ## Session log mechanics
 

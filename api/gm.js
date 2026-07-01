@@ -4,6 +4,13 @@ const { getWorldConfig } = require("../lib/worldconfig");
 const { STONE_IDS } = require("../lib/gamestate-manlandia");
 const { extractSuggestions } = require("../lib/suggestions");
 const { checkAdultAccess } = require("../lib/adultgate");
+const {
+  extractRoll,
+  extractCounterUpdate,
+  extractCharacterHarmUpdates,
+  extractResonanceHarmUpdates,
+  extractAbilityUsedKeys,
+} = require("../lib/gm-tags");
 
 const MAX_HISTORY = 40; // entries of context sent to the LLM per turn — bounds prompt cost; full log is still stored
 
@@ -88,18 +95,7 @@ module.exports = async function handler(req, res) {
     return res.status(500).json({ error: "The GM encountered an error: " + err.message });
   }
 
-  // Tolerate the model wrapping the stat in brackets (e.g. "ROLL:[AGILITY]") or
-  // getting the case wrong — the prompt says not to, but LLM output still varies.
-  const rollMatch = gmResponse.match(/^ROLL:\[?(FORCE|ACUITY|AGILITY|WILL|PRESENCE)\]?(:ADVANTAGE)?$/im);
-  const needsRoll = !!rollMatch;
-  const rollStat = rollMatch ? rollMatch[1].toLowerCase() : null;
-  const rollAdvantage = rollMatch ? !!rollMatch[2] : false;
-  const rollStripped = gmResponse
-    .replace(/^ROLL:\[?(FORCE|ACUITY|AGILITY|WILL|PRESENCE)\]?(:ADVANTAGE)?$/im, "")
-    // Defensive cleanup: if the model used a stat name we don't recognize, no
-    // roll gets triggered, but the stray line still shouldn't leak into the story.
-    .replace(/^ROLL:.*$/im, "")
-    .trim();
+  const { clean: rollStripped, needsRoll, rollStat, rollAdvantage } = extractRoll(gmResponse);
   const extracted = extractSuggestions(rollStripped);
   const cleanResponse = extracted.clean;
   const suggestions = (type === "roll_result" || needsRoll) ? [] : extracted.suggestions;
@@ -162,12 +158,12 @@ module.exports = async function handler(req, res) {
 
   if (worldConfig.id === "manlandia" || worldConfig.type === "custom") {
     // Villain awareness
-    const villainMatch = cleanResponse.match(/\[VILLAIN AWARENESS: (\d+) → (\d+)\]/);
-    if (villainMatch) gameState.worldState.villain_awareness = parseInt(villainMatch[2]);
+    const villainUpdate = extractCounterUpdate(cleanResponse, "VILLAIN AWARENESS");
+    if (villainUpdate !== null) gameState.worldState.villain_awareness = villainUpdate;
 
     // Curse level
-    const curseMatch = cleanResponse.match(/\[CURSE: (\d+) → (\d+)\]/);
-    if (curseMatch) gameState.worldState.curse_level = parseInt(curseMatch[2]);
+    const curseUpdate = extractCounterUpdate(cleanResponse, "CURSE");
+    if (curseUpdate !== null) gameState.worldState.curse_level = curseUpdate;
 
     // Stone found (Manlandia only)
     if (worldConfig.id === "manlandia") {
@@ -184,20 +180,15 @@ module.exports = async function handler(req, res) {
       }
     }
 
-    // Character harm: [CHARACTER N: OldHarm → NewHarm]
-    const charHarmRegex = /\[CHARACTER (\d): ([A-Za-z]+) → ([A-Za-z]+)\]/g;
-    let charHarmMatch;
-    while ((charHarmMatch = charHarmRegex.exec(cleanResponse)) !== null) {
-      const charKey = `player${charHarmMatch[1]}`;
-      if (gameState.characters[charKey]) gameState.characters[charKey].harm = charHarmMatch[3];
+    // Character harm: [CHARACTER N: OldHarm → NewHarm], or the hero's actual
+    // name in place of "CHARACTER N" — the model does this often (see lib/gm-tags.js)
+    for (const { key, harm } of extractCharacterHarmUpdates(cleanResponse, gameState.characters)) {
+      gameState.characters[key].harm = harm;
     }
 
-    // Ability used: [ABILITY N: used]
-    const abilityUsedRegex = /\[ABILITY (\d): used\]/gi;
-    let abilityUsedMatch;
-    while ((abilityUsedMatch = abilityUsedRegex.exec(cleanResponse)) !== null) {
-      const charKey = `player${abilityUsedMatch[1]}`;
-      if (gameState.characters[charKey]) gameState.characters[charKey].ability_used = true;
+    // Ability used: [ABILITY N: used] (tolerant of extra text — see lib/gm-tags.js)
+    for (const key of extractAbilityUsedKeys(cleanResponse, gameState.characters)) {
+      gameState.characters[key].ability_used = true;
     }
 
     responseWorldState = {
@@ -211,17 +202,14 @@ module.exports = async function handler(req, res) {
     };
   } else {
     // Resonance-specific parsing
-    const awarenessMatch = cleanResponse.match(/\[CONCLAVE AWARENESS: (\d+) → (\d+)\]/);
-    if (awarenessMatch) gameState.worldState.conclave_awareness = parseInt(awarenessMatch[2]);
+    const awarenessUpdate = extractCounterUpdate(cleanResponse, "CONCLAVE AWARENESS");
+    if (awarenessUpdate !== null) gameState.worldState.conclave_awareness = awarenessUpdate;
 
-    const dissonanceMatch = cleanResponse.match(/\[DISSONANCE: (\d+) → (\d+)\]/);
-    if (dissonanceMatch) gameState.worldState.fen_dissonance_awakening = parseInt(dissonanceMatch[2]);
+    const dissonanceUpdate = extractCounterUpdate(cleanResponse, "DISSONANCE");
+    if (dissonanceUpdate !== null) gameState.worldState.fen_dissonance_awakening = dissonanceUpdate;
 
-    const harmRegex = /\[(LYRA|FEN): ([A-Za-z]+) → ([A-Za-z]+)\]/g;
-    let harmMatch;
-    while ((harmMatch = harmRegex.exec(cleanResponse)) !== null) {
-      const who = harmMatch[1].toLowerCase();
-      if (gameState.characters[who]) gameState.characters[who].harm = harmMatch[3];
+    for (const { key, harm } of extractResonanceHarmUpdates(cleanResponse)) {
+      if (gameState.characters[key]) gameState.characters[key].harm = harm;
     }
 
     // Ability used: [ABILITY FEN: ability_name] or [ABILITY LYRA: ability_name]

@@ -44,19 +44,27 @@ function formatRollMessage(player, stat, result, gameState = defaultGameState())
 }
 
 function stripGMTags(content) {
+  // The model doesn't always use the exact documented tag shape (see
+  // lib/gm-tags.js for the server-side parsing story) — these are display-only
+  // strips, so it's safe to be broader here than the parsers that actually act
+  // on a tag: an ASCII "->" alongside the Unicode arrow, and a generic
+  // "[Name: Harm -> Harm]" catch-all for when the model names a hero directly
+  // instead of using "CHARACTER N" (live example: "[Globak: Unhurt → Scratched]").
+  const ARROW = "(?:→|->)";
   return (content || "")
-    .replace(/\[CONCLAVE AWARENESS: \d+ → \d+\]/g, "")
-    .replace(/\[DISSONANCE: \d+ → \d+\]/g, "")
-    .replace(/\[VILLAIN AWARENESS: \d+ → \d+\]/g, "")
-    .replace(/\[CURSE: \d+ → \d+\]/g, "")
+    .replace(new RegExp(`\\[CONCLAVE AWARENESS: \\d+\\s*${ARROW}\\s*\\d+\\]`, "g"), "")
+    .replace(new RegExp(`\\[DISSONANCE: \\d+\\s*${ARROW}\\s*\\d+\\]`, "g"), "")
+    .replace(new RegExp(`\\[VILLAIN AWARENESS: \\d+\\s*${ARROW}\\s*\\d+\\]`, "g"), "")
+    .replace(new RegExp(`\\[CURSE: \\d+\\s*${ARROW}\\s*\\d+\\]`, "g"), "")
     .replace(/\[STONE FOUND: [^\]]+\]/g, "")
-    .replace(/\[CHARACTER \d: [A-Za-z]+ → [A-Za-z]+\]/g, "")
+    .replace(new RegExp(`\\[CHARACTER \\d:\\s*[A-Za-z]+\\s*${ARROW}\\s*[A-Za-z]+\\]`, "gi"), "")
     .replace(/\[LOCATION: [^\]]+\]/g, "")
     .replace(/\[SCAR: [^\]]+\]/g, "")
-    .replace(/\[(LYRA|FEN): [A-Za-z]+ → [A-Za-z]+\]/g, "")
-    .replace(/\[ABILITY \d: used\]/gi, "")
+    .replace(new RegExp(`\\[(LYRA|FEN):\\s*[A-Za-z]+\\s*${ARROW}\\s*[A-Za-z]+\\]`, "gi"), "")
+    .replace(/\[ABILITY \d: [^\]]*used[^\]]*\]/gi, "")
     .replace(/\[ABILITY (FEN|LYRA): [a-z_]+\]/gi, "")
-    .replace(/\[SUGGESTIONS: [^\]]+\]/gi, "").trim();
+    .replace(/\[SUGGESTIONS: [^\]]+\]/gi, "")
+    .replace(new RegExp(`\\[[A-Za-z]+:\\s*[A-Za-z]+\\s*${ARROW}\\s*[A-Za-z]+\\]`, "g"), "").trim();
 }
 
 function getCleanText(text) {

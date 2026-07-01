@@ -193,3 +193,14 @@ test("manlandia is never adult-gated, even with no pin header at all", async (t)
 
   assert.equal(res.statusCode, 200);
 });
+
+test("end-to-end: a harm tag using the hero's real name instead of CHARACTER N still updates the right hero (real Dark Wars scenario)", async (t) => {
+  const seeded = require("../lib/gamestate-manlandia").getInitialStateManlandia();
+  seeded.characters.player1.name = "Globak";
+  const redis = statefulRedisMock(seeded);
+  t.mock.module("../lib/redis.js", redis);
+  mockGemini(t, ["Your lack of agility has put the mission at risk. You're now:\n[Globak: Unhurt → Scratched]"]);
+
+  const res = await callGm({ player: "player1", message: "climb down", type: "action" }, "c_test1");
+  assert.equal(res.body.gameState.characters.player1.harm, "Scratched");
+});
