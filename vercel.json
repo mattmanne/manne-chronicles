@@ -7,6 +7,7 @@
   "rewrites": [
     { "source": "/style.css", "destination": "/public/style.css" },
     { "source": "/game.js",   "destination": "/public/game.js"   },
+    { "source": "/pure.js",   "destination": "/public/pure.js"   },
     { "source": "/",          "destination": "/public/index.html" }
   ]
 }

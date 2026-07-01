@@ -22,8 +22,6 @@ const STATS = {
   player3: { force: 0, acuity: 0, agility: 0, will: 0, presence: 0 },
   player4: { force: 0, acuity: 0, agility: 0, will: 0, presence: 0 },
 };
-const HARM_LEVELS = ["Unhurt", "Scratched", "Hurt", "Wounded", "Broken", "Dying"];
-
 const LOCATIONS = [
   { id: "archive",       name: "The Archive",      x: 105, y: 80,  type: "landmark",
     desc: "Lyra's library. Ancient records under Conclave scrutiny. The Archives date back three centuries.",
@@ -100,11 +98,6 @@ const sessionLabel = document.getElementById("session-label");
 const suggestionChips = document.getElementById("suggestion-chips");
 
 /* ── URL helpers ── */
-function withWorld(url) {
-  const sep = url.includes("?") ? "&" : "?";
-  return `${url}${sep}world=${currentWorld}`;
-}
-
 function authPost(url, body) {
   return fetch(withWorld(url), {
     method: "POST",
@@ -134,11 +127,6 @@ function initSecret() {
     }
   }
   return true;
-}
-
-/* ── Helpers ── */
-function isManlandiaLike() {
-  return currentWorld === "manlandia" || currentWorld.startsWith("c_");
 }
 
 /* ── World Selection ── */
@@ -449,17 +437,6 @@ function setupPlayerButtons() {
   });
 }
 
-function getPlayerDisplayName(player) {
-  if (player === "fen")  return "Fen";
-  if (player === "lyra") return "Lyra";
-  if (player && player.startsWith("player")) {
-    const n = player.slice(6);
-    const name = cachedGameState?.characters?.[player]?.name;
-    return (name && name !== `Hero ${n}`) ? name : `Hero ${n}`;
-  }
-  return player;
-}
-
 /* ── Voice Input ── */
 function setupVoice() {
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -603,10 +580,6 @@ async function loadExistingLog() {
   }
 }
 
-function stripPlayerPrefix(content) {
-  return (content || "").replace(/^[A-Za-z][A-Za-z0-9]*: /, "");
-}
-
 /* ── Polling ── */
 function startPolling() {
   pollTimer = setInterval(async () => {
@@ -715,11 +688,6 @@ async function sendToGM(player, message, type) {
   } finally {
     setLoading(false);
   }
-}
-
-function formatRollMessage(player, stat, result) {
-  const name = getPlayerDisplayName(player);
-  return `${name} rolls ${stat.toUpperCase()}: ${result.die1} + ${result.die2} + (${result.modifier}) = ${result.total}`;
 }
 
 /* ── Dice Animation ── */
@@ -1248,57 +1216,6 @@ function renderManlandiaCard(n, char) {
   }
 }
 
-function stripGMTags(content) {
-  return (content || "")
-    .replace(/\[CONCLAVE AWARENESS: \d+ → \d+\]/g, "")
-    .replace(/\[DISSONANCE: \d+ → \d+\]/g, "")
-    .replace(/\[VILLAIN AWARENESS: \d+ → \d+\]/g, "")
-    .replace(/\[CURSE: \d+ → \d+\]/g, "")
-    .replace(/\[STONE FOUND: [^\]]+\]/g, "")
-    .replace(/\[CHARACTER \d: [A-Za-z]+ → [A-Za-z]+\]/g, "")
-    .replace(/\[LOCATION: [^\]]+\]/g, "")
-    .replace(/\[SCAR: [^\]]+\]/g, "")
-    .replace(/\[(LYRA|FEN): [A-Za-z]+ → [A-Za-z]+\]/g, "")
-    .replace(/\[ABILITY \d: used\]/gi, "")
-    .replace(/\[ABILITY (FEN|LYRA): [a-z_]+\]/gi, "")
-    .replace(/\[SUGGESTIONS: [^\]]+\]/gi, "").trim();
-}
-
-function formatCampaignExport(state) {
-  const archive   = state.worldState?.session_archive  || [];
-  const summaries = state.worldState?.session_summaries || [];
-  const archivedSessions = new Set(archive.map(a => a.session));
-  const legacyItems = summaries
-    .map((s, i) => ({ session: i + 1, summary: s, log: null }))
-    .filter(s => !archivedSessions.has(s.session));
-  const all = [...archive, ...legacyItems].sort((a, b) => a.session - b.session);
-
-  const sep  = "═".repeat(44);
-  const dash = "─".repeat(44);
-  const title = currentWorld === "resonance" ? "RESONANCE — A LEGACY CAMPAIGN" : (document.getElementById("game-title")?.textContent || currentWorld).toUpperCase();
-  const lines = [title, sep, ""];
-
-  for (const item of all) {
-    lines.push(`SESSION ${item.session}`);
-    if (item.summary) lines.push(`Summary: ${item.summary}`);
-    lines.push(dash);
-    if (item.log) {
-      for (const e of item.log) {
-        const isGM  = e.role === "gm";
-        const label = isGM ? "Story" : getPlayerDisplayName(e.player || currentPlayer);
-        const content = isGM ? stripGMTags(e.content) : stripPlayerPrefix(e.content);
-        lines.push(`${label}: ${content}`, "");
-      }
-    } else {
-      lines.push("(Full log not available for this session.)", "");
-    }
-    lines.push(sep, "");
-  }
-
-  if (!all.length) lines.push("No sessions archived yet.");
-  return lines.join("\n");
-}
-
 /* ── Archive ── */
 async function loadArchive() {
   try {
@@ -1665,10 +1582,6 @@ function updateStoneTracker(stonesFound) {
 }
 
 /* ── DOM Builders ── */
-function getCleanText(text) {
-  return stripGMTags(text).replace(/\n{3,}/g, "\n\n");
-}
-
 function appendGMEntry(text, animate) {
   const cleanText    = getCleanText(text);
   const stateChanges = extractStateChanges(text);
@@ -1716,40 +1629,6 @@ function appendSystemMessage(msg) {
   entry.style.cssText = "text-align:center;font-size:0.75rem;color:#666;padding:8px;";
   entry.textContent = msg;
   logEntries.appendChild(entry);
-}
-
-function extractStateChanges(text) {
-  const changes = [];
-
-  if (isManlandiaLike()) {
-    const villain = text.match(/\[VILLAIN AWARENESS: (\d+) → (\d+)\]/);
-    if (villain) changes.push({ text: `👁 Villain Awareness: ${villain[1]} → ${villain[2]}`, positive: false });
-    const curse = text.match(/\[CURSE: (\d+) → (\d+)\]/);
-    if (curse) changes.push({ text: `🌫 World Peril: ${curse[1]} → ${curse[2]}`, positive: false });
-    if (currentWorld === "manlandia") {
-      for (const m of [...text.matchAll(/\[STONE FOUND: ([^\]]+)\]/g)]) {
-        changes.push({ text: `✦ Stone Found: ${m[1].trim()}`, positive: true });
-      }
-    }
-    for (const m of [...text.matchAll(/\[CHARACTER (\d): ([A-Za-z]+) → ([A-Za-z]+)\]/g)]) {
-      const worsened = HARM_LEVELS.indexOf(m[3]) > HARM_LEVELS.indexOf(m[2]);
-      const name = getPlayerDisplayName(`player${m[1]}`);
-      changes.push({ text: `${name}: ${m[2]} → ${m[3]}`, positive: !worsened });
-    }
-  } else {
-    const awareness = text.match(/\[CONCLAVE AWARENESS: (\d+) → (\d+)\]/);
-    if (awareness) changes.push({ text: `⚡ Conclave Awareness: ${awareness[1]} → ${awareness[2]}`, positive: false });
-    const dissonance = text.match(/\[DISSONANCE: (\d+) → (\d+)\]/);
-    if (dissonance) changes.push({ text: `◈ Dissonance Awakening: ${dissonance[1]} → ${dissonance[2]}`, positive: true });
-    for (const m of [...text.matchAll(/\[(LYRA|FEN): ([A-Za-z]+) → ([A-Za-z]+)\]/g)]) {
-      const worsened = HARM_LEVELS.indexOf(m[3]) > HARM_LEVELS.indexOf(m[2]);
-      changes.push({ text: `${m[1]}: ${m[2]} → ${m[3]}`, positive: !worsened });
-    }
-  }
-
-  const loc = text.match(/\[LOCATION: ([^\]]+)\]/);
-  if (loc) changes.push({ text: `📍 ${loc[1].trim()}`, positive: true });
-  return changes;
 }
 
 /* ── Update Character UI ── */

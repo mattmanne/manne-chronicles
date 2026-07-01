@@ -21,7 +21,7 @@ lib/gamestate-custom.js  lib/gamestate-manlandia.js  lib/gamestate.js
 lib/gemini.js  lib/prompt-custom.js  lib/prompt-manlandia.js
 lib/prompt.js  lib/recap.js  lib/redis.js  lib/suggestions.js
 lib/worldconfig.js
-public/game.js
+public/game.js  public/pure.js
 ```
 
 Report any failures immediately. If any fail, fix them before continuing.
@@ -63,6 +63,9 @@ Run these checks in order:
 
 **Recap**
 - GET `/api/recap?world=manlandia` (or any world with existing sessionLog entries) → expect a `recap` string
+
+**Static assets**
+- GET `/pure.js` → expect 200 with JS content (this is a Vercel rewrite in vercel.json — if it's ever missing, the whole app breaks silently since game.js depends on functions defined there)
 
 **GM (live call — pick whichever world has entries)**
 - If manlandia has 0 entries: POST `/api/gm?world=manlandia` with `{"player":"player1","message":"[SESSION BEGINS]","type":"begin"}` → expect `response` string or `needsRoll: true`

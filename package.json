@@ -1,7 +1,7 @@
 {
   "name": "resonance-dnd",
   "version": "1.0.0",
-  "description": "Resonance: A Legacy Campaign — two-player narrative RPG",
+  "description": "Resonance & Manlandia — narrative RPGs with an AI Game Master, plus unlimited custom worlds",
   "scripts": {
     "test": "node --experimental-test-module-mocks --test tests/*.test.js"
   }

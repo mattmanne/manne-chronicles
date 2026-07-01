@@ -1,6 +1,6 @@
 # Resonance / Manlandia
 
-Two narrative RPGs sharing one app. Open on your phone, speak your actions, the AI Game Master responds.
+Two narrative RPGs — plus unlimited custom worlds you build yourself — sharing one app. Open on your phone, speak your actions, the AI Game Master responds.
 
 **Play at:** https://resonance-dnd.vercel.app
 
@@ -28,6 +28,20 @@ On your first visit the app asks which world to open. Your choice is saved to yo
 Each world has its own separate story and saved progress. To switch:
 - Tap the **⇌** button in the top-right header — this opens the world selector again
 - Or visit `https://resonance-dnd.vercel.app?world=resonance` or `?world=manlandia`
+
+### Creating your own world
+
+Tap **✨ New World** on the world selector to build a custom campaign:
+1. **Name** your world
+2. **Describe** the setting, quest, and creatures — the GM uses this to write every scene
+3. **Player count** (1–4 heroes)
+4. Optionally mark it **adult** for a mature-themed campaign (see "Adult Worlds" below)
+
+Your world is saved on the server and shows up in the world selector from then on, for any device. You can delete a custom world from the same selector — it asks for confirmation first.
+
+### Adult worlds
+
+Resonance and any custom world marked "adult" are locked behind a PIN so kids don't stumble into mature content. Tap **🔒 Unlock Adult Worlds** on the world selector and enter the PIN. Once unlocked, that device stays unlocked — you won't be asked again on it. Kid-friendly worlds (Manlandia, and any custom world not marked adult) never require a PIN.
 
 ### The four tabs
 
@@ -73,7 +87,13 @@ Speak or type naturally — describe what your character does:
 - *"I grab Fen's arm and pull him toward the back exit"*
 - *"I try to bluff the guard — tell him we're with the archive delivery"*
 
+Not sure what to do next? After most narrations, a few **suggestion chips** appear above the text box with ideas for what you could try. Tap one to drop it into the text box (you can still edit it before sending), or tap **Other…** to clear the box and type your own.
+
 The GM narrates what happens, or calls for a dice roll (dice animate automatically on screen).
+
+### Picking up where you left off
+
+Tap **📜 Recap** above the story log any time — it summarizes what's happened recently in a few sentences, great for jumping back in after a break.
 
 ### Dice rolls
 
@@ -261,3 +281,16 @@ Manlandia: `fetch('/api/state?world=manlandia',{method:'POST',headers:{'Content-
 - **Vercel dashboard:** https://vercel.com (log in with Google)
 - **Upstash dashboard:** https://upstash.com (log in with Google)
 - **Groq dashboard:** https://console.groq.com (log in with Google)
+
+**Environment variables** (set in Vercel under Settings → Environment Variables):
+
+| Variable | Purpose |
+|---|---|
+| `GROQ_API_KEY` | AI Game Master (Groq) |
+| `UPSTASH_REDIS_REST_URL` | Database connection |
+| `UPSTASH_REDIS_REST_TOKEN` | Database auth |
+| `GAME_SECRET` | The campaign secret players enter on first visit |
+| `ADULT_PIN` | PIN for unlocking adult worlds |
+| `ALLOWED_ORIGIN` | Optional — restricts which site can call the API (defaults to allowing any) |
+
+For architecture details (how worlds route to code, the GM's state-tag notation, Redis key layout, running tests locally), see `CLAUDE.md`.

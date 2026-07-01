@@ -4,7 +4,7 @@ const { getWorldConfig } = require("../lib/worldconfig");
 const { STONE_IDS } = require("../lib/gamestate-manlandia");
 const { extractSuggestions } = require("../lib/suggestions");
 
-const MAX_HISTORY = 40;
+const MAX_HISTORY = 40; // entries of context sent to the LLM per turn — bounds prompt cost; full log is still stored
 
 function matchResonanceLocationId(name) {
   const s = name.toLowerCase();
@@ -93,7 +93,9 @@ module.exports = async function handler(req, res) {
   const cleanResponse = extracted.clean;
   const suggestions = (type === "roll_result" || needsRoll) ? [] : extracted.suggestions;
 
-  // When completing a roll, un-flag the deferred entries saved on the prior call
+  // When completing a roll, un-flag the deferred entries saved on the prior call.
+  // Their timestamps are pushed back 2ms so they still sort before the new
+  // entries pushed later in this same request.
   if (type === "roll_result") {
     const unmasked = Date.now();
     gameState.sessionLog.forEach(e => {
@@ -109,9 +111,10 @@ module.exports = async function handler(req, res) {
   gameState.sessionLog.push(userEntry, gmEntry);
 
   if (gameState.sessionLog.length > 100) {
-    gameState.sessionLog = gameState.sessionLog.slice(-80);
+    gameState.sessionLog = gameState.sessionLog.slice(-80); // keep the stored log (and Redis payload) bounded
   }
 
+  // GM bracket-tag notation parsed below — full reference table in CLAUDE.md.
   // Shared: LOCATION and SCAR tags
   const matchLocationId = worldConfig.id === "manlandia"
     ? matchManlandiaLocationId
