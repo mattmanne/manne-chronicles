@@ -1004,7 +1004,10 @@ function setupWizard() {
     const name = document.getElementById("wiz-name").value.trim();
     if (!name) { document.getElementById("wiz-name").focus(); return; }
     wizardData.name = name;
-    wizSetStep(2);
+    // Editing an already-created hero: archetype/ability are already known
+    // (see openWizard) — jump straight to the backstory step so fixing a
+    // typo doesn't force re-picking both and risking an accidental change.
+    wizSetStep(wizardData.archetype && wizardData.ability_id ? 4 : 2);
   });
   document.getElementById("wiz-name").addEventListener("keydown", (e) => {
     if (e.key === "Enter") document.getElementById("wiz-name-next").click();
@@ -1073,6 +1076,12 @@ function openWizard(player) {
   }
   if (existing?.backstory) {
     document.getElementById("wiz-backstory").value = existing.backstory;
+  }
+  if (existing?.archetype) {
+    wizardData.archetype = existing.archetype;
+    wizardData.ability_id = existing.ability_id;
+    document.querySelector(`[data-archetype="${existing.archetype}"]`)?.classList.add("selected");
+    document.querySelector(`[data-ability="${existing.ability_id}"]`)?.classList.add("selected");
   }
   wizSetStep(1);
   document.getElementById("character-wizard").classList.add("active");
