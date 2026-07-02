@@ -60,6 +60,10 @@ test("stripGMTags also removes a named-hero harm tag (live: model wrote a hero's
   assert.equal(stripGMTags("Ouch! [Globak: Unhurt → Scratched]"), "Ouch!");
 });
 
+test("stripGMTags removes the arrow-less CHARACTER tag variant (live: '[CHARACTER 1: Hurt]', no transition)", () => {
+  assert.equal(stripGMTags("You're still hurting. [CHARACTER 1: Hurt]"), "You're still hurting.");
+});
+
 test("stripGMTags tolerates an ASCII arrow, not just the Unicode one", () => {
   assert.equal(stripGMTags("Uh oh. [CURSE: 0 -> 1]"), "Uh oh.");
 });

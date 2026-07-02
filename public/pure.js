@@ -58,6 +58,8 @@ function stripGMTags(content) {
     .replace(new RegExp(`\\[CURSE: \\d+\\s*${ARROW}\\s*\\d+\\]`, "g"), "")
     .replace(/\[STONE FOUND: [^\]]+\]/g, "")
     .replace(new RegExp(`\\[CHARACTER \\d:\\s*[A-Za-z]+\\s*${ARROW}\\s*[A-Za-z]+\\]`, "gi"), "")
+    // Also strip the arrow-less variant — live example: "[CHARACTER 1: Hurt]".
+    .replace(/\[CHARACTER \d:\s*[A-Za-z]+\s*\]/gi, "")
     .replace(/\[LOCATION: [^\]]+\]/g, "")
     .replace(/\[SCAR: [^\]]+\]/g, "")
     .replace(new RegExp(`\\[(LYRA|FEN):\\s*[A-Za-z]+\\s*${ARROW}\\s*[A-Za-z]+\\]`, "gi"), "")

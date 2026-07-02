@@ -123,6 +123,18 @@ test("extractCharacterHarmUpdates does not confuse a CURSE or VILLAIN AWARENESS 
   assert.deepEqual(updates, []);
 });
 
+test("extractCharacterHarmUpdates handles the arrow-less variant — live example: '[CHARACTER 1: Hurt]'", () => {
+  const characters = { player1: { name: "Sumai" } };
+  const updates = extractCharacterHarmUpdates("[CHARACTER 1: Hurt]", characters);
+  assert.deepEqual(updates, [{ key: "player1", harm: "Hurt" }]);
+});
+
+test("extractCharacterHarmUpdates does not double-count an arrow-less match inside a well-formed arrow tag", () => {
+  const characters = { player1: { name: "Sumai" } };
+  const updates = extractCharacterHarmUpdates("[CHARACTER 1: Scratched → Hurt]", characters);
+  assert.deepEqual(updates, [{ key: "player1", harm: "Hurt" }]);
+});
+
 /* ── extractResonanceHarmUpdates ── */
 
 test("extractResonanceHarmUpdates matches LYRA/FEN with either arrow style", () => {
