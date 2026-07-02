@@ -29,13 +29,41 @@ test("generateContent retries once on a 429 and returns the retry's result", asy
   assert.equal(calls, 2);
 });
 
-test("generateContent throws after a second consecutive 429", async (t) => {
+test("generateContent falls back to the smaller model when the primary is still 429 after retrying", async (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const originalFetch = global.fetch;
+  const modelsUsed = [];
+  global.fetch = async (_url, opts) => {
+    const { model } = JSON.parse(opts.body);
+    modelsUsed.push(model);
+    if (model === "llama-3.3-70b-versatile") {
+      return { status: 429, json: async () => ({ error: { message: "rate limit reached", code: "rate_limit_exceeded" } }) };
+    }
+    return { status: 200, json: async () => ({ choices: [{ message: { content: "ok from fallback model" } }] }) };
+  };
+  t.after(() => { global.fetch = originalFetch; });
+
+  const { generateContent } = freshRequire("../lib/gemini.js");
+  const promise = generateContent("sys", [], "hi");
+  await flushMicrotasks();
+  await t.mock.timers.tick(1500);
+  const result = await promise;
+
+  assert.equal(result, "ok from fallback model");
+  assert.deepEqual(modelsUsed, ["llama-3.3-70b-versatile", "llama-3.3-70b-versatile", "llama-3.1-8b-instant"]);
+});
+
+test("generateContent throws the primary's 429 (with its retryAfterSeconds) when the fallback model also fails", async (t) => {
   t.mock.timers.enable({ apis: ["setTimeout"] });
   const originalFetch = global.fetch;
   let calls = 0;
   global.fetch = async () => {
     calls++;
-    return { status: 429, json: async () => ({ error: { message: "rate limit reached", code: "rate_limit_exceeded" } }) };
+    return {
+      status: 429,
+      headers: { get: (name) => (name === "retry-after" ? "20" : null) },
+      json: async () => ({ error: { message: "rate limit reached", code: "rate_limit_exceeded" } }),
+    };
   };
   t.after(() => { global.fetch = originalFetch; });
 
@@ -44,8 +72,14 @@ test("generateContent throws after a second consecutive 429", async (t) => {
   await flushMicrotasks();
   await t.mock.timers.tick(1500);
 
-  await assert.rejects(() => promise, /Groq error: rate limit reached/);
-  assert.equal(calls, 2);
+  try {
+    await promise;
+    assert.fail("expected generateContent to reject");
+  } catch (err) {
+    assert.match(err.message, /Groq error: rate limit reached/);
+    assert.equal(err.retryAfterSeconds, 20);
+  }
+  assert.equal(calls, 3); // primary, primary retry, fallback
 });
 
 test("generateContent throws immediately on a non-429 error, without retrying", async (t) => {
