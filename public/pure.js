@@ -106,6 +106,13 @@ function extractStateChanges(text, opts = {}) {
   return changes;
 }
 
+function resolveSuggestionSelection(text, suggestions) {
+  if (!suggestions || !suggestions.length) return null;
+  const m = (text || "").trim().match(/^#?(\d+)\.?$/);
+  if (!m) return null;
+  return suggestions[parseInt(m[1], 10) - 1] || null;
+}
+
 function formatCampaignExport(state, opts = {}) {
   const {
     world = defaultWorld(),
@@ -159,6 +166,7 @@ if (typeof module !== "undefined" && module.exports) {
     stripGMTags,
     getCleanText,
     extractStateChanges,
+    resolveSuggestionSelection,
     formatCampaignExport,
   };
 }

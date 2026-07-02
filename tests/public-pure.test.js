@@ -2,7 +2,7 @@ const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const {
   HARM_LEVELS, isManlandiaLike, withWorld, getPlayerDisplayName, stripPlayerPrefix,
-  formatRollMessage, stripGMTags, getCleanText, extractStateChanges, formatCampaignExport,
+  formatRollMessage, stripGMTags, getCleanText, extractStateChanges, resolveSuggestionSelection, formatCampaignExport,
 } = require("../public/pure.js");
 
 test("isManlandiaLike is true for manlandia and any c_ world, false for resonance", () => {
@@ -32,6 +32,23 @@ test("stripPlayerPrefix removes a leading 'Name: ' label", () => {
 test("formatRollMessage builds a readable roll summary", () => {
   const msg = formatRollMessage("player1", "force", { die1: 4, die2: 5, modifier: 2, total: 11 }, { characters: { player1: { name: "Taisha" } } });
   assert.equal(msg, "Taisha rolls FORCE: 4 + 5 + (2) = 11");
+});
+
+test("resolveSuggestionSelection maps a bare number to the matching suggestion chip", () => {
+  const suggestions = ["Search the desk", "Press her for answers", "Leave quietly"];
+  assert.equal(resolveSuggestionSelection("3", suggestions), "Leave quietly");
+  assert.equal(resolveSuggestionSelection(" 1 ", suggestions), "Search the desk");
+  assert.equal(resolveSuggestionSelection("2.", suggestions), "Press her for answers");
+  assert.equal(resolveSuggestionSelection("#2", suggestions), "Press her for answers");
+});
+
+test("resolveSuggestionSelection returns null for out-of-range numbers, non-numeric text, or no active suggestions", () => {
+  const suggestions = ["Search the desk", "Press her for answers", "Leave quietly"];
+  assert.equal(resolveSuggestionSelection("4", suggestions), null);
+  assert.equal(resolveSuggestionSelection("0", suggestions), null);
+  assert.equal(resolveSuggestionSelection("I search the desk", suggestions), null);
+  assert.equal(resolveSuggestionSelection("3", []), null);
+  assert.equal(resolveSuggestionSelection("3", null), null);
 });
 
 test("stripGMTags removes every known bracket tag, including the newest SUGGESTIONS tag", () => {

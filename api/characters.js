@@ -50,7 +50,7 @@ module.exports = async function handler(req, res) {
     ability_id,
     ability_used: existing.ability_used ?? false,
     harm:         existing.harm ?? "Unhurt",
-    backstory:    typeof backstory === "string" ? backstory.trim().slice(0, 200) : (existing.backstory ?? ""),
+    backstory:    typeof backstory === "string" ? backstory.trim() : (existing.backstory ?? ""),
   };
 
   await setState(key, gameState);

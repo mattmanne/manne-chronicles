@@ -71,13 +71,13 @@ test("editing an existing hero preserves ability_used, harm, and backstory unles
   assert.equal(hero.backstory, "An old tale.");
 });
 
-test("truncates an overly long name to 20 characters and backstory to 200", async (t) => {
+test("truncates an overly long name to 20 characters but leaves backstory uncapped", async (t) => {
   const longName = "N".repeat(50);
   const longBackstory = "B".repeat(500);
   const { run, redis } = callCharacters(null, { ...VALID_BODY, name: longName, backstory: longBackstory });
   await run(t);
   assert.equal(redis.state.characters.player1.name.length, 20);
-  assert.equal(redis.state.characters.player1.backstory.length, 200);
+  assert.equal(redis.state.characters.player1.backstory.length, 500);
 });
 
 test("a non-string backstory falls back to the existing one instead of overwriting it", async (t) => {

@@ -8,6 +8,7 @@ let recognition      = null;
 let pollTimer        = null;
 let lastTimestamp    = 0;
 let cachedGameState  = null;
+let currentSuggestions = [];
 let gameSecret       = null;
 let continueInitDone = false;
 let manlandiaTone    = localStorage.getItem("manlandia_tone") || "adventure";
@@ -723,12 +724,16 @@ async function triggerOpeningIfNeeded() {
 async function submitAction() {
   const text = actionInput.value.trim();
   if (!text || isLoading) return;
+  // A player who types a bare number (e.g. "3") after being shown suggestion
+  // chips means "the 3rd chip" — send that chip's actual text instead of the
+  // ambiguous digit, which the GM has no reliable way to interpret on its own.
+  const message = resolveSuggestionSelection(text, currentSuggestions) || text;
   actionInput.value = "";
   setLoading(true);
   hideSuggestionChips();
-  appendPlayerEntry(currentPlayer, text, true);
+  appendPlayerEntry(currentPlayer, message, true);
   scrollToBottom();
-  const ok = await sendToGM(currentPlayer, text, "action");
+  const ok = await sendToGM(currentPlayer, message, "action");
   // On failure (rate limit, server error, dropped connection), put the
   // player's own words back in the box so they can just hit send again
   // instead of retyping the whole thing.
@@ -739,9 +744,11 @@ async function submitAction() {
 function hideSuggestionChips() {
   suggestionChips.classList.add("hidden");
   suggestionChips.innerHTML = "";
+  currentSuggestions = [];
 }
 
 function renderSuggestionChips(suggestions) {
+  currentSuggestions = suggestions || [];
   if (!suggestions || !suggestions.length) { hideSuggestionChips(); return; }
 
   suggestionChips.innerHTML = "";
