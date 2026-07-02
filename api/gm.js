@@ -178,7 +178,7 @@ module.exports = async function handler(req, res) {
     console.error("GM error:", err);
     if (needsLock) await releaseGmLock(worldConfig.id);
     if (err.status === 429) {
-      return res.status(429).json({ error: `The GM is handling a lot of requests right now — ${formatWaitMessage(err.retryAfterSeconds)} and try again. [DEBUG: ${err.message} | code=${err.code} | fallback=${err.fallbackDebug}]` });
+      return res.status(429).json({ error: `The GM is handling a lot of requests right now — ${formatWaitMessage(err.retryAfterSeconds)} and try again.` });
     }
     return res.status(500).json({ error: "The GM encountered an error: " + err.message });
   }

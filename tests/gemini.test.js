@@ -29,28 +29,38 @@ test("generateContent retries once on a 429 and returns the retry's result", asy
   assert.equal(calls, 2);
 });
 
-test("generateContent falls back to the smaller model when the primary is still 429 after retrying", async (t) => {
+test("generateContent falls back to the smaller model, with a trimmed history and lower token budget, when the primary is still 429 after retrying", async (t) => {
   t.mock.timers.enable({ apis: ["setTimeout"] });
   const originalFetch = global.fetch;
   const modelsUsed = [];
+  let fallbackBody = null;
   global.fetch = async (_url, opts) => {
-    const { model } = JSON.parse(opts.body);
-    modelsUsed.push(model);
-    if (model === "llama-3.3-70b-versatile") {
+    const body = JSON.parse(opts.body);
+    modelsUsed.push(body.model);
+    if (body.model === "llama-3.3-70b-versatile") {
       return { status: 429, json: async () => ({ error: { message: "rate limit reached", code: "rate_limit_exceeded" } }) };
     }
+    fallbackBody = body;
     return { status: 200, json: async () => ({ choices: [{ message: { content: "ok from fallback model" } }] }) };
   };
   t.after(() => { global.fetch = originalFetch; });
 
+  const longHistory = Array.from({ length: 10 }, (_, i) => ({ role: "user", content: `turn ${i}` }));
   const { generateContent } = freshRequire("../lib/gemini.js");
-  const promise = generateContent("sys", [], "hi");
+  const promise = generateContent("sys", longHistory, "hi");
   await flushMicrotasks();
   await t.mock.timers.tick(1500);
   const result = await promise;
 
   assert.equal(result, "ok from fallback model");
   assert.deepEqual(modelsUsed, ["llama-3.3-70b-versatile", "llama-3.3-70b-versatile", "llama-3.1-8b-instant"]);
+  // Only the most recent 6 history entries and a much smaller response
+  // budget — the fallback model's free-tier TPM is a fraction of the
+  // primary's, confirmed live against the real Groq account (6000 TPM vs.
+  // the request this app normally sends).
+  assert.equal(fallbackBody.max_tokens, 400);
+  const historySent = fallbackBody.messages.slice(1, -1); // drop system + trailing user message
+  assert.deepEqual(historySent, longHistory.slice(-6));
 });
 
 test("generateContent throws the primary's 429 (with its retryAfterSeconds) when the fallback model also fails", async (t) => {
