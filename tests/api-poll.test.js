@@ -68,6 +68,33 @@ test("since defaults to 0 when omitted, returning the full log (minus rolling en
   assert.equal(res.body.entries.length, 2);
 });
 
+test("a trailing rolling entry with a persisted rollStat is surfaced as pendingRoll", async (t) => {
+  const log = [
+    { role: "user", content: "Player1: push on", player: "player1", timestamp: 100, rolling: true },
+    { role: "gm", content: "You push toward the ledge.", timestamp: 100, rolling: true, rollStat: "AGILITY", rollAdvantage: false },
+  ];
+  const stored = { session: 1, sessionLog: log, characters: {}, worldState: { villain_awareness: 0, curse_level: 0, location: "x", visited_locations: [], location_scars: [] } };
+  const res = await callPoll(stored, { since: "0", world: "manlandia" })(t);
+  assert.deepEqual(res.body.pendingRoll, { stat: "AGILITY", advantage: false, player: "player1" });
+});
+
+test("a trailing rolling entry with no rollStat (a pre-fix stuck entry) is not surfaced", async (t) => {
+  const stored = { session: 1, sessionLog: BASE_LOG, characters: {}, worldState: { villain_awareness: 0, curse_level: 0, location: "x", visited_locations: [], location_scars: [] } };
+  const res = await callPoll(stored, { since: "0", world: "manlandia" })(t);
+  assert.equal(res.body.pendingRoll, null);
+});
+
+test("a resolved turn after the rolling pair means no pendingRoll, even though an older rolling entry exists", async (t) => {
+  const log = [
+    ...BASE_LOG,
+    { role: "user", content: "Player1: something else", player: "player1", timestamp: 300 },
+    { role: "gm", content: "A new scene unfolds.", timestamp: 300 },
+  ];
+  const stored = { session: 1, sessionLog: log, characters: {}, worldState: { villain_awareness: 0, curse_level: 0, location: "x", visited_locations: [], location_scars: [] } };
+  const res = await callPoll(stored, { since: "0", world: "manlandia" })(t);
+  assert.equal(res.body.pendingRoll, null);
+});
+
 test("resonance is locked to reads without the correct adult pin", async (t) => {
   const stored = { session: 1, sessionLog: [], characters: {}, worldState: { conclave_awareness: 0 } };
   t.mock.module("../lib/redis.js", statefulRedisMock(stored));

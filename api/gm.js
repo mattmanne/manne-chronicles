@@ -89,6 +89,97 @@ function matchStoneId(name) {
   return STONE_IDS.includes(s) ? s : null;
 }
 
+// GM bracket-tag notation, applied to gameState — full reference table in
+// CLAUDE.md. Deliberately NOT called while a roll is pending (see the
+// `rolling` handling in the handler below): a turn that asks for a roll
+// describes events that haven't been confirmed yet, so applying its tags
+// immediately would let world state (location, harm, curse level, etc.)
+// silently advance even if the roll is never actually completed — this is
+// exactly what happened to a real live Manlandia turn that got interrupted
+// mid-roll and stayed invisibly stuck. Deferred tags are applied later, once
+// the matching roll_result comes back, by re-running this same function
+// against the original stored entry content.
+function applyStateTags(cleanResponse, gameState, worldConfig, matchLocationId) {
+  const locationMatch = cleanResponse.match(/\[LOCATION: ([^\]]+)\]/);
+  if (locationMatch) {
+    const locName = locationMatch[1].trim();
+    gameState.worldState.location = locName;
+    const locId = matchLocationId(locName);
+    if (locId) {
+      if (!gameState.worldState.visited_locations) gameState.worldState.visited_locations = [];
+      if (!gameState.worldState.visited_locations.includes(locId)) {
+        gameState.worldState.visited_locations.push(locId);
+      }
+    }
+  }
+
+  const scarRegex = /\[SCAR: ([^:]+): ([^\]]+)\]/g;
+  let scarMatch;
+  while ((scarMatch = scarRegex.exec(cleanResponse)) !== null) {
+    const locId = matchLocationId(scarMatch[1].trim());
+    const label = scarMatch[2].trim();
+    if (locId) {
+      if (!gameState.worldState.location_scars) gameState.worldState.location_scars = [];
+      const exists = gameState.worldState.location_scars.some(s => s.id === locId && s.label === label);
+      if (!exists) gameState.worldState.location_scars.push({ id: locId, label });
+    }
+  }
+
+  if (worldConfig.id === "manlandia" || worldConfig.type === "custom") {
+    const villainUpdate = extractCounterUpdate(cleanResponse, "VILLAIN AWARENESS");
+    if (villainUpdate !== null) gameState.worldState.villain_awareness = villainUpdate;
+
+    const curseUpdate = extractCounterUpdate(cleanResponse, "CURSE");
+    if (curseUpdate !== null) gameState.worldState.curse_level = curseUpdate;
+
+    if (worldConfig.id === "manlandia") {
+      const stoneRegex = /\[STONE FOUND: ([^\]]+)\]/g;
+      let stoneMatch;
+      while ((stoneMatch = stoneRegex.exec(cleanResponse)) !== null) {
+        const stoneId = matchStoneId(stoneMatch[1]);
+        if (stoneId) {
+          if (!gameState.worldState.stones_found) gameState.worldState.stones_found = [];
+          if (!gameState.worldState.stones_found.includes(stoneId)) {
+            gameState.worldState.stones_found.push(stoneId);
+          }
+        }
+      }
+    }
+
+    for (const { key, harm } of extractCharacterHarmUpdates(cleanResponse, gameState.characters)) {
+      gameState.characters[key].harm = harm;
+    }
+
+    for (const key of extractAbilityUsedKeys(cleanResponse, gameState.characters)) {
+      gameState.characters[key].ability_used = true;
+    }
+  } else {
+    const awarenessUpdate = extractCounterUpdate(cleanResponse, "CONCLAVE AWARENESS");
+    if (awarenessUpdate !== null) gameState.worldState.conclave_awareness = awarenessUpdate;
+
+    const dissonanceUpdate = extractCounterUpdate(cleanResponse, "DISSONANCE");
+    if (dissonanceUpdate !== null) gameState.worldState.fen_dissonance_awakening = dissonanceUpdate;
+
+    for (const { key, harm } of extractResonanceHarmUpdates(cleanResponse)) {
+      if (gameState.characters[key]) gameState.characters[key].harm = harm;
+    }
+
+    const resAbilityRegex = /\[ABILITY (FEN|LYRA): ([a-z_]+)\]/gi;
+    let raMatch;
+    while ((raMatch = resAbilityRegex.exec(cleanResponse)) !== null) {
+      const who     = raMatch[1].toLowerCase();
+      const ability = raMatch[2].toLowerCase();
+      if (who === "lyra" && ability === "magic") {
+        if (gameState.characters.lyra && gameState.characters.lyra.magic_uses_remaining > 0) {
+          gameState.characters.lyra.magic_uses_remaining--;
+        }
+      } else if (gameState.characters[who] && ability in gameState.characters[who]) {
+        gameState.characters[who][ability] = true;
+      }
+    }
+  }
+}
+
 // Never lets a push failure break the actual GM response — this is
 // best-effort. Skips entirely (not an error) if VAPID isn't configured yet,
 // or if nobody else is subscribed to this world.
@@ -189,97 +280,52 @@ module.exports = async function handler(req, res) {
   const cleanResponse = extracted.clean;
   const suggestions = (type === "roll_result" || needsRoll) ? [] : extracted.suggestions;
 
-  // When completing a roll, un-flag the deferred entries saved on the prior call.
-  // Their timestamps are pushed back 2ms so they still sort before the new
-  // entries pushed later in this same request.
-  if (type === "roll_result") {
-    const unmasked = Date.now();
-    gameState.sessionLog.forEach(e => {
-      if (e.rolling) { delete e.rolling; e.timestamp = unmasked - 2; }
-    });
-  }
-
-  const ts = Date.now();
-  const rolling = needsRoll && type !== "roll_result";
-  const userEntry = { role: "user", content: userMessage, player, timestamp: ts };
-  const gmEntry   = { role: "gm",   content: cleanResponse,           timestamp: ts };
-  if (rolling) { userEntry.rolling = true; gmEntry.rolling = true; }
-  gameState.sessionLog.push(userEntry, gmEntry);
-
-  if (gameState.sessionLog.length > 100) {
-    gameState.sessionLog = gameState.sessionLog.slice(-80); // keep the stored log (and Redis payload) bounded
-  }
-
-  // GM bracket-tag notation parsed below — full reference table in CLAUDE.md.
-  // Shared: LOCATION and SCAR tags
   const matchLocationId = worldConfig.id === "manlandia"
     ? matchManlandiaLocationId
     : worldConfig.type === "custom"
       ? () => null
       : matchResonanceLocationId;
 
-  const locationMatch = cleanResponse.match(/\[LOCATION: ([^\]]+)\]/);
-  if (locationMatch) {
-    const locName = locationMatch[1].trim();
-    gameState.worldState.location = locName;
-    const locId = matchLocationId(locName);
-    if (locId) {
-      if (!gameState.worldState.visited_locations) gameState.worldState.visited_locations = [];
-      if (!gameState.worldState.visited_locations.includes(locId)) {
-        gameState.worldState.visited_locations.push(locId);
-      }
+  // When completing a roll, un-flag the deferred entries saved on the prior
+  // call, and only now apply the state tags their narration carried (see
+  // applyStateTags' comment for why this was deferred rather than applied
+  // when the roll was first requested). Their timestamps are pushed back 2ms
+  // so they still sort before the new entries pushed later in this same call.
+  if (type === "roll_result") {
+    const deferredEntries = gameState.sessionLog.filter(e => e.role === "gm" && e.rolling);
+    const unmasked = Date.now();
+    gameState.sessionLog.forEach(e => {
+      if (e.rolling) { delete e.rolling; e.timestamp = unmasked - 2; }
+    });
+    for (const entry of deferredEntries) {
+      applyStateTags(entry.content, gameState, worldConfig, matchLocationId);
     }
   }
 
-  const scarRegex = /\[SCAR: ([^:]+): ([^\]]+)\]/g;
-  let scarMatch;
-  while ((scarMatch = scarRegex.exec(cleanResponse)) !== null) {
-    const locId = matchLocationId(scarMatch[1].trim());
-    const label = scarMatch[2].trim();
-    if (locId) {
-      if (!gameState.worldState.location_scars) gameState.worldState.location_scars = [];
-      const exists = gameState.worldState.location_scars.some(s => s.id === locId && s.label === label);
-      if (!exists) gameState.worldState.location_scars.push({ id: locId, label });
-    }
+  const ts = Date.now();
+  const rolling = needsRoll && type !== "roll_result";
+  const userEntry = { role: "user", content: userMessage, player, timestamp: ts };
+  const gmEntry   = { role: "gm",   content: cleanResponse,           timestamp: ts };
+  if (rolling) {
+    userEntry.rolling = true;
+    gmEntry.rolling = true;
+    // Persisted so a dropped/interrupted roll can be recovered from a later
+    // poll instead of vanishing — see api/poll.js's pendingRoll.
+    gmEntry.rollStat = rollStat;
+    gmEntry.rollAdvantage = rollAdvantage;
   }
+  gameState.sessionLog.push(userEntry, gmEntry);
+
+  if (gameState.sessionLog.length > 100) {
+    gameState.sessionLog = gameState.sessionLog.slice(-80); // keep the stored log (and Redis payload) bounded
+  }
+
+  // Apply this turn's own state tags now, unless it's itself asking for a
+  // roll — those are deferred until the matching roll_result comes back.
+  if (!rolling) applyStateTags(cleanResponse, gameState, worldConfig, matchLocationId);
 
   let responseWorldState;
-
   if (worldConfig.id === "manlandia" || worldConfig.type === "custom") {
-    // Villain awareness
-    const villainUpdate = extractCounterUpdate(cleanResponse, "VILLAIN AWARENESS");
-    if (villainUpdate !== null) gameState.worldState.villain_awareness = villainUpdate;
-
-    // Curse level
-    const curseUpdate = extractCounterUpdate(cleanResponse, "CURSE");
-    if (curseUpdate !== null) gameState.worldState.curse_level = curseUpdate;
-
-    // Stone found (Manlandia only)
-    if (worldConfig.id === "manlandia") {
-      const stoneRegex = /\[STONE FOUND: ([^\]]+)\]/g;
-      let stoneMatch;
-      while ((stoneMatch = stoneRegex.exec(cleanResponse)) !== null) {
-        const stoneId = matchStoneId(stoneMatch[1]);
-        if (stoneId) {
-          if (!gameState.worldState.stones_found) gameState.worldState.stones_found = [];
-          if (!gameState.worldState.stones_found.includes(stoneId)) {
-            gameState.worldState.stones_found.push(stoneId);
-          }
-        }
-      }
-    }
-
-    // Character harm: [CHARACTER N: OldHarm → NewHarm], or the hero's actual
-    // name in place of "CHARACTER N" — the model does this often (see lib/gm-tags.js)
-    for (const { key, harm } of extractCharacterHarmUpdates(cleanResponse, gameState.characters)) {
-      gameState.characters[key].harm = harm;
-    }
-
-    // Ability used: [ABILITY N: used] (tolerant of extra text — see lib/gm-tags.js)
-    for (const key of extractAbilityUsedKeys(cleanResponse, gameState.characters)) {
-      gameState.characters[key].ability_used = true;
-    }
-
     responseWorldState = {
       session: gameState.session,
       villain_awareness: gameState.worldState.villain_awareness,
@@ -290,32 +336,6 @@ module.exports = async function handler(req, res) {
       location_scars: gameState.worldState.location_scars || [],
     };
   } else {
-    // Resonance-specific parsing
-    const awarenessUpdate = extractCounterUpdate(cleanResponse, "CONCLAVE AWARENESS");
-    if (awarenessUpdate !== null) gameState.worldState.conclave_awareness = awarenessUpdate;
-
-    const dissonanceUpdate = extractCounterUpdate(cleanResponse, "DISSONANCE");
-    if (dissonanceUpdate !== null) gameState.worldState.fen_dissonance_awakening = dissonanceUpdate;
-
-    for (const { key, harm } of extractResonanceHarmUpdates(cleanResponse)) {
-      if (gameState.characters[key]) gameState.characters[key].harm = harm;
-    }
-
-    // Ability used: [ABILITY FEN: ability_name] or [ABILITY LYRA: ability_name]
-    const resAbilityRegex = /\[ABILITY (FEN|LYRA): ([a-z_]+)\]/gi;
-    let raMatch;
-    while ((raMatch = resAbilityRegex.exec(cleanResponse)) !== null) {
-      const who     = raMatch[1].toLowerCase();
-      const ability = raMatch[2].toLowerCase();
-      if (who === "lyra" && ability === "magic") {
-        if (gameState.characters.lyra && gameState.characters.lyra.magic_uses_remaining > 0) {
-          gameState.characters.lyra.magic_uses_remaining--;
-        }
-      } else if (gameState.characters[who] && ability in gameState.characters[who]) {
-        gameState.characters[who][ability] = true;
-      }
-    }
-
     responseWorldState = {
       session: gameState.session,
       conclave_awareness: gameState.worldState.conclave_awareness,

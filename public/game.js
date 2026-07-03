@@ -13,6 +13,7 @@ let gameSecret       = null;
 let continueInitDone = false;
 let manlandiaTone    = localStorage.getItem("manlandia_tone") || "adventure";
 let campaignList     = [];
+let resumingRoll     = false;
 let adultPin         = localStorage.getItem("adult_pin") || "";
 // Devices that unlocked before adult worlds required an X-Adult-Pin header
 // have the old flag but never stored the actual pin — treat that as "not
@@ -681,6 +682,7 @@ async function loadExistingLog() {
       if (entry.timestamp > lastTimestamp) lastTimestamp = entry.timestamp;
     }
     scrollToBottom();
+    resumePendingRollIfAny(data.pendingRoll);
   } catch(_) {
     appendSystemMessage("Could not load story — check your connection and reload the page.");
   }
@@ -706,6 +708,7 @@ function startPolling() {
         else setUnreadBadge(true);
         if (document.getElementById("tab-map").classList.contains("active")) renderMap(cachedGameState);
       }
+      resumePendingRollIfAny(data.pendingRoll);
     } catch(_) {}
   }, 8000);
 }
@@ -810,6 +813,27 @@ async function sendToGM(player, message, type) {
     return false;
   } finally {
     setLoading(false);
+  }
+}
+
+// A roll normally resolves automatically in the same call chain as sendToGM
+// (see needsRoll above) — there's no manual "roll" button. If that chain
+// gets interrupted (tab closed, app backgrounded, network drop) mid-animation,
+// nothing else would ever retry it, so both the initial log load and every
+// poll tick check for a pendingRoll left over from an earlier session and
+// resume it here. `resumingRoll` guards against the animation's own delay
+// (isLoading isn't set until sendToGM's roll_result call at the very end)
+// letting a second poll tick start the same roll twice.
+async function resumePendingRollIfAny(pending) {
+  if (!pending || pending.player !== currentPlayer || isLoading || resumingRoll) return;
+  resumingRoll = true;
+  try {
+    hideSuggestionChips();
+    const rollResult = await animateRoll(pending.player, pending.stat, pending.advantage);
+    appendRollResult(pending.player, pending.stat, rollResult);
+    await sendToGM(pending.player, formatRollMessage(pending.player, pending.stat, rollResult), "roll_result");
+  } finally {
+    resumingRoll = false;
   }
 }
 

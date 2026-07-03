@@ -154,6 +154,28 @@ test("a roll-request turn flags entries as rolling, and the roll_result turn un-
   assert.equal(redis.state.sessionLog[0].timestamp, redis.state.sessionLog[1].timestamp);
 });
 
+test("state tags in a roll-request turn are deferred until the roll resolves", async (t) => {
+  const redis = statefulRedisMock(null);
+  t.mock.module("../lib/redis.js", redis);
+  mockGemini(t, [
+    "You push toward the Frost Lands. [LOCATION: Frost Lands]\nROLL:FORCE",
+    "You make it through.",
+  ]);
+
+  const res1 = await callGm({ player: "player1", message: "push on", type: "action" });
+  assert.equal(res1.body.needsRoll, true);
+  // Not applied yet — the roll hasn't resolved, so this shouldn't be visible
+  // as confirmed state (this is the exact bug found in a real stuck live turn).
+  assert.notEqual(res1.body.gameState.worldState.location, "Frost Lands");
+  assert.notEqual(redis.state.worldState.location, "Frost Lands");
+  assert.equal(redis.state.sessionLog[1].rollStat, "force");
+
+  const res2 = await callGm({ player: "player1", message: "rolled a 9", type: "roll_result" });
+  // Now that the roll resolved, the deferred LOCATION tag is applied.
+  assert.equal(res2.body.gameState.worldState.location, "Frost Lands");
+  assert.equal(redis.state.worldState.location, "Frost Lands");
+});
+
 test("sessionLog is trimmed to the most recent 80 entries once it exceeds 100", async (t) => {
   const seeded = require("../lib/gamestate-manlandia").getInitialStateManlandia();
   for (let i = 0; i < 100; i++) {
