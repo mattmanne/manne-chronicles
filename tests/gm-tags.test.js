@@ -47,10 +47,26 @@ test("extractRoll recognizes ADVANTAGE with brackets", () => {
   assert.equal(r.rollAdvantage, true);
 });
 
-test("extractRoll strips an unrecognized stat from display without triggering a roll (live: PERCEPTION isn't a real stat)", () => {
-  const r = extractRoll("The creature's eyes lock onto you.\nROLL:[PERCEPTION]");
+test("extractRoll strips a truly unrecognized stat from display without triggering a roll", () => {
+  const r = extractRoll("The creature's eyes lock onto you.\nROLL:[LUCK]");
   assert.equal(r.needsRoll, false);
   assert.equal(r.clean, "The creature's eyes lock onto you.");
+});
+
+test("extractRoll maps common D&D-style synonyms onto the real five stats (live: PERCEPTION in a custom campaign, despite the prompt naming it as a forbidden example)", () => {
+  const cases = [
+    ["PERCEPTION", "acuity"], ["WISDOM", "acuity"], ["INTELLIGENCE", "acuity"],
+    ["STRENGTH", "force"], ["MIGHT", "force"],
+    ["DEXTERITY", "agility"], ["SPEED", "agility"], ["STEALTH", "agility"],
+    ["CONSTITUTION", "will"], ["RESOLVE", "will"], ["COURAGE", "will"],
+    ["CHARISMA", "presence"], ["PERSUASION", "presence"],
+  ];
+  for (const [synonym, canonical] of cases) {
+    const r = extractRoll(`The scene tenses.\nROLL:[${synonym}]`);
+    assert.equal(r.needsRoll, true, `${synonym} should trigger a roll`);
+    assert.equal(r.rollStat, canonical, `${synonym} should map to ${canonical}`);
+    assert.equal(r.clean, "The scene tenses.");
+  }
 });
 
 test("extractRoll leaves narration with no ROLL: line completely untouched", () => {

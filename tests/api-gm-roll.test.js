@@ -48,10 +48,19 @@ test("recognizes a bracketed ADVANTAGE roll", async (t) => {
   assert.equal(res.body.rollAdvantage, true);
 });
 
-test("an unrecognized stat name doesn't trigger a roll, but the stray tag is still stripped from the narration", async (t) => {
+test("a truly unrecognized stat name doesn't trigger a roll, but the stray tag is still stripped from the narration", async (t) => {
+  t.mock.module("../lib/redis.js", statefulRedisMock(null));
+  mockGemini(t, "The creature's eyes lock onto you.\nROLL:[LUCK]");
+  const res = await callGm({ player: "player1", message: "watch it", type: "action" });
+  assert.equal(res.body.needsRoll, false);
+  assert.equal(res.body.response, "The creature's eyes lock onto you.");
+});
+
+test("a D&D-style synonym like PERCEPTION maps onto the real stat instead of silently dropping the roll (live, twice, in a custom campaign)", async (t) => {
   t.mock.module("../lib/redis.js", statefulRedisMock(null));
   mockGemini(t, "The creature's eyes lock onto you.\nROLL:[PERCEPTION]");
   const res = await callGm({ player: "player1", message: "watch it", type: "action" });
-  assert.equal(res.body.needsRoll, false);
+  assert.equal(res.body.needsRoll, true);
+  assert.equal(res.body.rollStat, "acuity");
   assert.equal(res.body.response, "The creature's eyes lock onto you.");
 });
