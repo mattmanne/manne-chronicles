@@ -31,6 +31,25 @@ module.exports = async function handler(req, res) {
 
     const { action, payload } = req.body;
 
+    // TEMP CLEANUP: strips any leaked raw "ROLL:" line still sitting in
+    // stored narration from before the mid-sentence trigger fix — same
+    // stripping regex as extractRoll()'s `clean` step. One-off, used once
+    // against the live "Dark Wars" campaign with the user's explicit
+    // go-ahead, then removed.
+    if (action === "cleanup_leaked_roll_text") {
+      const current = (await getState(key)) || getInitialState();
+      let fixed = 0;
+      current.sessionLog.forEach((e) => {
+        if (e.role === "gm" && /ROLL:/i.test(e.content)) {
+          const before = e.content;
+          e.content = e.content.replace(/^.*ROLL:.*$/gim, "").replace(/\n{3,}/g, "\n\n").trim();
+          if (e.content !== before) fixed++;
+        }
+      });
+      await setState(key, current);
+      return res.json({ ok: true, fixed });
+    }
+
     if (action === "reset") {
       let fresh;
       if (worldConfig.type === "custom") {
