@@ -330,3 +330,103 @@ test("manlandia is never adult-gated, even with no pin header at all", async (t)
   const res = await callState({ method: "GET", headers: {}, query: { world: "manlandia" }, body: {} });
   assert.equal(res.statusCode, 200);
 });
+
+/* ── Bonds — adult games only ── */
+
+test("add_bond adds a relationship statement to the character's own bonds list (Resonance)", async (t) => {
+  const redis = statefulRedisMock({ session: 1, sessionLog: [], worldState: {}, characters: { fen: { bonds: [] }, lyra: { bonds: [] } } });
+  t.mock.module("../lib/redis.js", redis);
+
+  const res = await callState({ method: "POST", headers: { "x-adult-pin": ADULT_PIN }, query: { world: "resonance" }, body: { action: "add_bond", payload: { character: "fen", target: "lyra", text: "  I trust her with my life  " } } });
+  assert.equal(res.body.ok, true);
+  assert.deepEqual(redis.state.characters.fen.bonds, [{ target: "lyra", text: "I trust her with my life", resolved: false }]);
+  assert.deepEqual(redis.state.characters.lyra.bonds, []);
+});
+
+test("add_bond rejects a kid game (Manlandia)", async (t) => {
+  const redis = statefulRedisMock({ session: 1, sessionLog: [], worldState: {}, characters: { player1: {}, player2: {} } });
+  t.mock.module("../lib/redis.js", redis);
+
+  const res = await callState({ method: "POST", headers: { "x-adult-pin": ADULT_PIN }, query: { world: "manlandia" }, body: { action: "add_bond", payload: { character: "player1", target: "player2", text: "A bond" } } });
+  assert.equal(res.statusCode, 400);
+});
+
+test("add_bond rejects a non-adult custom world", async (t) => {
+  const redis = statefulRedisMock({ session: 1, sessionLog: [], worldConfig: { adult: false }, worldState: {}, characters: { player1: {}, player2: {} } });
+  t.mock.module("../lib/redis.js", redis);
+
+  const res = await callState({ method: "POST", headers: { "x-adult-pin": ADULT_PIN }, query: { world: "c_kid" }, body: { action: "add_bond", payload: { character: "player1", target: "player2", text: "A bond" } } });
+  assert.equal(res.statusCode, 400);
+});
+
+test("add_bond works for an adult-flagged custom world and lazily creates the bonds array", async (t) => {
+  const redis = statefulRedisMock({ session: 1, sessionLog: [], worldConfig: { adult: true }, worldState: {}, characters: { player1: { name: "Zeb" }, player2: { name: "Anya" } } });
+  t.mock.module("../lib/redis.js", redis);
+
+  const res = await callState({ method: "POST", headers: { "x-adult-pin": ADULT_PIN }, query: { world: "c_adult" }, body: { action: "add_bond", payload: { character: "player1", target: "player2", text: "I owe Anya a debt" } } });
+  assert.equal(res.body.ok, true);
+  assert.deepEqual(redis.state.characters.player1.bonds, [{ target: "player2", text: "I owe Anya a debt", resolved: false }]);
+});
+
+test("add_bond rejects bonding with yourself, an unknown target, or empty text", async (t) => {
+  const seed = () => ({ session: 1, sessionLog: [], worldState: {}, characters: { fen: { bonds: [] }, lyra: { bonds: [] } } });
+  t.mock.module("../lib/redis.js", statefulRedisMock(seed()));
+
+  const self = await callState({ method: "POST", headers: { "x-adult-pin": ADULT_PIN }, query: { world: "resonance" }, body: { action: "add_bond", payload: { character: "fen", target: "fen", text: "..." } } });
+  assert.equal(self.statusCode, 400);
+
+  const unknown = await callState({ method: "POST", headers: { "x-adult-pin": ADULT_PIN }, query: { world: "resonance" }, body: { action: "add_bond", payload: { character: "fen", target: "nobody", text: "..." } } });
+  assert.equal(unknown.statusCode, 400);
+
+  const empty = await callState({ method: "POST", headers: { "x-adult-pin": ADULT_PIN }, query: { world: "resonance" }, body: { action: "add_bond", payload: { character: "fen", target: "lyra", text: "   " } } });
+  assert.equal(empty.statusCode, 400);
+});
+
+test("resolve_bond marks a bond resolved and stays cosmetic-only for Resonance (no XP system)", async (t) => {
+  const redis = statefulRedisMock({ session: 1, sessionLog: [], worldState: {}, characters: { fen: { bonds: [{ target: "lyra", text: "I trust her", resolved: false }] } } });
+  t.mock.module("../lib/redis.js", redis);
+
+  const res = await callState({ method: "POST", headers: { "x-adult-pin": ADULT_PIN }, query: { world: "resonance" }, body: { action: "resolve_bond", payload: { character: "fen", index: 0 } } });
+  assert.equal(res.body.ok, true);
+  assert.equal(redis.state.characters.fen.bonds[0].resolved, true);
+  assert.equal(redis.state.characters.fen.xp, undefined);
+});
+
+test("resolve_bond awards bonus XP for an adult-flagged custom world", async (t) => {
+  const redis = statefulRedisMock({
+    session: 1, sessionLog: [], worldConfig: { adult: true }, worldState: {},
+    characters: { player1: { xp: 5, bonds: [{ target: "player2", text: "A debt owed", resolved: false }] } },
+  });
+  t.mock.module("../lib/redis.js", redis);
+
+  const res = await callState({ method: "POST", headers: { "x-adult-pin": ADULT_PIN }, query: { world: "c_adult" }, body: { action: "resolve_bond", payload: { character: "player1", index: 0 } } });
+  assert.equal(res.body.ok, true);
+  assert.equal(redis.state.characters.player1.bonds[0].resolved, true);
+  assert.equal(redis.state.characters.player1.xp, 20); // 5 + bondXp (15)
+});
+
+test("resolve_bond is idempotent — resolving an already-resolved bond doesn't double-award XP", async (t) => {
+  const redis = statefulRedisMock({
+    session: 1, sessionLog: [], worldConfig: { adult: true }, worldState: {},
+    characters: { player1: { xp: 5, bonds: [{ target: "player2", text: "A debt owed", resolved: false }] } },
+  });
+  t.mock.module("../lib/redis.js", redis);
+
+  await callState({ method: "POST", headers: { "x-adult-pin": ADULT_PIN }, query: { world: "c_adult" }, body: { action: "resolve_bond", payload: { character: "player1", index: 0 } } });
+  await callState({ method: "POST", headers: { "x-adult-pin": ADULT_PIN }, query: { world: "c_adult" }, body: { action: "resolve_bond", payload: { character: "player1", index: 0 } } });
+  assert.equal(redis.state.characters.player1.xp, 20);
+});
+
+test("resolve_bond rejects a kid game", async (t) => {
+  const kidRedis = statefulRedisMock({ session: 1, sessionLog: [], worldState: {}, characters: { player1: { bonds: [] } } });
+  t.mock.module("../lib/redis.js", kidRedis);
+  const kid = await callState({ method: "POST", headers: { "x-adult-pin": ADULT_PIN }, query: { world: "manlandia" }, body: { action: "resolve_bond", payload: { character: "player1", index: 0 } } });
+  assert.equal(kid.statusCode, 400);
+});
+
+test("resolve_bond rejects an invalid bond index", async (t) => {
+  const redis = statefulRedisMock({ session: 1, sessionLog: [], worldState: {}, characters: { fen: { bonds: [] } } });
+  t.mock.module("../lib/redis.js", redis);
+  const badIndex = await callState({ method: "POST", headers: { "x-adult-pin": ADULT_PIN }, query: { world: "resonance" }, body: { action: "resolve_bond", payload: { character: "fen", index: 0 } } });
+  assert.equal(badIndex.statusCode, 400);
+});

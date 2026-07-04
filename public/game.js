@@ -1282,6 +1282,31 @@ function setupWizard() {
       const res = await authPost("/api/state", { action: "choose_ability", payload: { character: choiceBtn.dataset.player, ability_id: choiceBtn.dataset.ability } });
       const data = await res.json();
       if (data.ok) { cachedGameState = { ...cachedGameState, characters: data.characters }; updateCharacterUI({ characters: data.characters }); }
+      return;
+    }
+
+    const bondAddBtn = e.target.closest(".bond-add-btn");
+    if (bondAddBtn) {
+      const row = bondAddBtn.closest(".bond-add-row");
+      const target = bondAddBtn.dataset.target || row.querySelector(".bond-target-select")?.value;
+      const textInput = row.querySelector(".bond-text-input");
+      const text = textInput?.value.trim();
+      if (!target || !text) return;
+      const res = await authPost("/api/state", { action: "add_bond", payload: { character: bondAddBtn.dataset.character, target, text } });
+      const data = await res.json();
+      if (data.ok) {
+        textInput.value = "";
+        cachedGameState = { ...cachedGameState, characters: data.characters };
+        updateCharacterUI({ characters: data.characters });
+      }
+      return;
+    }
+
+    const bondResolveBtn = e.target.closest(".bond-resolve-btn");
+    if (bondResolveBtn) {
+      const res = await authPost("/api/state", { action: "resolve_bond", payload: { character: bondResolveBtn.dataset.character, index: parseInt(bondResolveBtn.dataset.index, 10) } });
+      const data = await res.json();
+      if (data.ok) { cachedGameState = { ...cachedGameState, characters: data.characters }; updateCharacterUI({ characters: data.characters }); }
     }
   });
 }
@@ -1598,6 +1623,7 @@ function renderManlandiaCard(n, char) {
   // campaigns (Manlandia and kid custom worlds use the shared party
   // inventory instead, see renderInventory), so this stays hidden otherwise.
   renderCharInventory(`p${n}`, char?.inventory);
+  renderBondsSection(`p${n}`, p, char);
 }
 
 /* ── Archive ── */
@@ -1703,6 +1729,46 @@ function renderCharInventory(idPrefix, items) {
   if (!list.length) { el.classList.add("hidden"); el.innerHTML = ""; return; }
   el.classList.remove("hidden");
   el.innerHTML = `🎒 ${list.map(escapeHtml).join(", ")}`;
+}
+
+// Bonds — adult games only (Resonance always, adult-flagged custom
+// sometimes; see lib/gamestate.js / lib/gamestate-custom.js). Player-
+// authored, so unlike every other render function in this file the
+// "add a new bond" form is built ONCE and left alone on later calls —
+// rebuilding it every poll would wipe out whatever the player is
+// mid-typing. Only the read-only bonds list is refreshed each time.
+function renderBondsSection(idPrefix, selfKey, character) {
+  const section = document.getElementById(`${idPrefix}-bonds-section`);
+  if (!section) return;
+  if (!character?.bonds) { section.classList.add("hidden"); return; }
+  section.classList.remove("hidden");
+
+  const allCharacters = cachedGameState?.characters || {};
+  const list = section.querySelector(".bonds-list");
+  if (list) {
+    const bonds = character.bonds;
+    list.innerHTML = bonds.length ? bonds.map((b, i) => {
+      const targetName = allCharacters[b.target]?.name || b.target;
+      return `
+        <li class="bond-item${b.resolved ? " resolved" : ""}">
+          <span>→ <strong>${escapeHtml(targetName)}</strong>: ${escapeHtml(b.text)}</span>
+          ${b.resolved ? "" : `<button class="bond-resolve-btn" data-character="${selfKey}" data-index="${i}">✓ Resolve</button>`}
+        </li>`;
+    }).join("") : `<li class="bond-empty">No bonds yet.</li>`;
+  }
+
+  if (!section.querySelector(".bond-add-row")) {
+    const others = Object.entries(allCharacters).filter(([k]) => k !== selfKey);
+    const options = others.map(([k, c]) => `<option value="${k}">${escapeHtml(c?.name || k)}</option>`).join("");
+    const row = document.createElement("div");
+    row.className = "bond-add-row";
+    row.innerHTML = `
+      ${others.length > 1 ? `<select class="bond-target-select">${options}</select>` : ""}
+      <input type="text" class="bond-text-input" maxlength="200" placeholder="I trust/distrust them because…" />
+      <button class="bond-add-btn" data-character="${selfKey}"${others.length === 1 ? ` data-target="${others[0][0]}"` : ""}>Add</button>
+    `;
+    section.appendChild(row);
+  }
 }
 
 // Shared across all world types — generalizes Manlandia's stone tracker
@@ -2191,6 +2257,8 @@ function updateCharacterUI(data) {
 
     renderCharInventory("fen",  chars.fen?.inventory);
     renderCharInventory("lyra", chars.lyra?.inventory);
+    renderBondsSection("fen",  "fen",  chars.fen);
+    renderBondsSection("lyra", "lyra", chars.lyra);
 
     if (ws?.conclave_awareness !== undefined) {
       const badge = document.getElementById("awareness-badge");

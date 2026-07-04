@@ -89,6 +89,47 @@ module.exports = async function handler(req, res) {
       return res.json({ ok: true, characters: current.characters });
     }
 
+    // Bonds — adult games only (Resonance, adult-flagged custom campaigns).
+    // Player-authored relationship statements about another party member,
+    // not a GM-narration tag like NPC/OBJECTIVE — the player decides when to
+    // write and resolve one, so this goes through /api/state like the other
+    // player-driven actions (recover_harm, choose_ability), not /api/gm.
+    function bondsAllowed(current) {
+      return worldConfig.id === "resonance"
+        || (worldConfig.type === "custom" && current.worldConfig?.adult === true);
+    }
+
+    if (action === "add_bond") {
+      const current = (await getState(key)) || getInitialState();
+      if (!bondsAllowed(current)) return res.status(400).json({ error: "Bonds are only available in adult games" });
+      const { character, target, text } = payload || {};
+      const trimmed = typeof text === "string" ? text.trim().slice(0, 200) : "";
+      if (!current.characters[character] || !current.characters[target] || character === target || !trimmed) {
+        return res.status(400).json({ error: "Invalid character, target, or bond text" });
+      }
+      if (!current.characters[character].bonds) current.characters[character].bonds = [];
+      current.characters[character].bonds.push({ target, text: trimmed, resolved: false });
+      await setState(key, current);
+      return res.json({ ok: true, characters: current.characters });
+    }
+
+    if (action === "resolve_bond") {
+      const current = (await getState(key)) || getInitialState();
+      if (!bondsAllowed(current)) return res.status(400).json({ error: "Bonds are only available in adult games" });
+      const { character, index } = payload || {};
+      const bond = current.characters[character]?.bonds?.[index];
+      if (!bond) return res.status(400).json({ error: "Invalid character or bond" });
+      if (bond.resolved) return res.json({ ok: true, characters: current.characters });
+      bond.resolved = true;
+      // Resonance has no XP/growth system at all (see lib/growth.js) — only
+      // adult custom campaigns actually have somewhere to put the reward.
+      if (worldConfig.type === "custom") {
+        Object.assign(current.characters[character], applyXpGain(current.characters[character], GROWTH_CONFIG_ADULT.bondXp, GROWTH_CONFIG_ADULT));
+      }
+      await setState(key, current);
+      return res.json({ ok: true, characters: current.characters });
+    }
+
     if (action === "set_author_note") {
       const current = (await getState(key)) || getInitialState();
       const note = typeof payload?.note === "string" ? payload.note.trim().slice(0, 1000) : "";
