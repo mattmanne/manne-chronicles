@@ -13,6 +13,13 @@ const VALID_ARCHETYPES = Object.keys(ARCHETYPE_STATS);
 const VALID_ABILITIES  = ["animal_friend", "lucky_break", "protect_friend", "ancient_magic"];
 const VALID_PLAYERS    = ["player1", "player2", "player3", "player4"];
 
+// A base64 data URL runs ~4/3 the size of the underlying bytes, so ~280,000
+// characters caps the stored image around 200KB — generous headroom over
+// what the client's own resizeForStorage() actually produces (200x200 JPEG
+// at quality 0.72, typically well under 50KB), while still bounding the
+// Redis payload if that resize step is ever bypassed or changed.
+const MAX_PHOTO_LENGTH = 280000;
+
 module.exports = async function handler(req, res) {
   const allowedOrigin = process.env.ALLOWED_ORIGIN || "*";
   res.setHeader("Access-Control-Allow-Origin", allowedOrigin);
@@ -32,12 +39,15 @@ module.exports = async function handler(req, res) {
   }
 
   const { key } = worldConfig;
-  const { player, name, archetype, ability_id, backstory } = req.body;
+  const { player, name, archetype, ability_id, backstory, photo } = req.body;
 
   if (!VALID_PLAYERS.includes(player))                        return res.status(400).json({ error: "Invalid player" });
   if (!name || typeof name !== "string" || !name.trim())      return res.status(400).json({ error: "Name required" });
   if (!VALID_ARCHETYPES.includes(archetype))                  return res.status(400).json({ error: "Invalid archetype" });
   if (!VALID_ABILITIES.includes(ability_id))                  return res.status(400).json({ error: "Invalid ability" });
+  if (typeof photo === "string" && photo.length > MAX_PHOTO_LENGTH) {
+    return res.status(400).json({ error: "Photo is too large" });
+  }
 
   const gameState = (await getState(key)) || worldConfig.getInitialState();
   const existing  = gameState.characters[player] || {};
@@ -51,6 +61,18 @@ module.exports = async function handler(req, res) {
     ability_used: existing.ability_used ?? false,
     harm:         existing.harm ?? "Unhurt",
     backstory:    typeof backstory === "string" ? backstory.trim() : (existing.backstory ?? ""),
+    // A hero's photo is stored server-side (not localStorage) so it syncs
+    // across every family member's device instead of only the phone it was
+    // uploaded from — omitting the field on later edits (e.g. just fixing a
+    // typo'd name) preserves whatever photo was already saved.
+    photo:        typeof photo === "string" && photo ? photo : (existing.photo ?? ""),
+    // Growth fields (see lib/growth.js) — untouched by name/archetype edits,
+    // just defaulted here so a brand-new character starts from zero instead
+    // of undefined.
+    xp:               existing.xp ?? 0,
+    milestones:       existing.milestones ?? [],
+    bonus_abilities:  existing.bonus_abilities ?? [],
+    pending_choice:   existing.pending_choice ?? null,
   };
 
   await setState(key, gameState);

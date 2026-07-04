@@ -3,6 +3,7 @@ const assert = require("node:assert/strict");
 const {
   normalizeHarm, buildNameToKeyMap, extractRoll, extractCounterUpdate,
   extractCharacterHarmUpdates, extractResonanceHarmUpdates, extractAbilityUsedKeys,
+  objectivesMatch, extractObjectiveUpdates,
 } = require("../lib/gm-tags");
 
 /* ── extractRoll — every variant below is a real string captured from live campaigns ── */
@@ -151,6 +152,18 @@ test("extractCharacterHarmUpdates does not double-count an arrow-less match insi
   assert.deepEqual(updates, [{ key: "player1", harm: "Hurt" }]);
 });
 
+test("extractCharacterHarmUpdates tolerates trailing commentary after the new harm word, live example: '[CHARACTER 1: Scratched → Scratched, no change]'", () => {
+  const characters = { player1: { name: "Globak" } };
+  const updates = extractCharacterHarmUpdates("[CHARACTER 1: Scratched → Scratched, no change]", characters);
+  assert.deepEqual(updates, [{ key: "player1", harm: "Scratched" }]);
+});
+
+test("extractCharacterHarmUpdates's trailing-commentary tolerance also applies to the named-hero variant", () => {
+  const characters = { player1: { name: "Globak" } };
+  const updates = extractCharacterHarmUpdates("[Globak: Scratched → Hurt, wincing in pain]", characters);
+  assert.deepEqual(updates, [{ key: "player1", harm: "Hurt" }]);
+});
+
 /* ── extractResonanceHarmUpdates ── */
 
 test("extractResonanceHarmUpdates matches LYRA/FEN with either arrow style", () => {
@@ -160,6 +173,10 @@ test("extractResonanceHarmUpdates matches LYRA/FEN with either arrow style", () 
 
 test("extractResonanceHarmUpdates ignores an unrecognized harm word", () => {
   assert.deepEqual(extractResonanceHarmUpdates("[LYRA: Unhurt → Deceased]"), []);
+});
+
+test("extractResonanceHarmUpdates tolerates trailing commentary after the new harm word", () => {
+  assert.deepEqual(extractResonanceHarmUpdates("[FEN: Unhurt → Scratched, a bit shaken]"), [{ key: "fen", harm: "Scratched" }]);
 });
 
 /* ── extractAbilityUsedKeys ── */
@@ -189,4 +206,68 @@ test("extractAbilityUsedKeys ignores a character slot that doesn't exist", () =>
 test("buildNameToKeyMap lowercases names and skips characters with no name yet", () => {
   const characters = { player1: { name: "Globak" }, player2: {}, player3: { name: "Orion" } };
   assert.deepEqual(buildNameToKeyMap(characters), { globak: "player1", orion: "player3" });
+});
+
+/* ── objectivesMatch / extractObjectiveUpdates ── */
+
+test("objectivesMatch is true for identical text", () => {
+  assert.equal(objectivesMatch("Find the sword", "Find the sword"), true);
+});
+
+test("objectivesMatch tolerates the model paraphrasing a goal slightly, not just retyping it verbatim", () => {
+  assert.equal(objectivesMatch("Find the sword", "Find the enchanted sword"), true);
+  assert.equal(objectivesMatch("Rescue Bramble", "Go rescue Bramble from the cave"), true);
+});
+
+test("objectivesMatch is false for genuinely unrelated goals", () => {
+  assert.equal(objectivesMatch("Find the sword", "Talk to the merchant"), false);
+});
+
+test("objectivesMatch is false when either side is empty", () => {
+  assert.equal(objectivesMatch("", "Find the sword"), false);
+  assert.equal(objectivesMatch("Find the sword", ""), false);
+});
+
+test("extractObjectiveUpdates adds a new objective not already known", () => {
+  const { additions } = extractObjectiveUpdates("You should find the ancient sword. [OBJECTIVE: Find the ancient sword]", []);
+  assert.deepEqual(additions, ["Find the ancient sword"]);
+});
+
+test("extractObjectiveUpdates does not re-add an objective that already exists (even reworded)", () => {
+  const existing = [{ text: "Find the ancient sword", done: false }];
+  const { additions } = extractObjectiveUpdates("[OBJECTIVE: Find the enchanted ancient sword]", existing);
+  assert.deepEqual(additions, []);
+});
+
+test("extractObjectiveUpdates dedups two near-identical additions within the same response", () => {
+  const { additions } = extractObjectiveUpdates("[OBJECTIVE: Find the sword] Later. [OBJECTIVE: Find the ancient sword]", []);
+  assert.equal(additions.length, 1);
+});
+
+test("extractObjectiveUpdates marks a fuzzy-matching open objective complete", () => {
+  const existing = [{ text: "Find the ancient sword", done: false }];
+  const { completedTexts } = extractObjectiveUpdates("[OBJECTIVE COMPLETE: Find the sword]", existing);
+  assert.deepEqual(completedTexts, ["Find the ancient sword"]);
+});
+
+test("extractObjectiveUpdates ignores a completion that doesn't match anything open", () => {
+  const existing = [{ text: "Find the ancient sword", done: false }];
+  const { completedTexts } = extractObjectiveUpdates("[OBJECTIVE COMPLETE: Rescue the princess]", existing);
+  assert.deepEqual(completedTexts, []);
+});
+
+test("extractObjectiveUpdates does not re-complete an objective that's already done", () => {
+  const existing = [{ text: "Find the ancient sword", done: true }];
+  const { completedTexts } = extractObjectiveUpdates("[OBJECTIVE COMPLETE: Find the ancient sword]", existing);
+  assert.deepEqual(completedTexts, []);
+});
+
+test("extractObjectiveUpdates handles both an addition and a completion in the same response", () => {
+  const existing = [{ text: "Find the ancient sword", done: false }];
+  const { additions, completedTexts } = extractObjectiveUpdates(
+    "[OBJECTIVE COMPLETE: Find the ancient sword]\n[OBJECTIVE: Return the sword to the shrine]",
+    existing
+  );
+  assert.deepEqual(additions, ["Return the sword to the shrine"]);
+  assert.deepEqual(completedTexts, ["Find the ancient sword"]);
 });

@@ -26,6 +26,7 @@
         <span class="world-btn-sub">The Family Adventure</span>
       </button>
       <div id="custom-campaigns-list"></div>
+      <button id="show-archived-toggle" class="show-archived-toggle hidden" type="button"></button>
       <button id="create-world-btn" class="world-btn world-btn-new">
         <span class="world-btn-name">✨ New World</span>
         <span class="world-btn-sub">Create your own adventure</span>
@@ -39,8 +40,8 @@
   <div id="world-creator">
     <div class="world-creator-box">
       <div class="world-creator-header">
-        <span class="world-creator-title">✨ Create Your World</span>
-        <button id="wc-close-btn" class="wc-close-btn">✕</button>
+        <span class="world-creator-title" id="wc-title">✨ Create Your World</span>
+        <button id="wc-close-btn" class="wc-close-btn" aria-label="Close world creator">✕</button>
       </div>
       <div class="world-creator-body">
         <div class="wc-field">
@@ -59,7 +60,7 @@
             <label for="wc-adult-checkbox" class="wc-adult-label">Adult world — mature themes, no kid-safety guardrails</label>
           </div>
         </div>
-        <div class="wc-field">
+        <div class="wc-field" id="wc-count-field">
           <label class="wc-label">How many heroes?</label>
           <div class="wc-count-btns">
             <button class="wc-count-btn" data-count="1">1</button>
@@ -67,6 +68,7 @@
             <button class="wc-count-btn" data-count="3">3</button>
             <button class="wc-count-btn" data-count="4">4</button>
           </div>
+          <p class="wc-hint hidden" id="wc-locked-hint">Hero count and world type can't be changed after a world is created.</p>
         </div>
       </div>
       <div class="world-creator-footer">
@@ -94,8 +96,10 @@
       <div class="recap-title">The Story So Far</div>
       <p id="recap-text" class="recap-text"></p>
       <div class="recap-actions">
+        <button id="recap-share-btn" class="secondary-btn" type="button">📤 Share</button>
         <button id="recap-close-btn" class="wc-cancel-btn">Close</button>
       </div>
+      <span id="recap-share-status" role="status"></span>
     </div>
   </div>
 
@@ -202,14 +206,14 @@
     <div class="help-box">
       <div class="help-header">
         <span class="help-title">❓ Ask for Help</span>
-        <button id="help-close-btn" class="icon-btn">✕</button>
+        <button id="help-close-btn" class="icon-btn" aria-label="Close help">✕</button>
       </div>
       <div id="help-messages" class="help-messages">
         <div class="help-msg-a">Hi! Ask me anything about the game — rules, your characters, what the dice mean, or what's happening in the story. I'm here to help! 🌟</div>
       </div>
       <div class="help-input-row">
         <input type="text" id="help-input" class="help-input" placeholder="Ask anything about the game…" maxlength="300" autocomplete="off" autocorrect="off" />
-        <button id="help-voice-btn" class="help-voice-btn" title="Speak your question">🎤</button>
+        <button id="help-voice-btn" class="help-voice-btn" title="Speak your question" aria-label="Speak your question">🎤</button>
         <button id="help-send-btn" class="help-send-btn">Ask</button>
       </div>
     </div>
@@ -287,8 +291,8 @@
           <div id="suggestion-chips" class="hidden"></div>
           <div id="action-row">
             <input type="text" id="action-input" placeholder="What do you do?" autocomplete="off" autocorrect="off" />
-            <button id="voice-btn" title="Speak your action">🎤</button>
-            <button id="send-btn" title="Send">▶</button>
+            <button id="voice-btn" title="Speak your action" aria-label="Speak your action">🎤</button>
+            <button id="send-btn" title="Send" aria-label="Send">▶</button>
           </div>
           <div id="voice-status" class="hidden">Listening…</div>
         </footer>
@@ -376,6 +380,7 @@
                   <span id="p1-harm" class="harm-value Unhurt" data-player="player1">Unhurt</span>
                 </div>
                 <div class="ability-row" id="p1-ability-row"></div>
+                <div class="char-growth" id="p1-growth"></div>
                 <div class="card-actions" id="p1-card-actions"></div>
                 <div class="char-backstory hidden" id="p1-backstory"></div>
               </div>
@@ -392,6 +397,7 @@
                   <span id="p2-harm" class="harm-value Unhurt" data-player="player2">Unhurt</span>
                 </div>
                 <div class="ability-row" id="p2-ability-row"></div>
+                <div class="char-growth" id="p2-growth"></div>
                 <div class="card-actions" id="p2-card-actions"></div>
                 <div class="char-backstory hidden" id="p2-backstory"></div>
               </div>
@@ -408,6 +414,7 @@
                   <span id="p3-harm" class="harm-value Unhurt" data-player="player3">Unhurt</span>
                 </div>
                 <div class="ability-row" id="p3-ability-row"></div>
+                <div class="char-growth" id="p3-growth"></div>
                 <div class="card-actions" id="p3-card-actions"></div>
                 <div class="char-backstory hidden" id="p3-backstory"></div>
               </div>
@@ -424,6 +431,7 @@
                   <span id="p4-harm" class="harm-value Unhurt" data-player="player4">Unhurt</span>
                 </div>
                 <div class="ability-row" id="p4-ability-row"></div>
+                <div class="char-growth" id="p4-growth"></div>
                 <div class="card-actions" id="p4-card-actions"></div>
                 <div class="char-backstory hidden" id="p4-backstory"></div>
               </div>
@@ -439,6 +447,17 @@
       <div id="tab-archive" class="tab-panel">
         <div class="archive-header">
           <button id="export-btn" class="export-btn">⬇ Export</button>
+        </div>
+        <div class="author-note-section">
+          <button id="author-note-toggle" class="secondary-btn" type="button" aria-expanded="false" aria-controls="author-note-panel">📝 Author's Note</button>
+          <div id="author-note-panel" class="hidden">
+            <p class="author-note-hint">Facts the GM should always remember and never contradict — e.g. "Grandpa Joe is secretly the villain."</p>
+            <textarea id="author-note-input" maxlength="1000" placeholder="Nothing set yet…" aria-label="Author's Note"></textarea>
+            <div class="author-note-actions">
+              <button id="author-note-save" class="secondary-btn" type="button">Save Note</button>
+              <span id="author-note-status" role="status"></span>
+            </div>
+          </div>
         </div>
         <div class="tab-scroll" id="archive-content">
           <div class="archive-empty">No sessions archived yet.<br>End a session to save it here.</div>
@@ -518,6 +537,12 @@
 
           <!-- Custom campaign map (shown for c_ worlds only, outside resonance/manlandia wrappers) -->
           <div id="map-container-custom" style="display:none"></div>
+
+          <!-- Objective/quest checklist — shared across all world types -->
+          <div id="objectives-panel" class="hidden">
+            <div class="objectives-label">QUEST LOG</div>
+            <ul id="objectives-list" class="objectives-list"></ul>
+          </div>
 
         </div>
       </div>

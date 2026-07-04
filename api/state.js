@@ -2,6 +2,7 @@ const { getState, setState } = require("../lib/redis");
 const { HARM_LEVELS } = require("../lib/gamestate");
 const { getWorldConfig } = require("../lib/worldconfig");
 const { checkAdultAccess } = require("../lib/adultgate");
+const { GROWTH_CONFIG_KID, GROWTH_CONFIG_ADULT, applyXpGain, chooseAbility } = require("../lib/growth");
 
 module.exports = async function handler(req, res) {
   const allowedOrigin = process.env.ALLOWED_ORIGIN || "*";
@@ -77,6 +78,25 @@ module.exports = async function handler(req, res) {
       return res.json({ ok: false, error: "Already unhurt", characters: current.characters });
     }
 
+    if (action === "choose_ability") {
+      const current = (await getState(key)) || getInitialState();
+      const { character, ability_id } = payload || {};
+      if (!current.characters[character]) return res.status(400).json({ error: "Invalid character" });
+      const result = chooseAbility(current.characters[character], ability_id);
+      if (!result) return res.status(400).json({ error: "That power isn't available to choose right now" });
+      Object.assign(current.characters[character], result);
+      await setState(key, current);
+      return res.json({ ok: true, characters: current.characters });
+    }
+
+    if (action === "set_author_note") {
+      const current = (await getState(key)) || getInitialState();
+      const note = typeof payload?.note === "string" ? payload.note.trim().slice(0, 1000) : "";
+      current.worldState.author_note = note;
+      await setState(key, current);
+      return res.json({ ok: true, author_note: note });
+    }
+
     if (action === "new_session") {
       const current = (await getState(key)) || getInitialState();
       if (!current.worldState.session_archive) current.worldState.session_archive = [];
@@ -102,6 +122,40 @@ module.exports = async function handler(req, res) {
           if (current.characters[p]) current.characters[p].ability_used = false;
         });
       }
+
+      // Harm reset on a new session — a fresh start for kid games, but adult
+      // games keep some narrative weight between sessions rather than
+      // wiping the slate clean. `new_session` previously never touched harm
+      // at all, which meant a character who ended a session "Broken" started
+      // the next one still "Broken."
+      const isAdultGame = worldConfig.id === "resonance"
+        || (worldConfig.type === "custom" && current.worldConfig?.adult === true);
+
+      // Baseline XP growth (see lib/growth.js) — Resonance is excluded
+      // entirely (Lyra/Fen already have 3 fixed, bespoke abilities apiece
+      // with no unlockable pool). Only grows heroes that actually exist
+      // (have picked an archetype) rather than the 4 empty character slots.
+      if (worldConfig.id === "manlandia" || worldConfig.type === "custom") {
+        const growthConfig = isAdultGame ? GROWTH_CONFIG_ADULT : GROWTH_CONFIG_KID;
+        ["player1", "player2", "player3", "player4"].forEach((p) => {
+          const c = current.characters[p];
+          if (!c || !c.archetype) return;
+          Object.assign(c, applyXpGain(c, growthConfig.baselineXp, growthConfig));
+        });
+      }
+      const characterKeys = worldConfig.id === "resonance"
+        ? ["lyra", "fen"]
+        : ["player1", "player2", "player3", "player4"];
+      characterKeys.forEach((k) => {
+        const c = current.characters[k];
+        if (!c) return;
+        if (isAdultGame) {
+          const idx = HARM_LEVELS.indexOf(c.harm);
+          if (idx > 0) c.harm = HARM_LEVELS[Math.max(0, idx - 2)];
+        } else {
+          c.harm = "Unhurt";
+        }
+      });
 
       await setState(key, current);
       return res.json({ ok: true, session: current.session });

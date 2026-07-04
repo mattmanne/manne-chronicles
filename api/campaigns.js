@@ -45,11 +45,54 @@ module.exports = async function handler(req, res) {
         playerCount: wc.playerCount,
         adult:       wc.adult,
         createdAt:   Date.now(),
+        status:      "active",
       };
       index.push(entry);
       await setState("campaigns:index", index);
 
       return res.json({ ok: true, campaign: entry });
+    }
+
+    if (action === "update") {
+      const { id, name, theme } = payload || {};
+      if (!id || !String(id).startsWith("c_")) return res.status(400).json({ error: "Invalid campaign ID" });
+      if (!name || !String(name).trim()) return res.status(400).json({ error: "Name required" });
+      if (!theme || !String(theme).trim()) return res.status(400).json({ error: "Theme required" });
+
+      const gsKey = `campaign:${id}:gamestate`;
+      const gameState = await getState(gsKey);
+      if (!gameState) return res.status(404).json({ error: "Campaign not found" });
+
+      const trimmedName  = String(name).trim().slice(0, 40);
+      const trimmedTheme = String(theme).trim().slice(0, 600);
+
+      // playerCount and adult are intentionally NOT editable here — changing
+      // playerCount after characters already exist risks orphaning a hero's
+      // data, and adult is a content-safety boundary, not a typo to fix.
+      gameState.worldConfig = { ...gameState.worldConfig, name: trimmedName, theme: trimmedTheme };
+      await setState(gsKey, gameState);
+
+      const index = (await getState("campaigns:index")) || [];
+      const subtitle = trimmedTheme.slice(0, 70) + (trimmedTheme.length > 70 ? "…" : "");
+      const updatedIndex = index.map((c) => c.id === id ? { ...c, name: trimmedName, subtitle } : c);
+      await setState("campaigns:index", updatedIndex);
+
+      return res.json({ ok: true, campaign: updatedIndex.find((c) => c.id === id) });
+    }
+
+    // Archive/unarchive: a reversible alternative to delete for a campaign
+    // you just don't want cluttering the world selector anymore, without
+    // losing anything (unlike delete, which is permanent and — per a known
+    // existing quirk — also never cleans up the underlying gamestate key).
+    if (action === "archive" || action === "unarchive") {
+      const { id } = payload || {};
+      if (!id || !String(id).startsWith("c_")) return res.status(400).json({ error: "Invalid campaign ID" });
+      const index = (await getState("campaigns:index")) || [];
+      if (!index.some((c) => c.id === id)) return res.status(404).json({ error: "Campaign not found" });
+      const status = action === "archive" ? "archived" : "active";
+      const updatedIndex = index.map((c) => c.id === id ? { ...c, status } : c);
+      await setState("campaigns:index", updatedIndex);
+      return res.json({ ok: true, campaign: updatedIndex.find((c) => c.id === id) });
     }
 
     if (action === "delete") {

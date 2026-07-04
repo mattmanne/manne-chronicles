@@ -80,6 +80,123 @@ test("create truncates overly long names and themes, and shortens the subtitle w
   assert.equal(redis.get(`campaign:${res.body.campaign.id}:gamestate`).worldConfig.theme.length, 600);
 });
 
+test("update requires a valid id, name, and theme", async (t) => {
+  t.mock.module("../lib/redis.js", keyedRedisMock());
+
+  const badId = await callCampaigns({ method: "POST", headers: {}, query: {}, body: { action: "update", payload: { id: "not-a-campaign", name: "A", theme: "T" } } });
+  assert.equal(badId.statusCode, 400);
+
+  const noName = await callCampaigns({ method: "POST", headers: {}, query: {}, body: { action: "update", payload: { id: "c_1", theme: "T" } } });
+  assert.equal(noName.statusCode, 400);
+
+  const noTheme = await callCampaigns({ method: "POST", headers: {}, query: {}, body: { action: "update", payload: { id: "c_1", name: "A" } } });
+  assert.equal(noTheme.statusCode, 400);
+});
+
+test("update returns 404 for a campaign whose gamestate doesn't exist", async (t) => {
+  t.mock.module("../lib/redis.js", keyedRedisMock());
+  const res = await callCampaigns({ method: "POST", headers: {}, query: {}, body: { action: "update", payload: { id: "c_missing", name: "A", theme: "T" } } });
+  assert.equal(res.statusCode, 404);
+});
+
+test("update changes name/theme on both the index and the campaign's own gamestate, but leaves playerCount and adult untouched", async (t) => {
+  const redis = keyedRedisMock({
+    "campaigns:index": [{ id: "c_1", name: "Star Reach", subtitle: "Space pirates", playerCount: 3, adult: true }],
+    "campaign:c_1:gamestate": { worldConfig: { id: "c_1", name: "Star Reach", theme: "Space pirates", playerCount: 3, adult: true } },
+  });
+  t.mock.module("../lib/redis.js", redis);
+
+  const res = await callCampaigns({ method: "POST", headers: {}, query: {}, body: { action: "update", payload: { id: "c_1", name: "Star Reach II", theme: "Space pirates hunting a lost relic" } } });
+  assert.equal(res.body.ok, true);
+  assert.equal(res.body.campaign.name, "Star Reach II");
+  assert.equal(res.body.campaign.subtitle, "Space pirates hunting a lost relic");
+
+  const indexEntry = redis.get("campaigns:index")[0];
+  assert.equal(indexEntry.name, "Star Reach II");
+  // Untouched even though not in the payload — playerCount/adult are locked.
+  assert.equal(indexEntry.playerCount, 3);
+  assert.equal(indexEntry.adult, true);
+
+  const gs = redis.get("campaign:c_1:gamestate");
+  assert.equal(gs.worldConfig.name, "Star Reach II");
+  assert.equal(gs.worldConfig.theme, "Space pirates hunting a lost relic");
+  assert.equal(gs.worldConfig.playerCount, 3);
+  assert.equal(gs.worldConfig.adult, true);
+});
+
+test("update ignores a playerCount or adult value sent in the payload", async (t) => {
+  const redis = keyedRedisMock({
+    "campaigns:index": [{ id: "c_1", name: "Star Reach", subtitle: "Space pirates", playerCount: 2, adult: false }],
+    "campaign:c_1:gamestate": { worldConfig: { id: "c_1", name: "Star Reach", theme: "Space pirates", playerCount: 2, adult: false } },
+  });
+  t.mock.module("../lib/redis.js", redis);
+
+  await callCampaigns({ method: "POST", headers: {}, query: {}, body: { action: "update", payload: { id: "c_1", name: "Star Reach", theme: "Space pirates", playerCount: 4, adult: true } } });
+  assert.equal(redis.get("campaign:c_1:gamestate").worldConfig.playerCount, 2);
+  assert.equal(redis.get("campaign:c_1:gamestate").worldConfig.adult, false);
+  assert.equal(redis.get("campaigns:index")[0].playerCount, 2);
+  assert.equal(redis.get("campaigns:index")[0].adult, false);
+});
+
+test("update truncates an overly long name and theme", async (t) => {
+  const redis = keyedRedisMock({
+    "campaigns:index": [{ id: "c_1", name: "Star Reach", subtitle: "Space pirates" }],
+    "campaign:c_1:gamestate": { worldConfig: { id: "c_1", name: "Star Reach", theme: "Space pirates" } },
+  });
+  t.mock.module("../lib/redis.js", redis);
+
+  const longName  = "N".repeat(100);
+  const longTheme = "T".repeat(1000);
+  await callCampaigns({ method: "POST", headers: {}, query: {}, body: { action: "update", payload: { id: "c_1", name: longName, theme: longTheme } } });
+  assert.equal(redis.get("campaign:c_1:gamestate").worldConfig.name.length, 40);
+  assert.equal(redis.get("campaign:c_1:gamestate").worldConfig.theme.length, 600);
+  assert.ok(redis.get("campaigns:index")[0].subtitle.endsWith("…"));
+});
+
+test("create marks a new campaign as active by default", async (t) => {
+  const redis = keyedRedisMock();
+  t.mock.module("../lib/redis.js", redis);
+  const res = await callCampaigns({ method: "POST", headers: {}, query: {}, body: { action: "create", payload: { name: "Star Reach", theme: "Space pirates" } } });
+  assert.equal(res.body.campaign.status, "active");
+});
+
+test("archive and unarchive toggle a campaign's status, reversibly", async (t) => {
+  const redis = keyedRedisMock({ "campaigns:index": [{ id: "c_1", name: "Star Reach", status: "active" }] });
+  t.mock.module("../lib/redis.js", redis);
+
+  const archived = await callCampaigns({ method: "POST", headers: {}, query: {}, body: { action: "archive", payload: { id: "c_1" } } });
+  assert.equal(archived.body.ok, true);
+  assert.equal(redis.get("campaigns:index")[0].status, "archived");
+
+  const restored = await callCampaigns({ method: "POST", headers: {}, query: {}, body: { action: "unarchive", payload: { id: "c_1" } } });
+  assert.equal(restored.body.ok, true);
+  assert.equal(redis.get("campaigns:index")[0].status, "active");
+});
+
+test("archive rejects an invalid id or a campaign that doesn't exist", async (t) => {
+  const redis = keyedRedisMock({ "campaigns:index": [{ id: "c_1", name: "Star Reach", status: "active" }] });
+  t.mock.module("../lib/redis.js", redis);
+
+  const badId = await callCampaigns({ method: "POST", headers: {}, query: {}, body: { action: "archive", payload: { id: "not-a-campaign" } } });
+  assert.equal(badId.statusCode, 400);
+
+  const missing = await callCampaigns({ method: "POST", headers: {}, query: {}, body: { action: "archive", payload: { id: "c_999" } } });
+  assert.equal(missing.statusCode, 404);
+});
+
+test("archiving one campaign leaves the others untouched", async (t) => {
+  const redis = keyedRedisMock({ "campaigns:index": [
+    { id: "c_1", name: "Star Reach", status: "active" },
+    { id: "c_2", name: "Dark Wars", status: "active" },
+  ] });
+  t.mock.module("../lib/redis.js", redis);
+
+  await callCampaigns({ method: "POST", headers: {}, query: {}, body: { action: "archive", payload: { id: "c_1" } } });
+  const index = redis.get("campaigns:index");
+  assert.equal(index.find(c => c.id === "c_1").status, "archived");
+  assert.equal(index.find(c => c.id === "c_2").status, "active");
+});
+
 test("delete removes the campaign from the index but rejects a non c_ id", async (t) => {
   const redis = keyedRedisMock({ "campaigns:index": [{ id: "c_1", name: "Star Reach" }, { id: "c_2", name: "Dark Wars" }] });
   t.mock.module("../lib/redis.js", redis);

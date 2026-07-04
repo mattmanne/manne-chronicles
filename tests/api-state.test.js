@@ -133,6 +133,133 @@ test("new_session archives the log, increments the session, and resets Resonance
   assert.equal(redis.state.characters.fen.lucky_break_used, false);
 });
 
+test("new_session fully resets harm to Unhurt for kid games (Manlandia)", async (t) => {
+  const seeded = {
+    session: 1,
+    sessionLog: [],
+    worldState: {},
+    characters: {
+      player1: { harm: "Broken", ability_used: true },
+      player2: { harm: "Hurt", ability_used: false },
+    },
+  };
+  const redis = statefulRedisMock(seeded);
+  t.mock.module("../lib/redis.js", redis);
+
+  await callState({ method: "POST", headers: { "x-adult-pin": ADULT_PIN }, query: { world: "manlandia" }, body: { action: "new_session", payload: { summary: "They rested." } } });
+  assert.equal(redis.state.characters.player1.harm, "Unhurt");
+  assert.equal(redis.state.characters.player2.harm, "Unhurt");
+});
+
+test("new_session only partially heals harm for adult games (Resonance) — steps down at most 2 levels", async (t) => {
+  const seeded = {
+    session: 1,
+    sessionLog: [],
+    worldState: {},
+    characters: {
+      lyra: { harm: "Dying", weight_of_knowing_used: false, magic_uses_remaining: 3 },
+      fen: { harm: "Hurt", not_on_my_watch_used: false, lucky_break_used: false },
+    },
+  };
+  const redis = statefulRedisMock(seeded);
+  t.mock.module("../lib/redis.js", redis);
+
+  await callState({ method: "POST", headers: { "x-adult-pin": ADULT_PIN }, query: { world: "resonance" }, body: { action: "new_session", payload: { summary: "A rough night." } } });
+  // Dying (index 5) steps down 2 to Wounded (index 3), not all the way to Unhurt.
+  assert.equal(redis.state.characters.lyra.harm, "Wounded");
+  // Hurt (index 2) steps down 2 to Unhurt (index 0), floored rather than negative.
+  assert.equal(redis.state.characters.fen.harm, "Unhurt");
+});
+
+test("new_session on a non-adult custom world fully resets harm", async (t) => {
+  const kidWorld = {
+    session: 1,
+    sessionLog: [],
+    worldConfig: { adult: false },
+    worldState: {},
+    characters: { player1: { harm: "Wounded", ability_used: false } },
+  };
+  const kidRedis = statefulRedisMock(kidWorld);
+  t.mock.module("../lib/redis.js", kidRedis);
+  await callState({ method: "POST", headers: { "x-adult-pin": ADULT_PIN }, query: { world: "c_1" }, body: { action: "new_session", payload: { summary: "..." } } });
+  assert.equal(kidRedis.state.characters.player1.harm, "Unhurt");
+});
+
+test("new_session on an adult-flagged custom world only partially heals harm", async (t) => {
+  const adultWorld = {
+    session: 1,
+    sessionLog: [],
+    worldConfig: { adult: true },
+    worldState: {},
+    characters: { player1: { harm: "Wounded", ability_used: false } },
+  };
+  const adultRedis = statefulRedisMock(adultWorld);
+  t.mock.module("../lib/redis.js", adultRedis);
+  await callState({ method: "POST", headers: { "x-adult-pin": ADULT_PIN }, query: { world: "c_2" }, body: { action: "new_session", payload: { summary: "..." } } });
+  // Wounded (index 3) steps down 2 to Scratched (index 1).
+  assert.equal(adultRedis.state.characters.player1.harm, "Scratched");
+});
+
+test("new_session awards baseline XP to created heroes in Manlandia, but not to empty character slots", async (t) => {
+  const seeded = {
+    session: 1,
+    sessionLog: [],
+    worldState: {},
+    characters: {
+      player1: { archetype: "fighter", ability_id: "lucky_break", xp: 5, harm: "Unhurt" },
+      player2: {},
+    },
+  };
+  const redis = statefulRedisMock(seeded);
+  t.mock.module("../lib/redis.js", redis);
+
+  await callState({ method: "POST", headers: { "x-adult-pin": ADULT_PIN }, query: { world: "manlandia" }, body: { action: "new_session", payload: { summary: "..." } } });
+  assert.equal(redis.state.characters.player1.xp, 15);
+  assert.equal(redis.state.characters.player2.xp, undefined);
+});
+
+test("new_session does not grow characters in Resonance (no unlockable ability pool)", async (t) => {
+  const seeded = {
+    session: 1,
+    sessionLog: [],
+    worldState: {},
+    characters: {
+      lyra: { weight_of_knowing_used: true, magic_uses_remaining: 0, harm: "Unhurt" },
+      fen: { not_on_my_watch_used: true, lucky_break_used: true, harm: "Unhurt" },
+    },
+  };
+  const redis = statefulRedisMock(seeded);
+  t.mock.module("../lib/redis.js", redis);
+
+  await callState({ method: "POST", headers: { "x-adult-pin": ADULT_PIN }, query: { world: "resonance" }, body: { action: "new_session", payload: { summary: "..." } } });
+  assert.equal(redis.state.characters.lyra.xp, undefined);
+  assert.equal(redis.state.characters.fen.xp, undefined);
+});
+
+test("choose_ability adds the picked power and rejects one that wasn't offered", async (t) => {
+  const seeded = {
+    session: 1, sessionLog: [], worldState: {},
+    characters: { player1: { bonus_abilities: [], pending_choice: { options: ["animal_friend", "protect_friend"] } } },
+  };
+  const redis = statefulRedisMock(seeded);
+  t.mock.module("../lib/redis.js", redis);
+
+  const bad = await callState({ method: "POST", headers: { "x-adult-pin": ADULT_PIN }, query: { world: "manlandia" }, body: { action: "choose_ability", payload: { character: "player1", ability_id: "ancient_magic" } } });
+  assert.equal(bad.statusCode, 400);
+
+  const good = await callState({ method: "POST", headers: { "x-adult-pin": ADULT_PIN }, query: { world: "manlandia" }, body: { action: "choose_ability", payload: { character: "player1", ability_id: "animal_friend" } } });
+  assert.equal(good.body.ok, true);
+  assert.deepEqual(redis.state.characters.player1.bonus_abilities, ["animal_friend"]);
+  assert.equal(redis.state.characters.player1.pending_choice, null);
+});
+
+test("choose_ability rejects an invalid character", async (t) => {
+  const redis = statefulRedisMock({ session: 1, sessionLog: [], worldState: {}, characters: {} });
+  t.mock.module("../lib/redis.js", redis);
+  const res = await callState({ method: "POST", headers: { "x-adult-pin": ADULT_PIN }, query: { world: "manlandia" }, body: { action: "choose_ability", payload: { character: "player9", ability_id: "animal_friend" } } });
+  assert.equal(res.statusCode, 400);
+});
+
 test("new_session resets ability_used for each hero in Manlandia", async (t) => {
   const seeded = {
     session: 1,
@@ -152,6 +279,26 @@ test("new_session resets ability_used for each hero in Manlandia", async (t) => 
   for (const p of ["player1", "player2", "player3", "player4"]) {
     assert.equal(redis.state.characters[p].ability_used, false);
   }
+});
+
+test("set_author_note stores a trimmed note, capped at 1000 characters", async (t) => {
+  const redis = statefulRedisMock({ session: 1, sessionLog: [], worldState: {}, characters: {} });
+  t.mock.module("../lib/redis.js", redis);
+
+  const res = await callState({ method: "POST", headers: { "x-adult-pin": ADULT_PIN }, query: { world: "resonance" }, body: { action: "set_author_note", payload: { note: "  Grandpa Joe is secretly the villain.  " } } });
+  assert.equal(res.body.ok, true);
+  assert.equal(redis.state.worldState.author_note, "Grandpa Joe is secretly the villain.");
+
+  const long = await callState({ method: "POST", headers: { "x-adult-pin": ADULT_PIN }, query: { world: "resonance" }, body: { action: "set_author_note", payload: { note: "x".repeat(2000) } } });
+  assert.equal(long.body.author_note.length, 1000);
+});
+
+test("set_author_note falls back to an empty string for a non-string note", async (t) => {
+  const redis = statefulRedisMock({ session: 1, sessionLog: [], worldState: { author_note: "old note" }, characters: {} });
+  t.mock.module("../lib/redis.js", redis);
+
+  await callState({ method: "POST", headers: { "x-adult-pin": ADULT_PIN }, query: { world: "resonance" }, body: { action: "set_author_note", payload: { note: 12345 } } });
+  assert.equal(redis.state.worldState.author_note, "");
 });
 
 test("an unknown action returns 400", async (t) => {

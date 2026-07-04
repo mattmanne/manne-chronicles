@@ -57,16 +57,20 @@ function stripGMTags(content) {
     .replace(new RegExp(`\\[VILLAIN AWARENESS: \\d+\\s*${ARROW}\\s*\\d+\\]`, "g"), "")
     .replace(new RegExp(`\\[CURSE: \\d+\\s*${ARROW}\\s*\\d+\\]`, "g"), "")
     .replace(/\[STONE FOUND: [^\]]+\]/g, "")
-    .replace(new RegExp(`\\[CHARACTER \\d:\\s*[A-Za-z]+\\s*${ARROW}\\s*[A-Za-z]+\\]`, "gi"), "")
+    // Trailing [^\]]* tolerates the model appending commentary after the new
+    // harm word — live: "[CHARACTER 1: Scratched → Scratched, no change]".
+    .replace(new RegExp(`\\[CHARACTER \\d:\\s*[A-Za-z]+\\s*${ARROW}\\s*[A-Za-z]+[^\\]]*\\]`, "gi"), "")
     // Also strip the arrow-less variant — live example: "[CHARACTER 1: Hurt]".
     .replace(/\[CHARACTER \d:\s*[A-Za-z]+\s*\]/gi, "")
     .replace(/\[LOCATION: [^\]]+\]/g, "")
     .replace(/\[SCAR: [^\]]+\]/g, "")
-    .replace(new RegExp(`\\[(LYRA|FEN):\\s*[A-Za-z]+\\s*${ARROW}\\s*[A-Za-z]+\\]`, "gi"), "")
+    .replace(new RegExp(`\\[(LYRA|FEN):\\s*[A-Za-z]+\\s*${ARROW}\\s*[A-Za-z]+[^\\]]*\\]`, "gi"), "")
     .replace(/\[ABILITY \d: [^\]]*used[^\]]*\]/gi, "")
     .replace(/\[ABILITY (FEN|LYRA): [a-z_]+\]/gi, "")
     .replace(/\[SUGGESTIONS: [^\]]+\]/gi, "")
-    .replace(new RegExp(`\\[[A-Za-z]+:\\s*[A-Za-z]+\\s*${ARROW}\\s*[A-Za-z]+\\]`, "g"), "").trim();
+    .replace(/\[OBJECTIVE(?: COMPLETE)?: [^\]]+\]/gi, "")
+    .replace(/\[XP \d: \+\d+\]/gi, "")
+    .replace(new RegExp(`\\[[A-Za-z]+:\\s*[A-Za-z]+\\s*${ARROW}\\s*[A-Za-z]+[^\\]]*\\]`, "g"), "").trim();
 }
 
 function getCleanText(text) {

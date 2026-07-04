@@ -10,8 +10,11 @@ const {
   extractCharacterHarmUpdates,
   extractResonanceHarmUpdates,
   extractAbilityUsedKeys,
+  extractObjectiveUpdates,
+  extractXpBonuses,
 } = require("../lib/gm-tags");
 const { selectNotifyTargets, buildNotificationPayload } = require("../lib/push");
+const { GROWTH_CONFIG_KID, GROWTH_CONFIG_ADULT, applyXpGain } = require("../lib/growth");
 const webpush = require("web-push");
 
 const MAX_HISTORY = 40; // entries of context sent to the LLM per turn — bounds prompt cost; full log is still stored
@@ -84,6 +87,20 @@ function matchManlandiaLocationId(name) {
   return null;
 }
 
+// Manlandia/Resonance match against a fixed list of known place names for a
+// curated, pre-drawn map. Custom worlds have no such list — the GM invents
+// arbitrary locations per campaign — so the location's own text IS its id.
+// This means `visited_locations`/`location_scars` (previously always empty
+// for custom worlds, since the old () => null here meant nothing ever
+// passed the shared LOCATION/SCAR handling's `if (locId)` check) start
+// getting populated for the journey-trail map in public/game.js. Dedup is
+// exact-string, so a revisit narrated with different casing/wording won't
+// be caught as the same place — a known, deliberately accepted v1
+// limitation, same as every other tag in this app that started this way.
+function matchCustomLocationId(name) {
+  return name.trim();
+}
+
 function matchStoneId(name) {
   const s = name.toLowerCase().trim();
   return STONE_IDS.includes(s) ? s : null;
@@ -125,6 +142,18 @@ function applyStateTags(cleanResponse, gameState, worldConfig, matchLocationId) 
     }
   }
 
+  // Objective/quest tracking — shared across all world types (generalizes
+  // Manlandia's stone tracker, the only world with structured quest state before this).
+  if (!gameState.worldState.objectives) gameState.worldState.objectives = [];
+  const objectiveUpdates = extractObjectiveUpdates(cleanResponse, gameState.worldState.objectives);
+  for (const text of objectiveUpdates.additions) {
+    gameState.worldState.objectives.push({ text, done: false });
+  }
+  for (const text of objectiveUpdates.completedTexts) {
+    const obj = gameState.worldState.objectives.find(o => o.text === text);
+    if (obj) obj.done = true;
+  }
+
   if (worldConfig.id === "manlandia" || worldConfig.type === "custom") {
     const villainUpdate = extractCounterUpdate(cleanResponse, "VILLAIN AWARENESS");
     if (villainUpdate !== null) gameState.worldState.villain_awareness = villainUpdate;
@@ -152,6 +181,17 @@ function applyStateTags(cleanResponse, gameState, worldConfig, matchLocationId) 
 
     for (const key of extractAbilityUsedKeys(cleanResponse, gameState.characters)) {
       gameState.characters[key].ability_used = true;
+    }
+
+    // Bonus XP for a notable moment — on top of the baseline every character
+    // already gets on new_session (see api/state.js and lib/growth.js).
+    // Resonance is excluded from the whole growth system, so this only runs
+    // in this branch.
+    const isAdultGame = worldConfig.type === "custom" && gameState.worldConfig?.adult === true;
+    const growthConfig = isAdultGame ? GROWTH_CONFIG_ADULT : GROWTH_CONFIG_KID;
+    for (const { key, amount } of extractXpBonuses(cleanResponse)) {
+      if (!gameState.characters[key]) continue;
+      Object.assign(gameState.characters[key], applyXpGain(gameState.characters[key], amount, growthConfig));
     }
   } else {
     const awarenessUpdate = extractCounterUpdate(cleanResponse, "CONCLAVE AWARENESS");
@@ -283,7 +323,7 @@ module.exports = async function handler(req, res) {
   const matchLocationId = worldConfig.id === "manlandia"
     ? matchManlandiaLocationId
     : worldConfig.type === "custom"
-      ? () => null
+      ? matchCustomLocationId
       : matchResonanceLocationId;
 
   // When completing a roll, un-flag the deferred entries saved on the prior
@@ -334,6 +374,7 @@ module.exports = async function handler(req, res) {
       location: gameState.worldState.location,
       visited_locations: gameState.worldState.visited_locations || [],
       location_scars: gameState.worldState.location_scars || [],
+      objectives: gameState.worldState.objectives || [],
     };
   } else {
     responseWorldState = {
@@ -343,6 +384,7 @@ module.exports = async function handler(req, res) {
       location: gameState.worldState.location,
       visited_locations: gameState.worldState.visited_locations || [],
       location_scars: gameState.worldState.location_scars || [],
+      objectives: gameState.worldState.objectives || [],
     };
   }
 

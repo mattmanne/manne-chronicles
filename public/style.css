@@ -332,6 +332,21 @@ html, body {
 .log-entry { display: flex; flex-direction: column; gap: 4px; animation: fadeIn 0.3s ease-out; }
 .log-entry.no-anim { animation: none; }
 
+.system-message { text-align: center; font-size: 0.75rem; color: var(--parch-dim); padding: 8px; }
+.system-message-retry {
+  margin-top: 6px;
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--parchment);
+  font-size: 0.72rem;
+  padding: 5px 12px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.system-message-retry:hover:not(:disabled) { border-color: var(--gold-dim); color: var(--gold); }
+.system-message-retry:disabled { opacity: 0.5; cursor: default; }
+
 .log-entry.gm .entry-content {
   font-family: var(--font-serif);
   font-size: 0.95rem;
@@ -494,6 +509,48 @@ html, body {
 }
 .export-btn:hover { border-color: var(--gold-dim); color: var(--gold); }
 
+.author-note-section {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+#author-note-panel.hidden { display: none; }
+#author-note-panel {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.author-note-hint {
+  font-size: 0.72rem;
+  color: var(--parch-dim);
+  font-style: italic;
+  line-height: 1.5;
+  margin: 0;
+}
+#author-note-input {
+  width: 100%;
+  min-height: 80px;
+  resize: vertical;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--parchment);
+  font-family: inherit;
+  font-size: 0.82rem;
+  padding: 10px;
+  box-sizing: border-box;
+}
+.author-note-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+#author-note-status {
+  font-size: 0.72rem;
+  color: var(--gold-dim);
+}
+
 .archive-empty {
   color: var(--parch-dim); font-style: italic;
   text-align: center; padding: 32px 16px;
@@ -614,6 +671,20 @@ html, body {
 @keyframes pulse    { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
 @keyframes dotPulse { 0%, 80%, 100% { opacity: 0.2; } 40% { opacity: 1; } }
 
+/* Collapses every animation/transition to effectively instant for anyone
+   who's set a system-level reduced-motion preference — most notably the
+   Dying harm badge's infinite pulse, but this is a blanket fix rather than
+   special-casing each animation individually, so it also covers dice rolls,
+   the speak-button pulse, and anything added later. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 /* ── Scrollbars ── */
 #log-area::-webkit-scrollbar,
 .tab-scroll::-webkit-scrollbar,
@@ -726,6 +797,39 @@ html, body {
 .wc-field { display: flex; flex-direction: column; gap: 6px; }
 .wc-label { font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--parch-dim); }
 .wc-hint { font-size: 0.75rem; color: var(--parch-dim); opacity: 0.7; line-height: 1.4; margin: 0; }
+.wc-hint.hidden { display: none; }
+#wc-count-field.wc-locked .wc-count-btn { opacity: 0.5; pointer-events: none; }
+.campaign-edit-btn { background: none; border: none; font-size: 0.9rem; cursor: pointer; opacity: 0.8; }
+.campaign-edit-btn:hover { opacity: 1; }
+.custom-campaign-card .campaign-actions { display: flex; gap: 4px; align-items: center; }
+.campaign-archive-btn, .campaign-unarchive-btn { background: none; border: none; font-size: 0.9rem; cursor: pointer; opacity: 0.6; }
+.campaign-archive-btn:hover, .campaign-unarchive-btn:hover { opacity: 1; color: var(--gold); }
+.custom-campaign-card.archived { opacity: 0.6; }
+.archived-badge {
+  display: inline-block;
+  font-size: 0.5rem;
+  font-family: var(--font-sans);
+  letter-spacing: 0.04em;
+  padding: 1px 4px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  color: var(--parch-dim);
+  vertical-align: middle;
+  margin-left: 5px;
+}
+.show-archived-toggle {
+  background: none;
+  border: none;
+  color: var(--parch-dim);
+  font-size: 0.72rem;
+  padding: 8px;
+  cursor: pointer;
+  text-align: center;
+  width: 100%;
+}
+.show-archived-toggle:hover { color: var(--gold-dim); }
+.show-archived-toggle.hidden { display: none; }
 .wc-input { width: 100%; padding: 11px 14px; font-size: 0.9rem; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; color: var(--parch); font-family: var(--font-sans); box-sizing: border-box; }
 .wc-input:focus { border-color: var(--gold-dim); outline: none; }
 .wc-textarea { width: 100%; padding: 11px 14px; font-size: 0.85rem; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; color: var(--parch); font-family: var(--font-sans); resize: none; line-height: 1.5; box-sizing: border-box; }
@@ -755,8 +859,45 @@ html, body {
 .danger-fill { background: #c0392b; }
 .peril-fill  { background: #7f8c8d; }
 .custom-map-meter-val { font-size: 0.7rem; color: var(--parch-dim); width: 30px; text-align: right; flex-shrink: 0; }
-.custom-map-scars { border-top: 1px solid var(--border); padding-top: 12px; display: flex; flex-direction: column; gap: 6px; }
-.map-scar-entry { font-size: 0.75rem; color: var(--parch-dim); }
+/* ── Journey Trail (custom-world map — no fixed geography to pin to) ── */
+.journey-trail { border-top: 1px solid var(--border); padding-top: 14px; }
+.journey-trail-label {
+  font-size: 0.65rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--parch-dim);
+  margin-bottom: 10px;
+}
+.journey-trail-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+.journey-stop {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 6px 0;
+  position: relative;
+}
+.journey-stop:not(:last-child)::before {
+  content: "";
+  position: absolute;
+  left: 7px;
+  top: 26px;
+  bottom: -6px;
+  width: 1px;
+  background: var(--border);
+}
+.journey-marker { flex-shrink: 0; font-size: 0.9rem; line-height: 1.3; width: 16px; text-align: center; }
+.journey-content { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.journey-name { font-size: 0.82rem; color: var(--parch-dim); line-height: 1.3; }
+.journey-stop.current .journey-name { color: var(--gold); font-weight: 600; }
+.journey-scars { display: flex; flex-direction: column; gap: 2px; margin-top: 3px; }
+.journey-scar { font-size: 0.68rem; color: #8b1a1a; }
 
 /* ── Character Wizard ── */
 #character-wizard {
@@ -899,6 +1040,29 @@ html, body {
 .manlandia-ability-btn.available { border-color: var(--gold-dim); color: var(--parchment); }
 .manlandia-ability-btn.used { opacity: 0.4; text-decoration: line-through; cursor: default; }
 
+/* ── Character Growth (XP, badges, ability-choice moments) ── */
+.char-growth:empty { display: none; }
+.growth-summary { font-size: 0.72rem; color: var(--parch-dim); display: flex; align-items: center; gap: 4px; }
+.growth-badge { font-size: 0.8rem; cursor: default; }
+.growth-choice {
+  background: var(--surface2);
+  border: 1px solid var(--gold-dim);
+  border-radius: 8px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.growth-choice-label { font-size: 0.76rem; color: var(--gold); font-weight: 600; }
+.growth-choice-options { display: flex; flex-direction: column; gap: 6px; }
+.growth-choice-btn {
+  width: 100%; padding: 8px; font-size: 0.76rem;
+  background: none; border: 1px solid var(--border);
+  border-radius: 7px; color: var(--parchment); cursor: pointer;
+  text-align: left; transition: all 0.2s;
+}
+.growth-choice-btn:hover { border-color: var(--gold-dim); background: var(--surface); }
+
 /* ── World visibility ── */
 .resonance-only { display: none; }
 .manlandia-only { display: none; }
@@ -1026,6 +1190,41 @@ body.world-manlandia #villain-badge   { display: inline-block; }
 .stone-slot.found .stone-name {
   color: var(--parch-dim);
 }
+
+/* ── Objectives / Quest Log — shared across all world types ── */
+#objectives-panel {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin-top: 14px;
+}
+#objectives-panel.hidden { display: none; }
+.objectives-label {
+  font-size: 0.65rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--parch-dim);
+  margin-bottom: 10px;
+}
+.objectives-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.objective-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 0.82rem;
+  color: var(--parchment);
+  line-height: 1.4;
+}
+.objective-check { flex-shrink: 0; }
+.objective-item.done { color: var(--parch-dim); text-decoration: line-through; opacity: 0.7; }
 
 /* ── Help Overlay ── */
 #help-overlay {
@@ -1392,6 +1591,7 @@ body.world-custom .manlandia-lore { display: none !important; }
 }
 
 .recap-actions { display: flex; gap: 10px; justify-content: flex-end; }
+#recap-share-status { display: block; text-align: right; font-size: 0.72rem; color: var(--gold-dim); margin-top: 6px; min-height: 1em; }
 
 .delete-confirm-delete-btn {
   background: var(--red);

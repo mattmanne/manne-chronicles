@@ -37,6 +37,25 @@ test("LOCATION tag sets location and dedups visited_locations across turns", asy
   assert.equal(res2.body.gameState.worldState.visited_locations.filter(l => l === "frost-lands").length, 1);
 });
 
+test("LOCATION tag populates visited_locations for custom worlds too, keyed by the location's own text (no fixed place list to match against)", async (t) => {
+  const redis = statefulRedisMock(null);
+  t.mock.module("../lib/redis.js", redis);
+  mockGemini(t, [
+    "You arrive at the Whispering Bog. [LOCATION: Whispering Bog]",
+    "Still here. [LOCATION: Whispering Bog]",
+    "You push onward. [LOCATION: Dragon's Spire]",
+  ]);
+
+  const res1 = await callGm({ player: "player1", message: "explore", type: "action" }, "c_test");
+  assert.deepEqual(res1.body.gameState.worldState.visited_locations, ["Whispering Bog"]);
+
+  const res2 = await callGm({ player: "player1", message: "look around", type: "action" }, "c_test");
+  assert.deepEqual(res2.body.gameState.worldState.visited_locations, ["Whispering Bog"]);
+
+  const res3 = await callGm({ player: "player1", message: "continue", type: "action" }, "c_test");
+  assert.deepEqual(res3.body.gameState.worldState.visited_locations, ["Whispering Bog", "Dragon's Spire"]);
+});
+
 test("SCAR tag adds a location scar and dedups identical scars", async (t) => {
   const redis = statefulRedisMock(null);
   t.mock.module("../lib/redis.js", redis);
@@ -50,6 +69,15 @@ test("SCAR tag adds a location scar and dedups identical scars", async (t) => {
 
   const res2 = await callGm({ player: "player1", message: "strike again", type: "action" });
   assert.equal(res2.body.gameState.worldState.location_scars.length, 1);
+});
+
+test("SCAR tag works for custom worlds too, keyed by the location's own text", async (t) => {
+  const redis = statefulRedisMock(null);
+  t.mock.module("../lib/redis.js", redis);
+  mockGemini(t, ["The bridge collapses! [SCAR: Whispering Bog: Bridge collapsed]"]);
+
+  const res = await callGm({ player: "player1", message: "cross the bridge", type: "action" }, "c_test");
+  assert.deepEqual(res.body.gameState.worldState.location_scars, [{ id: "Whispering Bog", label: "Bridge collapsed" }]);
 });
 
 test("CHARACTER tag updates the named hero's harm (Manlandia)", async (t) => {
@@ -94,6 +122,66 @@ test("STONE FOUND tag adds a stone and dedups across turns (Manlandia only)", as
 
   const res2 = await callGm({ player: "player1", message: "search more", type: "action" });
   assert.deepEqual(res2.body.gameState.worldState.stones_found, ["earthstone"]);
+});
+
+test("OBJECTIVE tags add and complete quest goals, generalized to every world type", async (t) => {
+  const redis = statefulRedisMock(null);
+  t.mock.module("../lib/redis.js", redis);
+  mockGemini(t, [
+    "Bramble asks for your help. [OBJECTIVE: Find the lost stones]",
+    "You found one! [OBJECTIVE COMPLETE: Find the lost stones]",
+  ]);
+
+  const res1 = await callGm({ player: "player1", message: "talk to Bramble", type: "action" });
+  assert.deepEqual(res1.body.gameState.worldState.objectives, [{ text: "Find the lost stones", done: false }]);
+
+  const res2 = await callGm({ player: "player1", message: "search the cave", type: "action" });
+  assert.deepEqual(res2.body.gameState.worldState.objectives, [{ text: "Find the lost stones", done: true }]);
+});
+
+test("OBJECTIVE tags work for Resonance too, not just Manlandia/custom", async (t) => {
+  const redis = statefulRedisMock(null);
+  t.mock.module("../lib/redis.js", redis);
+  mockGemini(t, ["A lead emerges. [OBJECTIVE: Track down the informant]"]);
+
+  const res = await callGm({ player: "fen", message: "investigate", type: "action" }, "resonance");
+  assert.deepEqual(res.body.gameState.worldState.objectives, [{ text: "Track down the informant", done: false }]);
+});
+
+test("an OBJECTIVE tag in a roll-request turn is deferred until the roll resolves, same as other state tags", async (t) => {
+  const redis = statefulRedisMock(null);
+  t.mock.module("../lib/redis.js", redis);
+  mockGemini(t, [
+    "A new lead appears. [OBJECTIVE: Track down the informant]\nROLL:ACUITY",
+    "You piece it together.",
+  ]);
+
+  const res1 = await callGm({ player: "player1", message: "investigate", type: "action" });
+  assert.equal(res1.body.needsRoll, true);
+  assert.deepEqual(res1.body.gameState.worldState.objectives, []);
+
+  const res2 = await callGm({ player: "player1", message: "rolled a 9", type: "roll_result" });
+  assert.deepEqual(res2.body.gameState.worldState.objectives, [{ text: "Track down the informant", done: false }]);
+});
+
+test("XP N tag awards bonus XP on top of any baseline already accumulated (Manlandia)", async (t) => {
+  const seeded = require("../lib/gamestate-manlandia").getInitialStateManlandia();
+  seeded.characters.player1 = { ...seeded.characters.player1, archetype: "fighter", ability_id: "lucky_break", xp: 5 };
+  const redis = statefulRedisMock(seeded);
+  t.mock.module("../lib/redis.js", redis);
+  mockGemini(t, ["Great thinking! [XP 1: +10]"]);
+
+  const res = await callGm({ player: "player1", message: "clever plan", type: "action" });
+  assert.equal(res.body.gameState.characters.player1.xp, 15);
+});
+
+test("XP tag is ignored for Resonance (no unlockable ability pool to grow into)", async (t) => {
+  const redis = statefulRedisMock(null);
+  t.mock.module("../lib/redis.js", redis);
+  mockGemini(t, ["A clever plan. [XP 1: +10]"]);
+
+  const res = await callGm({ player: "fen", message: "clever plan", type: "action" }, "resonance");
+  assert.equal(res.body.gameState.characters.fen.xp, undefined);
 });
 
 test("CONCLAVE AWARENESS and DISSONANCE tags update world state (Resonance)", async (t) => {

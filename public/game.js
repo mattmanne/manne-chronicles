@@ -224,19 +224,42 @@ function applyWorldUI() {
   }
 }
 
+// Campaigns created before this feature shipped have no `status` field at
+// all — treat missing as active rather than requiring a data migration.
+let showArchived = false;
+
 function renderCampaignList() {
   const container = document.getElementById("custom-campaigns-list");
+  const toggle    = document.getElementById("show-archived-toggle");
   if (!container) return;
-  if (!campaignList.length) { container.innerHTML = ""; return; }
-  container.innerHTML = campaignList.map(c => `
-    <div class="world-btn custom-campaign-card${c.adult ? " adult-only" : ""}" data-world="${c.id}">
+
+  const archivedCount = campaignList.filter(c => c.status === "archived").length;
+  if (toggle) {
+    toggle.classList.toggle("hidden", archivedCount === 0);
+    toggle.textContent = showArchived ? "▲ Hide archived worlds" : `▼ Show ${archivedCount} archived world${archivedCount === 1 ? "" : "s"}`;
+  }
+
+  const visible = campaignList.filter(c => showArchived || c.status !== "archived");
+  if (!visible.length) { container.innerHTML = ""; return; }
+
+  container.innerHTML = visible.map(c => {
+    const archived = c.status === "archived";
+    return `
+    <div class="world-btn custom-campaign-card${c.adult ? " adult-only" : ""}${archived ? " archived" : ""}" data-world="${c.id}">
       <div class="custom-campaign-info">
-        <span class="world-btn-name">${c.name.toUpperCase()}${c.adult ? ' <span class="adult-badge">18+</span>' : ""}</span>
+        <span class="world-btn-name">${c.name.toUpperCase()}${c.adult ? ' <span class="adult-badge">18+</span>' : ""}${archived ? ' <span class="archived-badge">Archived</span>' : ""}</span>
         <span class="world-btn-sub">${c.playerCount} hero${c.playerCount > 1 ? "es" : ""} · ${c.subtitle || "Custom world"}</span>
       </div>
-      <button class="campaign-delete-btn" data-id="${c.id}" title="Delete this world">🗑</button>
+      <div class="campaign-actions">
+        <button class="campaign-edit-btn" data-id="${c.id}" title="Edit this world" aria-label="Edit ${c.name}">✏️</button>
+        ${archived
+          ? `<button class="campaign-unarchive-btn" data-id="${c.id}" title="Restore this world" aria-label="Restore ${c.name}">↩</button>`
+          : `<button class="campaign-archive-btn" data-id="${c.id}" title="Archive this world" aria-label="Archive ${c.name}">🗄</button>`}
+        <button class="campaign-delete-btn" data-id="${c.id}" title="Delete this world" aria-label="Delete ${c.name}">🗑</button>
+      </div>
     </div>
-  `).join("");
+  `;
+  }).join("");
 }
 
 function setupWorldSelector() {
@@ -247,9 +270,21 @@ function setupWorldSelector() {
     }
   });
 
-  // Delegated: custom campaigns + delete
+  // Delegated: custom campaigns + edit + delete
   const ccl = document.getElementById("custom-campaigns-list");
   if (ccl) ccl.addEventListener("click", e => {
+    const editBtn = e.target.closest(".campaign-edit-btn");
+    if (editBtn) {
+      e.stopPropagation();
+      openWorldCreatorForEdit(editBtn.dataset.id);
+      return;
+    }
+    const archiveBtn = e.target.closest(".campaign-archive-btn, .campaign-unarchive-btn");
+    if (archiveBtn) {
+      e.stopPropagation();
+      setCampaignArchived(archiveBtn.dataset.id, archiveBtn.classList.contains("campaign-archive-btn"));
+      return;
+    }
     const delBtn = e.target.closest(".campaign-delete-btn");
     if (delBtn) {
       e.stopPropagation();
@@ -258,6 +293,11 @@ function setupWorldSelector() {
     }
     const card = e.target.closest(".custom-campaign-card[data-world]");
     if (card) switchWorld(card.dataset.world);
+  });
+
+  document.getElementById("show-archived-toggle")?.addEventListener("click", () => {
+    showArchived = !showArchived;
+    renderCampaignList();
   });
 
   // Create new world button
@@ -309,6 +349,19 @@ async function doDeleteCampaign(id) {
   } catch(_) {}
 }
 
+// Reversible alternative to delete — hides a finished/abandoned campaign
+// from the default world-selector view without losing anything.
+async function setCampaignArchived(id, archived) {
+  try {
+    const res = await authPost("/api/campaigns", { action: archived ? "archive" : "unarchive", payload: { id } });
+    const data = await res.json();
+    if (data.ok) {
+      campaignList = campaignList.map(c => c.id === id ? data.campaign : c);
+      renderCampaignList();
+    }
+  } catch(_) {}
+}
+
 function setupDeleteConfirm() {
   document.getElementById("delete-confirm-cancel")?.addEventListener("click", () => {
     document.getElementById("delete-confirm-overlay").classList.remove("active");
@@ -322,6 +375,8 @@ function setupDeleteConfirm() {
   });
 }
 
+let editingCampaignId = null;
+
 function setupWorldCreator() {
   // Player count buttons
   document.querySelectorAll(".wc-count-btn").forEach(btn => {
@@ -334,15 +389,33 @@ function setupWorldCreator() {
   document.getElementById("wc-cancel-btn").addEventListener("click", closeWorldCreator);
 
   document.getElementById("wc-create-btn").addEventListener("click", async () => {
-    const name        = document.getElementById("wc-name").value.trim();
-    const theme       = document.getElementById("wc-theme").value.trim();
-    const playerCount = parseInt(document.querySelector(".wc-count-btn.active")?.dataset.count || "2");
-    const adult       = document.getElementById("wc-adult-checkbox")?.checked === true;
+    const name  = document.getElementById("wc-name").value.trim();
+    const theme = document.getElementById("wc-theme").value.trim();
     if (!name)  { document.getElementById("wc-name").focus();  return; }
     if (!theme) { document.getElementById("wc-theme").focus(); return; }
 
     const btn = document.getElementById("wc-create-btn");
     btn.disabled = true;
+
+    if (editingCampaignId) {
+      btn.textContent = "Saving…";
+      const id = editingCampaignId;
+      try {
+        const res  = await authPost("/api/campaigns", { action: "update", payload: { id, name, theme } });
+        const data = await res.json();
+        if (!data.ok) { btn.textContent = "Save Changes →"; btn.disabled = false; return; }
+        campaignList = campaignList.map(c => c.id === id ? data.campaign : c);
+        renderCampaignList();
+        closeWorldCreator();
+      } catch(_) {
+        btn.textContent = "Save Changes →";
+        btn.disabled = false;
+      }
+      return;
+    }
+
+    const playerCount = parseInt(document.querySelector(".wc-count-btn.active")?.dataset.count || "2");
+    const adult       = document.getElementById("wc-adult-checkbox")?.checked === true;
     btn.textContent = "Creating…";
     try {
       const res  = await authPost("/api/campaigns", { action: "create", payload: { name, theme, playerCount, adult } });
@@ -359,13 +432,58 @@ function setupWorldCreator() {
   });
 }
 
+// Reuses the world-creator overlay in a locked-down "edit" mode: name and
+// theme stay editable, but playerCount/adult are intentionally permanent
+// after creation (changing playerCount risks orphaning an existing hero's
+// data, and adult is a content-safety boundary, not a typo to fix).
+// The campaign's *full* theme text only lives in its own gamestate
+// (campaigns:index only stores a truncated subtitle for the world-selector
+// list) — fetch it directly rather than editing the truncated version,
+// which would otherwise silently replace a long theme with an ellipsis on save.
+async function openWorldCreatorForEdit(id) {
+  const camp = campaignList.find(c => c.id === id);
+  if (!camp) return;
+
+  let fullTheme = camp.subtitle || "";
+  try {
+    const res = await fetch(`/api/state?world=${id}`, { headers: { "X-Adult-Pin": adultPin || "" } });
+    if (res.ok) {
+      const state = await res.json();
+      if (typeof state.worldConfig?.theme === "string") fullTheme = state.worldConfig.theme;
+    }
+  } catch(_) { /* fall back to the truncated subtitle rather than blocking the edit entirely */ }
+
+  editingCampaignId = id;
+  document.getElementById("wc-title").textContent = "✏️ Edit Your World";
+  document.getElementById("wc-create-btn").textContent = "Save Changes →";
+  document.getElementById("wc-name").value = camp.name;
+  document.getElementById("wc-theme").value = fullTheme;
+
+  document.querySelectorAll(".wc-count-btn").forEach(b => {
+    b.classList.toggle("active", parseInt(b.dataset.count) === camp.playerCount);
+    b.disabled = true;
+  });
+  document.getElementById("wc-count-field").classList.add("wc-locked");
+  document.getElementById("wc-locked-hint").classList.remove("hidden");
+  const adultCb = document.getElementById("wc-adult-checkbox");
+  if (adultCb) { adultCb.checked = camp.adult === true; adultCb.disabled = true; }
+
+  document.getElementById("world-creator").classList.add("active");
+}
+
 function closeWorldCreator() {
   document.getElementById("world-creator").classList.remove("active");
   document.getElementById("wc-name").value = "";
   document.getElementById("wc-theme").value = "";
-  document.querySelectorAll(".wc-count-btn").forEach(b => b.classList.toggle("active", b.dataset.count === "2"));
+  document.querySelectorAll(".wc-count-btn").forEach(b => { b.classList.toggle("active", b.dataset.count === "2"); b.disabled = false; });
+  document.getElementById("wc-count-field").classList.remove("wc-locked");
+  document.getElementById("wc-locked-hint").classList.add("hidden");
   const adultCb = document.getElementById("wc-adult-checkbox");
-  if (adultCb) adultCb.checked = false;
+  if (adultCb) { adultCb.checked = false; adultCb.disabled = false; }
+
+  editingCampaignId = null;
+  document.getElementById("wc-title").textContent = "✨ Create Your World";
+  document.getElementById("wc-create-btn").textContent = "Create World →";
 }
 
 async function switchWorld(worldId) {
@@ -421,6 +539,7 @@ async function continueInit() {
   setupAutoRead();
   setupPushNotifications();
   setupExport();
+  setupAuthorNote();
   setupRecap();
   setupWizard();
   setupHelp();
@@ -809,7 +928,13 @@ async function sendToGM(player, message, type) {
       return true;
     }
   } catch(_) {
-    appendSystemMessage("Connection error. Check your internet and try again.");
+    // A dropped connection (spotty mobile signal — realistic for a phone-first,
+    // async game) is different from a server error response above: nothing
+    // came back at all. Offer a one-tap retry of the exact same call rather
+    // than just an alert, but no *automatic* retry — if the original request
+    // actually reached the server and only the response was lost, silently
+    // resending risks a duplicate turn in the shared story log.
+    appendSystemMessage("Connection error. Check your internet and try again.", () => sendToGM(player, message, type));
     return false;
   } finally {
     setLoading(false);
@@ -963,6 +1088,41 @@ function finishSpeech(btn) {
   activeSpeech = null;
 }
 
+/* ── Author's Note ── */
+let authorNoteLoaded = false;
+
+function setupAuthorNote() {
+  const toggle = document.getElementById("author-note-toggle");
+  const panel  = document.getElementById("author-note-panel");
+  const input  = document.getElementById("author-note-input");
+  const status = document.getElementById("author-note-status");
+
+  toggle.addEventListener("click", async () => {
+    const opening = panel.classList.contains("hidden");
+    panel.classList.toggle("hidden");
+    toggle.setAttribute("aria-expanded", String(opening));
+    if (opening && !authorNoteLoaded) {
+      try {
+        const res = await authGet("/api/state");
+        if (handleLockedResponse(res.status)) return;
+        const state = await res.json();
+        input.value = state.worldState?.author_note || "";
+        authorNoteLoaded = true;
+      } catch(_) { /* leave the field blank — save still works, just without a prefilled value */ }
+    }
+  });
+
+  document.getElementById("author-note-save").addEventListener("click", async () => {
+    status.textContent = "Saving…";
+    try {
+      const res = await authPost("/api/state", { action: "set_author_note", payload: { note: input.value } });
+      const data = await res.json();
+      status.textContent = data.ok ? "Saved!" : "Save failed";
+    } catch(_) { status.textContent = "Save failed"; }
+    setTimeout(() => { status.textContent = ""; }, 2000);
+  });
+}
+
 /* ── Export ── */
 function setupExport() {
   document.getElementById("export-btn").addEventListener("click", async () => {
@@ -988,6 +1148,7 @@ function setupRecap() {
   document.getElementById("recap-close-btn").addEventListener("click", () => {
     document.getElementById("recap-overlay").classList.remove("active");
   });
+  document.getElementById("recap-share-btn").addEventListener("click", shareRecap);
 }
 
 async function loadRecap() {
@@ -1002,6 +1163,37 @@ async function loadRecap() {
   } catch(_) {
     textEl.textContent = "Connection error. Check your internet and try again.";
   }
+}
+
+// Lets a parent send the recap to someone outside the app (grandparents,
+// e.g.) as a highlights digest. Tries the native share sheet first (nicer
+// on phones — this app is phone-first), falls back to a clipboard copy
+// everywhere else (desktop browsers, or any browser without Web Share).
+async function shareRecap() {
+  const text   = document.getElementById("recap-text").textContent;
+  const status = document.getElementById("recap-share-status");
+  if (!text || text === "Loading recap…") return;
+
+  const title = `${defaultGameTitle() || "Our Adventure"} — Session Recap`;
+  const shareText = `${title}\n\n${text}`;
+
+  if (navigator.share) {
+    try {
+      await navigator.share({ title, text: shareText });
+      return;
+    } catch(_) {
+      // User cancelled the share sheet, or the platform rejected it — fall
+      // through to the clipboard so the button still does something useful.
+    }
+  }
+
+  try {
+    await navigator.clipboard.writeText(shareText);
+    status.textContent = "Copied to clipboard!";
+  } catch(_) {
+    status.textContent = "Couldn't share or copy — try selecting the text above.";
+  }
+  setTimeout(() => { status.textContent = ""; }, 3000);
 }
 
 /* ── Character Wizard ── */
@@ -1082,6 +1274,14 @@ function setupWizard() {
       const res = await authPost("/api/state", { action: "toggle_ability", payload: { character: p, ability: "ability_used" } });
       const data = await res.json();
       if (data.ok) { cachedGameState = { ...cachedGameState, characters: data.characters }; updateCharacterUI({ characters: data.characters }); }
+      return;
+    }
+
+    const choiceBtn = e.target.closest(".growth-choice-btn");
+    if (choiceBtn) {
+      const res = await authPost("/api/state", { action: "choose_ability", payload: { character: choiceBtn.dataset.player, ability_id: choiceBtn.dataset.ability } });
+      const data = await res.json();
+      if (data.ok) { cachedGameState = { ...cachedGameState, characters: data.characters }; updateCharacterUI({ characters: data.characters }); }
     }
   });
 }
@@ -1100,6 +1300,9 @@ function openWizard(player) {
   }
   if (existing?.backstory) {
     document.getElementById("wiz-backstory").value = existing.backstory;
+  }
+  if (existing?.photo) {
+    document.getElementById("wiz-photo-preview").innerHTML = `<img src="${existing.photo}" alt="hero photo" />`;
   }
   if (existing?.archetype) {
     wizardData.archetype = existing.archetype;
@@ -1129,12 +1332,6 @@ function wizSetStep(step) {
 async function wizFinish() {
   if (!wizardData.name || !wizardData.archetype || !wizardData.ability_id) return;
 
-  // Save photo to localStorage (device-only, per-world for custom campaigns)
-  if (wizardData.photo) {
-    const photoKey = currentWorld.startsWith("c_") ? `photo_${currentWorld}_${wizardPlayer}` : `manlandia_photo_${wizardPlayer}`;
-    localStorage.setItem(photoKey, wizardData.photo);
-  }
-
   // Save character data to server
   const backstory = (document.getElementById("wiz-backstory")?.value || "").trim();
   let chars;
@@ -1145,6 +1342,11 @@ async function wizFinish() {
       archetype:  wizardData.archetype,
       ability_id: wizardData.ability_id,
       backstory,
+      // Only sent when a new photo was actually picked this session — the
+      // server preserves whatever's already saved otherwise. Stored on the
+      // character record itself (not localStorage) so it syncs across every
+      // family member's device instead of only the phone it was uploaded from.
+      ...(wizardData.photo && { photo: wizardData.photo }),
     });
     const data = await res.json();
     if (!data.ok) { alert("Oops — try again!"); return; }
@@ -1314,13 +1516,11 @@ function renderManlandiaCard(n, char) {
   const p     = `player${n}`;
   const isSetup = !!(char?.archetype);
 
-  // Avatar (photo from localStorage, or initial letter)
+  // Avatar (photo from the character record, synced across devices, or initial letter)
   const avatarEl = document.getElementById(`p${n}-avatar`);
   if (avatarEl) {
-    const photoKey = currentWorld.startsWith("c_") ? `photo_${currentWorld}_${p}` : `manlandia_photo_${p}`;
-    const photo = localStorage.getItem(photoKey);
-    if (photo) {
-      avatarEl.innerHTML = `<img src="${photo}" alt="${char?.name || "Hero"}" />`;
+    if (char?.photo) {
+      avatarEl.innerHTML = `<img src="${char.photo}" alt="${char?.name || "Hero"}" />`;
     } else {
       const initial = (char?.name || `H${n}`).charAt(0).toUpperCase();
       avatarEl.innerHTML = `<div class="char-avatar-initials">${initial}</div>`;
@@ -1347,6 +1547,28 @@ function renderManlandiaCard(n, char) {
       abilRow.innerHTML = `<button class="manlandia-ability-btn ${used ? "used" : "available"}" data-player="${p}" title="${used ? "Already used this session" : "Tap to mark used"}">✦ ${label}</button>`;
     } else {
       abilRow.innerHTML = "";
+    }
+  }
+
+  // Growth: XP, earned badges, and (if crossed a bigger milestone) a choice
+  // of new power to unlock. See lib/growth.js — this only ever applies to
+  // Manlandia/custom heroes, never Resonance's Lyra/Fen.
+  const growthEl = document.getElementById(`p${n}-growth`);
+  if (growthEl) {
+    if (!isSetup) {
+      growthEl.innerHTML = "";
+    } else if (char.pending_choice?.options?.length) {
+      growthEl.innerHTML = `
+        <div class="growth-choice">
+          <div class="growth-choice-label">🎉 New power unlocked! Choose one:</div>
+          <div class="growth-choice-options">
+            ${char.pending_choice.options.map(a => `<button class="growth-choice-btn" data-player="${p}" data-ability="${a}">${ABILITY_DISPLAY[a] || a}</button>`).join("")}
+          </div>
+        </div>`;
+    } else {
+      const xp = char.xp || 0;
+      const badges = (char.milestones || []).map(m => `<span class="growth-badge" title="${m}">🏅</span>`).join("");
+      growthEl.innerHTML = xp ? `<div class="growth-summary">XP: ${xp}${badges ? ` ${badges}` : ""}</div>` : "";
     }
   }
 
@@ -1429,6 +1651,27 @@ function renderMap(state) {
   if (currentWorld === "manlandia") renderManlandiaMap(state);
   else if (currentWorld.startsWith("c_")) renderCustomMap(state);
   else renderResonanceMap(state);
+  renderObjectives(state);
+}
+
+// Shared across all world types — generalizes Manlandia's stone tracker
+// (a fixed checklist) to arbitrary free-text quest goals the GM can add via
+// [OBJECTIVE: ...] / [OBJECTIVE COMPLETE: ...] for any world.
+function renderObjectives(state) {
+  const panel = document.getElementById("objectives-panel");
+  const list  = document.getElementById("objectives-list");
+  if (!panel || !list) return;
+
+  const objectives = state?.worldState?.objectives || [];
+  if (!objectives.length) { panel.classList.add("hidden"); list.innerHTML = ""; return; }
+
+  panel.classList.remove("hidden");
+  list.innerHTML = objectives.map(o => `
+    <li class="objective-item${o.done ? " done" : ""}">
+      <span class="objective-check">${o.done ? "✓" : "○"}</span>
+      <span>${escapeHtml(o.text)}</span>
+    </li>
+  `).join("");
 }
 
 function renderCustomMap(state) {
@@ -1453,7 +1696,45 @@ function renderCustomMap(state) {
           <span class="custom-map-meter-val">${ws.curse_level||0}/10</span>
         </div>
       </div>
-      ${ws.location_scars?.length ? `<div class="custom-map-scars">${ws.location_scars.map(s => `<div class="map-scar-entry">✕ <strong>${s.id}</strong> — ${s.label}</div>`).join("")}</div>` : ""}
+      ${renderJourneyTrail(ws)}
+    </div>
+  `;
+}
+
+// Custom worlds have no fixed geography to pin onto a curated map graphic
+// (the GM invents arbitrary locations per campaign) — so instead of a literal
+// map, this renders the places visited as a chronological scrapbook trail,
+// with any scars that happened there shown inline. Data comes from
+// worldState.visited_locations / location_scars, which for custom worlds
+// are keyed by the location's own text rather than a fixed ID (see
+// matchCustomLocationId() in api/gm.js).
+function renderJourneyTrail(ws) {
+  const visited = ws.visited_locations || [];
+  if (!visited.length) return "";
+
+  const scarsByLocation = {};
+  (ws.location_scars || []).forEach(s => {
+    if (!scarsByLocation[s.id]) scarsByLocation[s.id] = [];
+    scarsByLocation[s.id].push(s.label);
+  });
+
+  return `
+    <div class="journey-trail">
+      <div class="journey-trail-label">YOUR JOURNEY</div>
+      <ul class="journey-trail-list">
+        ${visited.map(loc => {
+          const isCurrent = loc === ws.location;
+          const scars = scarsByLocation[loc] || [];
+          return `
+            <li class="journey-stop${isCurrent ? " current" : ""}">
+              <span class="journey-marker">${isCurrent ? "📍" : "○"}</span>
+              <div class="journey-content">
+                <span class="journey-name">${escapeHtml(loc)}</span>
+                ${scars.length ? `<div class="journey-scars">${scars.map(s => `<span class="journey-scar">✕ ${escapeHtml(s)}</span>`).join("")}</div>` : ""}
+              </div>
+            </li>`;
+        }).join("")}
+      </ul>
     </div>
   `;
 }
@@ -1749,7 +2030,7 @@ function appendGMEntry(text, animate) {
   entry.innerHTML = `
     <div class="entry-header">
       <span class="entry-label">The Story</span>
-      <button class="speak-btn" title="Read aloud">🔊</button>
+      <button class="speak-btn" title="Read aloud" aria-label="Read aloud">🔊</button>
     </div>
     <div class="entry-content">${escapeHtml(cleanText)}</div>
     ${stateChanges.map(s => `<div class="state-change${s.positive ? " positive" : ""}">${s.text}</div>`).join("")}`;
@@ -1782,11 +2063,25 @@ function appendRollResult(player, stat, result) {
   logEntries.appendChild(entry);
 }
 
-function appendSystemMessage(msg) {
+function appendSystemMessage(msg, onRetry) {
   const entry = document.createElement("div");
-  entry.style.cssText = "text-align:center;font-size:0.75rem;color:#666;padding:8px;";
+  entry.className = "system-message";
   entry.textContent = msg;
+  if (onRetry) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "system-message-retry";
+    btn.textContent = "↻ Retry";
+    btn.addEventListener("click", () => {
+      btn.disabled = true;
+      btn.textContent = "Retrying…";
+      onRetry();
+    }, { once: true });
+    entry.appendChild(document.createElement("br"));
+    entry.appendChild(btn);
+  }
   logEntries.appendChild(entry);
+  scrollToBottom();
 }
 
 /* ── Update Character UI ── */

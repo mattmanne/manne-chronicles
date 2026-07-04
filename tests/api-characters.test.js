@@ -87,6 +87,32 @@ test("a non-string backstory falls back to the existing one instead of overwriti
   assert.equal(redis.state.characters.player1.backstory, "Keep me.");
 });
 
+test("stores a photo on creation, syncable across devices instead of localStorage-only", async (t) => {
+  const { run, redis } = callCharacters(null, { ...VALID_BODY, photo: "data:image/jpeg;base64,AAAA" });
+  await run(t);
+  assert.equal(redis.state.characters.player1.photo, "data:image/jpeg;base64,AAAA");
+});
+
+test("omitting photo on an edit preserves the existing one", async (t) => {
+  const seeded = { characters: { player1: { photo: "data:image/jpeg;base64,KEEP" } } };
+  const { run, redis } = callCharacters(seeded, VALID_BODY);
+  await run(t);
+  assert.equal(redis.state.characters.player1.photo, "data:image/jpeg;base64,KEEP");
+});
+
+test("sending a new photo replaces the old one", async (t) => {
+  const seeded = { characters: { player1: { photo: "data:image/jpeg;base64,OLD" } } };
+  const { run, redis } = callCharacters(seeded, { ...VALID_BODY, photo: "data:image/jpeg;base64,NEW" });
+  await run(t);
+  assert.equal(redis.state.characters.player1.photo, "data:image/jpeg;base64,NEW");
+});
+
+test("rejects a photo over the size cap", async (t) => {
+  const { run } = callCharacters(null, { ...VALID_BODY, photo: "x".repeat(280001) });
+  const res = await run(t);
+  assert.equal(res.statusCode, 400);
+});
+
 test("works for custom campaigns as well as Manlandia", async (t) => {
   const { run, redis } = callCharacters(null, VALID_BODY, "c_test123");
   const res = await run(t);

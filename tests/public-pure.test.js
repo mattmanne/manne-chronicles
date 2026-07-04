@@ -72,6 +72,21 @@ test("stripGMTags removes an ability tag padded with extra descriptive text", ()
   assert.equal(stripGMTags("You did it! [ABILITY 1: Lucky Break used]"), "You did it!");
 });
 
+test("stripGMTags tolerates trailing commentary after a harm transition (live: '[CHARACTER 1: Scratched → Scratched, no change]')", () => {
+  assert.equal(stripGMTags("Still fine. [CHARACTER 1: Scratched → Scratched, no change]"), "Still fine.");
+  assert.equal(stripGMTags("Ouch! [Globak: Scratched → Hurt, wincing]"), "Ouch!");
+  assert.equal(stripGMTags("Careful. [FEN: Unhurt → Scratched, a bit shaken]"), "Careful.");
+});
+
+test("stripGMTags removes OBJECTIVE and OBJECTIVE COMPLETE tags", () => {
+  assert.equal(stripGMTags("A new lead! [OBJECTIVE: Find the lost stones]"), "A new lead!");
+  assert.equal(stripGMTags("Found it! [OBJECTIVE COMPLETE: Find the lost stones]"), "Found it!");
+});
+
+test("stripGMTags removes the XP bonus tag", () => {
+  assert.equal(stripGMTags("Clever! [XP 2: +10]"), "Clever!");
+});
+
 test("getCleanText strips tags and collapses excess blank lines", () => {
   const raw = "First line. [LOCATION: The Docks]\n\n\n\nSecond line.";
   // stripGMTags only removes the bracketed tag itself, so the space that preceded
