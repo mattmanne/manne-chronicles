@@ -48,6 +48,7 @@ module.exports = async function handler(req, res) {
       objectives: state.worldState.objectives || [],
       npcs: state.worldState.npcs || [],
       inventory: state.worldState.inventory || [],
+      last_actor: state.worldState.last_actor || null,
     };
   } else if (worldConfig.type === "custom") {
     worldStatePayload = {
@@ -60,6 +61,7 @@ module.exports = async function handler(req, res) {
       objectives: state.worldState.objectives || [],
       npcs: state.worldState.npcs || [],
       inventory: state.worldState.inventory || [],
+      last_actor: state.worldState.last_actor || null,
     };
   } else {
     worldStatePayload = {
@@ -71,6 +73,7 @@ module.exports = async function handler(req, res) {
       location_scars: state.worldState.location_scars || [],
       objectives: state.worldState.objectives || [],
       npcs: state.worldState.npcs || [],
+      last_actor: state.worldState.last_actor || null,
     };
   }
 

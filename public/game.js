@@ -2269,7 +2269,20 @@ function updateCharacterUI(data) {
     }
   }
 
+  renderWaitingBanner(ws, chars);
   if (ws?.session) sessionLabel.textContent = `Session ${ws.session}`;
+}
+
+// Informational only — turn order isn't enforced in this app (anyone can act
+// anytime), so this is a reminder, not a gate. See getWaitingOn in pure.js.
+function renderWaitingBanner(ws, characters) {
+  const banner = document.getElementById("waiting-banner");
+  if (!banner) return;
+  const waitingOn = getWaitingOn(ws?.last_actor, currentWorld, characters);
+  if (!waitingOn.length) { banner.classList.add("hidden"); banner.innerHTML = ""; return; }
+  const names = waitingOn.map(k => getPlayerDisplayName(k, { characters })).join(", ");
+  banner.classList.remove("hidden");
+  banner.innerHTML = `⏳ Waiting on: ${escapeHtml(names)}`;
 }
 
 function updateHarm(id, harm) {

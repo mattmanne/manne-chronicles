@@ -95,6 +95,18 @@ test("a resolved turn after the rolling pair means no pendingRoll, even though a
   assert.equal(res.body.pendingRoll, null);
 });
 
+test("last_actor is exposed for all three world types", async (t) => {
+  const stored = { session: 1, sessionLog: [], characters: {}, worldState: { villain_awareness: 0, curse_level: 0, location: "x", visited_locations: [], location_scars: [], last_actor: "player2" } };
+  const res = await callPoll(stored, { since: "0", world: "manlandia" })(t);
+  assert.equal(res.body.worldState.last_actor, "player2");
+});
+
+test("last_actor defaults to null when never set", async (t) => {
+  const stored = { session: 1, sessionLog: [], characters: {}, worldState: { conclave_awareness: 0, fen_dissonance_awakening: 0, location: "x", visited_locations: [], location_scars: [] } };
+  const res = await callPoll(stored, { since: "0", world: "resonance" })(t);
+  assert.equal(res.body.worldState.last_actor, null);
+});
+
 test("resonance is locked to reads without the correct adult pin", async (t) => {
   const stored = { session: 1, sessionLog: [], characters: {}, worldState: { conclave_awareness: 0 } };
   t.mock.module("../lib/redis.js", statefulRedisMock(stored));

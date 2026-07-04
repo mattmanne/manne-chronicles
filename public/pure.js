@@ -118,6 +118,29 @@ function extractStateChanges(text, opts = {}) {
   return changes;
 }
 
+// "Real" meaning a hero that actually exists — Resonance's Lyra/Fen always
+// count, but a Manlandia/custom player slot only counts once someone has
+// actually created a hero there (picked an archetype), not an empty "Hero N"
+// placeholder. Shared by the client's waiting-on banner and the server-side
+// stall-reminder cron job (api/cron-turn-reminder.js requires this file
+// directly, same dual-use pattern as every other function here) so both
+// agree on exactly who counts as a real party member.
+function getRealCharacterKeys(world = defaultWorld(), characters = defaultGameState()?.characters) {
+  if (!world) return [];
+  if (isManlandiaLike(world)) {
+    return ["player1", "player2", "player3", "player4"].filter((k) => characters?.[k]?.archetype);
+  }
+  return ["fen", "lyra"].filter((k) => characters?.[k]);
+}
+
+// Turn order isn't enforced in this app (anyone can act anytime) — this is
+// informational, not a hard gate. "Waiting on" just means "every real party
+// member other than whoever went last," recomputed fresh every time from a
+// single `last_actor` field rather than tracking a real turn order.
+function getWaitingOn(lastActor, world = defaultWorld(), characters = defaultGameState()?.characters) {
+  return getRealCharacterKeys(world, characters).filter((k) => k !== lastActor);
+}
+
 function resolveSuggestionSelection(text, suggestions) {
   if (!suggestions || !suggestions.length) return null;
   const m = (text || "").trim().match(/^#?(\d+)\.?$/);
@@ -180,5 +203,7 @@ if (typeof module !== "undefined" && module.exports) {
     extractStateChanges,
     resolveSuggestionSelection,
     formatCampaignExport,
+    getRealCharacterKeys,
+    getWaitingOn,
   };
 }

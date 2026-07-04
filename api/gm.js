@@ -376,6 +376,17 @@ module.exports = async function handler(req, res) {
   }
 
   const ts = Date.now();
+
+  // Powers the "waiting on ___" banner and the turn-stall push reminder cron
+  // (api/cron-turn-reminder.js) — recorded on every real submission
+  // regardless of roll state, since the point is "did someone engage," not
+  // "did their turn fully resolve." Deliberately just one field, not a real
+  // turn order: turn order isn't enforced in this app at all (anyone can act
+  // anytime), so "waiting on" is only ever computed as "everyone else"
+  // (see getWaitingOn in public/pure.js), not a specific next-up player.
+  gameState.worldState.last_actor = player;
+  gameState.worldState.last_action_at = ts;
+
   const rolling = needsRoll && type !== "roll_result";
   const userEntry = { role: "user", content: userMessage, player, timestamp: ts };
   const gmEntry   = { role: "gm",   content: cleanResponse,           timestamp: ts };
@@ -410,6 +421,7 @@ module.exports = async function handler(req, res) {
       objectives: gameState.worldState.objectives || [],
       npcs: gameState.worldState.npcs || [],
       inventory: gameState.worldState.inventory || [],
+      last_actor: gameState.worldState.last_actor || null,
     };
   } else {
     responseWorldState = {
@@ -421,6 +433,7 @@ module.exports = async function handler(req, res) {
       location_scars: gameState.worldState.location_scars || [],
       objectives: gameState.worldState.objectives || [],
       npcs: gameState.worldState.npcs || [],
+      last_actor: gameState.worldState.last_actor || null,
     };
   }
 

@@ -1625,6 +1625,18 @@ body.world-custom .manlandia-lore { display: none !important; }
 /* Recap */
 #recap-bar { padding: 10px 14px 0; }
 
+#waiting-banner {
+  margin: 10px 14px 0;
+  padding: 8px 12px;
+  background: rgba(201,168,76,0.1);
+  border: 1px solid var(--gold-dim);
+  border-radius: 6px;
+  color: var(--gold);
+  font-size: 0.8rem;
+  text-align: center;
+}
+#waiting-banner.hidden { display: none; }
+
 #recap-overlay {
   display: none;
   position: fixed; inset: 0;

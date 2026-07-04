@@ -121,6 +121,16 @@ Notifies the other player(s) in a world when someone takes a turn — the one it
 - **iOS caveat**: Apple only allows Web Push for a home-screen-installed PWA, not a regular Safari tab (since iOS 16.4). `public/manifest.json` + the `apple-touch-icon`/`manifest` links in `index.html`'s `<head>` make that installable, but there's no way to make Safari-tab notifications work on iPhone — this is a real platform limitation, documented for players in `README.md`.
 - **What can't be verified by tests**: everything up to "the correctly-addressed, correctly-encrypted request was handed to the push service" is covered (`tests/push.test.js`, `tests/api-push.test.js`, `tests/api-vapid.test.js`, the push-specific cases in `tests/api-gm-push.test.js`). Whether a real device actually *receives* it requires a real phone — there's no way to simulate a round trip through Apple's/Google's actual push infrastructure in an automated test.
 
+## Waiting-on banner and turn-stall reminders
+
+Turn order isn't enforced anywhere in this app — anyone can act anytime. Both features below are purely informational nudges on top of that, not a real turn-order system, built from a single `worldState.last_actor` field rather than tracking a real queue.
+
+- **`worldState.last_actor` / `last_action_at`**: set on every `POST /api/gm` submission (`api/gm.js`), regardless of roll state — the point is "did someone engage," not "did their turn fully resolve." Exposed to the client via both `/api/gm`'s response and `/api/poll`'s `worldStatePayload`.
+- **`getRealCharacterKeys(world, characters)` / `getWaitingOn(lastActor, world, characters)`** (`public/pure.js`) — shared between the client and the server (the cron job below `require()`s `public/pure.js` directly, same dual-use pattern the rest of that file already relies on for testability). "Real" means an actual created hero (Resonance's Lyra/Fen always count; a Manlandia/custom player slot only counts once it has an `archetype`). "Waiting on" is just "every real character except whoever went last" — recomputed fresh each time, not a persisted queue.
+- **Waiting-on banner**: `#waiting-banner` in the Story tab, rendered by `renderWaitingBanner()` inside `updateCharacterUI()` — so it refreshes everywhere that function already gets called (initial load, poll tick, right after a turn resolves) with no extra wiring. Hidden entirely for a solo game (nobody else to wait on).
+- **Turn-stall push reminder**: `api/cron-turn-reminder.js`, triggered daily by Vercel Cron (`vercel.json`'s `crons` array, `0 15 * * *`). Checks Resonance, Manlandia, and every non-archived custom campaign from `campaigns:index`; if a world's `last_action_at` is more than 48h stale, sends a push (via the same `lib/push.js`/`web-push` plumbing `api/gm.js` already uses) to everyone subscribed except the last actor's own devices. Fires once per stall, not once per day forever — gated on `worldState.last_reminder_sent_at` being older than `last_action_at`, which a fresh action naturally invalidates. Skips a world outright if there's nobody real to remind (solo campaigns) or push isn't configured yet (no VAPID keys). A single world's failure (via try/catch per world) can't take the whole cron run down.
+- **`CRON_SECRET`** (optional): if set, the cron endpoint requires `Authorization: Bearer <CRON_SECRET>`; if unset, it fails open — same convention as `GAME_SECRET`, and the blast radius of skipping this is "an extra push notification," not a data-safety risk. Vercel's own Cron feature calls this endpoint on its schedule regardless of whether the secret is configured; setting one just stops anyone else who finds the URL from triggering it on demand.
+
 ## Testing
 
 `npm test` runs `node --experimental-test-module-mocks --test tests/*.test.js` — plain `node:test`/`node:assert`, zero test-framework dependency.
@@ -132,7 +142,7 @@ Notifies the other player(s) in a world when someone takes a turn — the one it
 
 ## Env vars
 
-All 8 that the code actually reads from `process.env`:
+All 9 that the code actually reads from `process.env`:
 
 | Var | Used by | Purpose |
 |---|---|---|
@@ -144,3 +154,4 @@ All 8 that the code actually reads from `process.env`:
 | `ALLOWED_ORIGIN` | every `api/*.js` | CORS `Access-Control-Allow-Origin` (defaults to `*`) |
 | `VAPID_PUBLIC_KEY` | `api/vapid-public-key.js`, `api/gm.js` | Not secret — served to the client so it can call `pushManager.subscribe()` |
 | `VAPID_PRIVATE_KEY` | `api/gm.js` (`webpush.setVapidDetails()`) | Secret — signs the VAPID JWT proving this server sent the push. Generate a pair once with `node -e "console.log(require('web-push').generateVAPIDKeys())"`; if it's ever rotated, every existing subscription breaks and players need to re-enable notifications. |
+| `CRON_SECRET` | `api/cron-turn-reminder.js` | Optional — gates the turn-stall reminder cron endpoint via `Authorization: Bearer <value>`. Fails open (like `GAME_SECRET`) if unset. |

@@ -4,6 +4,9 @@
       "maxDuration": 60
     }
   },
+  "crons": [
+    { "path": "/api/cron-turn-reminder", "schedule": "0 15 * * *" }
+  ],
   "rewrites": [
     { "source": "/style.css",     "destination": "/public/style.css"     },
     { "source": "/game.js",       "destination": "/public/game.js"       },

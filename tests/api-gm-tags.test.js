@@ -408,3 +408,29 @@ test("ITEM FEN/LYRA tags add to each character's own inventory (Resonance)", asy
   assert.deepEqual(res.body.gameState.characters.fen.inventory, ["A pocketknife"]);
   assert.deepEqual(res.body.gameState.characters.lyra.inventory, ["A worn journal"]);
 });
+
+/* ── last_actor / last_action_at — powers the waiting-on banner + stall reminder cron ── */
+
+test("every turn records who took it and when, regardless of roll state", async (t) => {
+  const redis = statefulRedisMock(null);
+  t.mock.module("../lib/redis.js", redis);
+  mockGemini(t, ["Nothing risky happens."]);
+
+  const before = Date.now();
+  const res = await callGm({ player: "player2", message: "look around", type: "action" });
+  assert.equal(res.body.gameState.worldState.last_actor, "player2");
+  assert.ok(res.body.gameState.worldState.last_actor);
+  assert.ok(redis.state.worldState.last_action_at >= before);
+});
+
+test("last_actor updates to whoever acts next, overwriting the previous value", async (t) => {
+  const redis = statefulRedisMock(null);
+  t.mock.module("../lib/redis.js", redis);
+  mockGemini(t, ["First turn.", "Second turn."]);
+
+  await callGm({ player: "player1", message: "go", type: "action" });
+  assert.equal(redis.state.worldState.last_actor, "player1");
+
+  await callGm({ player: "player2", message: "go too", type: "action" });
+  assert.equal(redis.state.worldState.last_actor, "player2");
+});

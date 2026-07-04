@@ -3,6 +3,7 @@ const assert = require("node:assert/strict");
 const {
   HARM_LEVELS, isManlandiaLike, withWorld, getPlayerDisplayName, stripPlayerPrefix,
   formatRollMessage, stripGMTags, getCleanText, extractStateChanges, resolveSuggestionSelection, formatCampaignExport,
+  getRealCharacterKeys, getWaitingOn,
 } = require("../public/pure.js");
 
 test("isManlandiaLike is true for manlandia and any c_ world, false for resonance", () => {
@@ -163,4 +164,25 @@ test("formatCampaignExport reports no sessions archived yet when history is empt
 
 test("HARM_LEVELS is exported and ordered from best to worst", () => {
   assert.deepEqual(HARM_LEVELS, ["Unhurt", "Scratched", "Hurt", "Wounded", "Broken", "Dying"]);
+});
+
+test("getRealCharacterKeys returns both Resonance characters, ignoring nothing", () => {
+  assert.deepEqual(getRealCharacterKeys("resonance", { fen: {}, lyra: {} }), ["fen", "lyra"]);
+});
+
+test("getRealCharacterKeys only counts Manlandia/custom heroes that have actually picked an archetype", () => {
+  const characters = { player1: { archetype: "fighter" }, player2: {}, player3: { archetype: "healer" }, player4: {} };
+  assert.deepEqual(getRealCharacterKeys("manlandia", characters), ["player1", "player3"]);
+  assert.deepEqual(getRealCharacterKeys("c_test", characters), ["player1", "player3"]);
+});
+
+test("getWaitingOn excludes whoever went last from the real character list", () => {
+  assert.deepEqual(getWaitingOn("fen", "resonance", { fen: {}, lyra: {} }), ["lyra"]);
+  const characters = { player1: { archetype: "fighter" }, player2: { archetype: "healer" } };
+  assert.deepEqual(getWaitingOn("player1", "manlandia", characters), ["player2"]);
+});
+
+test("getWaitingOn returns an empty list for a solo game (nobody else to wait on)", () => {
+  const characters = { player1: { archetype: "fighter" }, player2: {} };
+  assert.deepEqual(getWaitingOn("player1", "manlandia", characters), []);
 });
