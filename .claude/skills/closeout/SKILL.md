@@ -100,7 +100,19 @@ These are logic checks using the existing state, not new calls:
 
 ---
 
-## STEP 5 — Memory Update
+## STEP 5 — Campaign Compatibility Review
+
+Any session can ship a change to the stored data shape — a new `worldState`/character field, a new GM bracket tag, a changed default, a bug fix that should apply retroactively (see the global retroactive-fixes policy in `~/.claude/CLAUDE.md`). Before closing out, check whether any currently-live campaign needs attention because of what shipped this session:
+
+1. Identify what actually changed this session that touches stored gamestate shape or GM tag behavior — check this session's diff/commits against `lib/gamestate.js`, `lib/gamestate-manlandia.js`, `lib/gamestate-custom.js`, and `lib/gm-tags.js`.
+2. GET `/api/campaigns` for the full campaign list, then `GET /api/state?world=<id>` for Resonance, Manlandia, and every custom campaign (including archived ones — they still hold real data). Check each against what changed: is a field the new code expects missing? Would this campaign's existing data read or behave differently now than it would have before?
+3. Most of the time nothing is needed — this app's standing convention is defensive lazy-init (`if (!gameState.worldState.x) gameState.worldState.x = []`, or a new field decided once at creation from `worldConfig`, e.g. the adult/kid inventory split) specifically so new fields never require a migration. Confirm that pattern actually covers what shipped before concluding "no action needed" — don't just assume it does.
+4. **If there's a real judgment call** — data that could reasonably go more than one way, a fix that would touch a real family's actual campaign, anything with conflict or loss risk — **stop and ask the user** which campaign(s) (if any) to update and how. Never silently decide this yourself, even if one option seems obviously better.
+5. Record the outcome in the Step 7 session summary: which campaigns were checked, whether any needed action, and what was decided (by you, defensively, or by the user, explicitly).
+
+---
+
+## STEP 6 — Memory Update
 
 Read the current memory files:
 - `memory/project_resonance.md`
@@ -116,7 +128,7 @@ Also scan for any memory that is now stale or wrong and update it.
 
 ---
 
-## STEP 6 — Session Summary
+## STEP 7 — Session Summary
 
 Write a concise close-out report covering:
 
@@ -137,7 +149,7 @@ Write a concise close-out report covering:
 
 ---
 
-## STEP 7 — Final Confirmation
+## STEP 8 — Final Confirmation
 
 State clearly: "✅ Session closed. App is deployed, all tests pass, git is clean."
 
