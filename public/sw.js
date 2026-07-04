@@ -1,7 +1,7 @@
 /* ── Push notifications — the whole service worker just needs these two handlers ── */
 
 self.addEventListener("push", (event) => {
-  let data = { title: "Resonance", body: "New message!" };
+  let data = { title: "The Manne Chronicles", body: "New message!" };
   try { data = event.data.json(); } catch (_) { /* fall back to the default above */ }
   event.waitUntil(self.registration.showNotification(data.title, { body: data.body }));
 });

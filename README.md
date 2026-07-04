@@ -1,8 +1,8 @@
-# Resonance / Manlandia
+# The Manne Chronicles
 
 Two narrative RPGs — plus unlimited custom worlds you build yourself — sharing one app. Open on your phone, speak your actions, the AI Game Master responds.
 
-**Play at:** https://resonance-dnd.vercel.app
+**Play at:** https://manne-chronicles.vercel.app
 
 | World | Players | Story |
 |-------|---------|-------|
@@ -17,7 +17,7 @@ On your first visit the app asks which world to open. Your choice is saved to yo
 
 ### Starting a session
 
-1. Open **https://resonance-dnd.vercel.app** on your phone — bookmark it
+1. Open **https://manne-chronicles.vercel.app** on your phone — bookmark it
 2. If it's your first visit, choose **Resonance** or **Manlandia**
 3. The GM narrates the opening scene automatically on first load
 4. On the **Story** tab, select your character button at the bottom
@@ -27,7 +27,7 @@ On your first visit the app asks which world to open. Your choice is saved to yo
 
 Each world has its own separate story and saved progress. To switch:
 - Tap the **⇌** button in the top-right header — this opens the world selector again
-- Or visit `https://resonance-dnd.vercel.app?world=resonance` or `?world=manlandia`
+- Or visit `https://manne-chronicles.vercel.app?world=resonance` or `?world=manlandia`
 
 ### Creating your own world
 
@@ -270,7 +270,7 @@ Pull down to refresh. The session log reloads from the server.
 The button only appears if your browser supports push notifications. On iPhone, it needs the app to be added to your Home Screen first (see "Getting notified" above). If you tapped Allow and still don't get notifications, try turning the Alert button off and back on — check your phone's system notification settings for the browser (or the installed app, on iPhone) if it still doesn't work.
 
 **Prompted for a secret on first load?**
-The app requires a campaign secret to prevent strangers from resetting your progress. Enter the value of `GAME_SECRET` from your Vercel environment variables. It's stored in your browser after the first entry — you won't be prompted again on that device. To share with Michelle, visit `https://resonance-dnd.vercel.app?secret=YOUR_SECRET_HERE` once on her phone and it will be saved automatically.
+The app requires a campaign secret to prevent strangers from resetting your progress. Enter the value of `GAME_SECRET` from your Vercel environment variables. It's stored in your browser after the first entry — you won't be prompted again on that device. To share with Michelle, visit `https://manne-chronicles.vercel.app?secret=YOUR_SECRET_HERE` once on her phone and it will be saved automatically.
 
 **Start a completely fresh campaign:**
 Go to the **⚔ Characters** tab → "End Session & Save" to archive the session first. For a full wipe, open the browser console and run (replacing YOUR_SECRET with your `GAME_SECRET` value):
@@ -289,7 +289,7 @@ Manlandia: `fetch('/api/state?world=manlandia',{method:'POST',headers:{'Content-
 - **Voice input:** Web Speech API (built into Chrome/Safari)
 - **Text-to-speech:** Web Speech Synthesis API (built into Chrome/Safari, no key needed)
 - **Push notifications:** Web Push (`web-push` npm package) — needs `VAPID_PUBLIC_KEY` and `VAPID_PRIVATE_KEY` in Vercel environment variables, generated once with `node -e "console.log(require('web-push').generateVAPIDKeys())"`
-- **GitHub repo:** https://github.com/mattmanne/resonance-dnd
+- **GitHub repo:** https://github.com/mattmanne/manne-chronicles
 - **Vercel dashboard:** https://vercel.com (log in with Google)
 - **Upstash dashboard:** https://upstash.com (log in with Google)
 - **Groq dashboard:** https://console.groq.com (log in with Google)

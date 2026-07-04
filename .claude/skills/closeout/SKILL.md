@@ -1,10 +1,10 @@
 ---
 name: closeout
-description: End-of-session close-out for the Resonance/Manlandia DnD app. Runs live API tests, syntax-checks all JS, verifies git is clean, updates memory docs, and produces a session summary with next steps. Use after any coding session on this project.
+description: End-of-session close-out for The Manne Chronicles (Resonance/Manlandia) DnD app. Runs live API tests, syntax-checks all JS, verifies git is clean, updates memory docs, and produces a session summary with next steps. Use after any coding session on this project.
 disable-model-invocation: false
 ---
 
-You are closing out a coding session on the Resonance/Manlandia family RPG app at https://resonance-dnd.vercel.app.
+You are closing out a coding session on The Manne Chronicles family RPG app at https://manne-chronicles.vercel.app.
 
 Work through all steps below in order. Do not skip steps. Report a clear pass/fail for every check.
 
@@ -44,7 +44,7 @@ Run `git status` and `git log --oneline -6`.
 
 ## STEP 3 — Live API Tests
 
-Base URL: `https://resonance-dnd.vercel.app`
+Base URL: `https://manne-chronicles.vercel.app`
 Game secret header: `X-Game-Secret: MannesAreTheBest`
 
 Run these checks in order:

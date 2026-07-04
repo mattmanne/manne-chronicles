@@ -11,7 +11,7 @@
 // Both env vars are optional — omit them and gated worlds (Resonance, adult
 // custom campaigns) are just skipped rather than failing the whole run.
 
-const BASE = process.argv[2] || "https://resonance-dnd.vercel.app";
+const BASE = process.argv[2] || "https://manne-chronicles.vercel.app";
 const ADULT_PIN = process.env.ADULT_PIN || "";
 const GAME_SECRET = process.env.GAME_SECRET || "";
 

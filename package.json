@@ -1,7 +1,7 @@
 {
-  "name": "resonance-dnd",
+  "name": "manne-chronicles",
   "version": "1.0.0",
-  "description": "Resonance & Manlandia — narrative RPGs with an AI Game Master, plus unlimited custom worlds",
+  "description": "The Manne Chronicles — Resonance, Manlandia, and unlimited custom worlds, narrated by an AI Game Master",
   "scripts": {
     "test": "node --experimental-test-module-mocks --test tests/*.test.js",
     "check-drift": "node scripts/check-tag-drift.js"

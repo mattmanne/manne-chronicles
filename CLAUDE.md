@@ -1,6 +1,8 @@
-# Resonance / Manlandia — Architecture Notes
+# The Manne Chronicles — Architecture Notes
 
 This is the developer-facing companion to `README.md` (which is written for players). Read this before making structural changes.
+
+The Manne Chronicles is the umbrella app name; "Resonance" and "Manlandia" below are the names of two built-in playable worlds inside it (plus unlimited user-created custom worlds) — not alternate names for the app itself.
 
 ## Tech stack
 
