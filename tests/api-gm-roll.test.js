@@ -22,6 +22,15 @@ test("recognizes ROLL:STAT with no brackets (the documented format)", async (t) 
   assert.equal(res.body.response, "You reach for the door.");
 });
 
+test("fires end-to-end when the trigger is embedded mid-sentence, not alone on its own line (live: Dark Wars, 'Note: ... The roll is: ROLL: WISDOM')", async (t) => {
+  t.mock.module("../lib/redis.js", statefulRedisMock(null));
+  mockGemini(t, "What do you do?\n\nNote: As you consider the offer, you roll a Wisdom check to see if you can sense any potential dangers or pitfalls. The roll is: ROLL: WISDOM");
+  const res = await callGm({ player: "player1", message: "consider the offer", type: "action" });
+  assert.equal(res.body.needsRoll, true);
+  assert.equal(res.body.rollStat, "acuity");
+  assert.doesNotMatch(res.body.response, /ROLL:/i);
+});
+
 test("also recognizes ROLL:[STAT] wrapped in brackets, the format the model actually produces in practice", async (t) => {
   t.mock.module("../lib/redis.js", statefulRedisMock(null));
   mockGemini(t, "The creature's eyes lock onto you.\nROLL:[ACUITY]");

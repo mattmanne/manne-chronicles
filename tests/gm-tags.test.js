@@ -36,6 +36,22 @@ test("extractRoll strips a stray ROLL: line the model prefixed onto its own expl
   assert.doesNotMatch(r.clean, /ROLL:/i);
 });
 
+test("extractRoll fires even when the trigger is embedded mid-sentence instead of alone on its own line — live example: 'Note: ... The roll is: ROLL: WISDOM' (Dark Wars, reported live after the synonym-mapping fix shipped)", () => {
+  const raw = "You look through the documents. What do you do?\n\nNote: As you consider the offer, you roll a Wisdom check to see if you can sense any potential dangers or pitfalls. The roll is: ROLL: WISDOM";
+  const r = extractRoll(raw);
+  assert.equal(r.needsRoll, true);
+  assert.equal(r.rollStat, "acuity");
+  assert.doesNotMatch(r.clean, /ROLL:/i);
+  assert.doesNotMatch(r.clean, /the roll is/i);
+});
+
+test("extractRoll keeps scanning past an unrecognized word to find a real stat later in the same text", () => {
+  const raw = "The roll is: ROLL: nervousness, actually: ROLL: [AGILITY]";
+  const r = extractRoll(raw);
+  assert.equal(r.needsRoll, true);
+  assert.equal(r.rollStat, "agility");
+});
+
 test("extractRoll is case-insensitive", () => {
   const r = extractRoll("You hide.\nroll:[agility]");
   assert.equal(r.needsRoll, true);
