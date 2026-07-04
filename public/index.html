@@ -328,6 +328,7 @@
                 <span class="stat highlight">WIL +3</span>
                 <span class="stat">PRE +0</span>
               </div>
+              <div class="char-inventory hidden" id="fen-inventory"></div>
             </div>
 
             <div class="char-card" id="lyra-card">
@@ -353,6 +354,7 @@
                 <span class="stat">WIL +2</span>
                 <span class="stat">PRE +1</span>
               </div>
+              <div class="char-inventory hidden" id="lyra-inventory"></div>
             </div>
           </div>
 
@@ -383,6 +385,7 @@
                 <div class="char-growth" id="p1-growth"></div>
                 <div class="card-actions" id="p1-card-actions"></div>
                 <div class="char-backstory hidden" id="p1-backstory"></div>
+                <div class="char-inventory hidden" id="p1-inventory"></div>
               </div>
               <div class="char-card manlandia-card" id="p2-card">
                 <div class="char-header manlandia-char-header">
@@ -400,6 +403,7 @@
                 <div class="char-growth" id="p2-growth"></div>
                 <div class="card-actions" id="p2-card-actions"></div>
                 <div class="char-backstory hidden" id="p2-backstory"></div>
+                <div class="char-inventory hidden" id="p2-inventory"></div>
               </div>
               <div class="char-card manlandia-card" id="p3-card">
                 <div class="char-header manlandia-char-header">
@@ -417,6 +421,7 @@
                 <div class="char-growth" id="p3-growth"></div>
                 <div class="card-actions" id="p3-card-actions"></div>
                 <div class="char-backstory hidden" id="p3-backstory"></div>
+                <div class="char-inventory hidden" id="p3-inventory"></div>
               </div>
               <div class="char-card manlandia-card" id="p4-card">
                 <div class="char-header manlandia-char-header">
@@ -434,6 +439,7 @@
                 <div class="char-growth" id="p4-growth"></div>
                 <div class="card-actions" id="p4-card-actions"></div>
                 <div class="char-backstory hidden" id="p4-backstory"></div>
+                <div class="char-inventory hidden" id="p4-inventory"></div>
               </div>
             </div>
           </div>
@@ -542,6 +548,19 @@
           <div id="objectives-panel" class="hidden">
             <div class="objectives-label">QUEST LOG</div>
             <ul id="objectives-list" class="objectives-list"></ul>
+          </div>
+
+          <!-- NPC lorebook — shared across all world types -->
+          <div id="lorebook-panel" class="hidden">
+            <div class="objectives-label">📖 WHO'S WHO</div>
+            <ul id="lorebook-list" class="objectives-list"></ul>
+          </div>
+
+          <!-- Shared party inventory — kid-friendly worlds only (adult games
+               track items per-character on each hero's own card instead) -->
+          <div id="inventory-panel" class="hidden">
+            <div class="objectives-label">🎒 PARTY INVENTORY</div>
+            <ul id="inventory-list" class="objectives-list"></ul>
           </div>
 
         </div>

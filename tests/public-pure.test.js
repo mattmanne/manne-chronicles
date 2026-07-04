@@ -87,6 +87,17 @@ test("stripGMTags removes the XP bonus tag", () => {
   assert.equal(stripGMTags("Clever! [XP 2: +10]"), "Clever!");
 });
 
+test("stripGMTags removes the NPC lorebook tag", () => {
+  assert.equal(stripGMTags("A stranger approaches. [NPC: Old Marrow: A one-eyed lighthouse keeper]"), "A stranger approaches.");
+});
+
+test("stripGMTags removes every ITEM tag variant: FOUND, numbered, named, and FEN/LYRA", () => {
+  assert.equal(stripGMTags("You find a key. [ITEM FOUND: A rusty iron key]"), "You find a key.");
+  assert.equal(stripGMTags("You take it. [ITEM 1: A silver locket]"), "You take it.");
+  assert.equal(stripGMTags("Globak grabs it. [ITEM Globak: A cracked shield]"), "Globak grabs it.");
+  assert.equal(stripGMTags("Fen pockets it. [ITEM FEN: A pocketknife]"), "Fen pockets it.");
+});
+
 test("getCleanText strips tags and collapses excess blank lines", () => {
   const raw = "First line. [LOCATION: The Docks]\n\n\n\nSecond line.";
   // stripGMTags only removes the bracketed tag itself, so the space that preceded

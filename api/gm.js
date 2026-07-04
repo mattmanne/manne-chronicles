@@ -12,6 +12,10 @@ const {
   extractAbilityUsedKeys,
   extractObjectiveUpdates,
   extractXpBonuses,
+  extractLorebookUpdates,
+  extractSharedItemAdditions,
+  extractCharacterItemAdditions,
+  extractResonanceItemAdditions,
 } = require("../lib/gm-tags");
 const { selectNotifyTargets, buildNotificationPayload } = require("../lib/push");
 const { GROWTH_CONFIG_KID, GROWTH_CONFIG_ADULT, applyXpGain } = require("../lib/growth");
@@ -154,6 +158,13 @@ function applyStateTags(cleanResponse, gameState, worldConfig, matchLocationId) 
     if (obj) obj.done = true;
   }
 
+  // NPC lorebook — shared across all world types, same as objectives: the
+  // whole party learns about a person together.
+  if (!gameState.worldState.npcs) gameState.worldState.npcs = [];
+  for (const npc of extractLorebookUpdates(cleanResponse, gameState.worldState.npcs)) {
+    gameState.worldState.npcs.push(npc);
+  }
+
   if (worldConfig.id === "manlandia" || worldConfig.type === "custom") {
     const villainUpdate = extractCounterUpdate(cleanResponse, "VILLAIN AWARENESS");
     if (villainUpdate !== null) gameState.worldState.villain_awareness = villainUpdate;
@@ -183,6 +194,23 @@ function applyStateTags(cleanResponse, gameState, worldConfig, matchLocationId) 
       gameState.characters[key].ability_used = true;
     }
 
+    // Inventory — shared party loot for kid-friendly games ([ITEM FOUND: ...]
+    // -> worldState.inventory), per-character carried items for adult custom
+    // campaigns ([ITEM N: ...] -> that hero's own inventory). Both regexes
+    // are checked unconditionally rather than gated on the campaign's adult
+    // flag: each prompt file only ever teaches the model the one tag matching
+    // its own world, so in practice only one of these ever actually fires —
+    // this is just the same tolerant "parse whatever shape shows up" stance
+    // as every other tag here, not a real ambiguity.
+    if (!gameState.worldState.inventory) gameState.worldState.inventory = [];
+    for (const item of extractSharedItemAdditions(cleanResponse, gameState.worldState.inventory)) {
+      gameState.worldState.inventory.push(item);
+    }
+    for (const { key, item } of extractCharacterItemAdditions(cleanResponse, gameState.characters)) {
+      if (!gameState.characters[key].inventory) gameState.characters[key].inventory = [];
+      gameState.characters[key].inventory.push(item);
+    }
+
     // Bonus XP for a notable moment — on top of the baseline every character
     // already gets on new_session (see api/state.js and lib/growth.js).
     // Resonance is excluded from the whole growth system, so this only runs
@@ -202,6 +230,11 @@ function applyStateTags(cleanResponse, gameState, worldConfig, matchLocationId) 
 
     for (const { key, harm } of extractResonanceHarmUpdates(cleanResponse)) {
       if (gameState.characters[key]) gameState.characters[key].harm = harm;
+    }
+
+    for (const { key, item } of extractResonanceItemAdditions(cleanResponse, gameState.characters)) {
+      if (!gameState.characters[key].inventory) gameState.characters[key].inventory = [];
+      gameState.characters[key].inventory.push(item);
     }
 
     const resAbilityRegex = /\[ABILITY (FEN|LYRA): ([a-z_]+)\]/gi;
@@ -375,6 +408,8 @@ module.exports = async function handler(req, res) {
       visited_locations: gameState.worldState.visited_locations || [],
       location_scars: gameState.worldState.location_scars || [],
       objectives: gameState.worldState.objectives || [],
+      npcs: gameState.worldState.npcs || [],
+      inventory: gameState.worldState.inventory || [],
     };
   } else {
     responseWorldState = {
@@ -385,6 +420,7 @@ module.exports = async function handler(req, res) {
       visited_locations: gameState.worldState.visited_locations || [],
       location_scars: gameState.worldState.location_scars || [],
       objectives: gameState.worldState.objectives || [],
+      npcs: gameState.worldState.npcs || [],
     };
   }
 

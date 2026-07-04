@@ -314,3 +314,97 @@ test("end-to-end: a harm tag using the hero's real name instead of CHARACTER N s
   const res = await callGm({ player: "player1", message: "climb down", type: "action" }, "c_test1");
   assert.equal(res.body.gameState.characters.player1.harm, "Scratched");
 });
+
+/* ── NPC lorebook — shared across all world types, same as OBJECTIVE ── */
+
+test("NPC tag adds a lorebook entry and dedups by name across turns", async (t) => {
+  const redis = statefulRedisMock(null);
+  t.mock.module("../lib/redis.js", redis);
+  mockGemini(t, [
+    "A stranger approaches. [NPC: Old Marrow: A one-eyed lighthouse keeper]",
+    "He waves again. [NPC: Old Marrow: A one-eyed lighthouse keeper]",
+  ]);
+
+  const res1 = await callGm({ player: "player1", message: "look around", type: "action" });
+  assert.deepEqual(res1.body.gameState.worldState.npcs, [{ name: "Old Marrow", description: "A one-eyed lighthouse keeper" }]);
+
+  const res2 = await callGm({ player: "player1", message: "look again", type: "action" });
+  assert.equal(res2.body.gameState.worldState.npcs.length, 1);
+});
+
+test("NPC tag works for Resonance too, not just Manlandia/custom", async (t) => {
+  const redis = statefulRedisMock(null);
+  t.mock.module("../lib/redis.js", redis);
+  mockGemini(t, ["A Warden introduces herself. [NPC: Captain Reyes: A stern Warden patrolling the Docks]"]);
+
+  const res = await callGm({ player: "fen", message: "greet her", type: "action" }, "resonance");
+  assert.deepEqual(res.body.gameState.worldState.npcs, [{ name: "Captain Reyes", description: "A stern Warden patrolling the Docks" }]);
+});
+
+test("an NPC tag in a roll-request turn is deferred until the roll resolves, same as other state tags", async (t) => {
+  const redis = statefulRedisMock(null);
+  t.mock.module("../lib/redis.js", redis);
+  mockGemini(t, [
+    "A figure emerges. [NPC: Old Marrow: A lighthouse keeper]\nROLL:ACUITY",
+    "You size him up.",
+  ]);
+
+  const res1 = await callGm({ player: "player1", message: "approach", type: "action" });
+  assert.equal(res1.body.needsRoll, true);
+  assert.deepEqual(res1.body.gameState.worldState.npcs, []);
+
+  const res2 = await callGm({ player: "player1", message: "rolled a 9", type: "roll_result" });
+  assert.deepEqual(res2.body.gameState.worldState.npcs, [{ name: "Old Marrow", description: "A lighthouse keeper" }]);
+});
+
+/* ── Inventory: shared party loot for kid-friendly games ── */
+
+test("ITEM FOUND tag adds to the shared party inventory and dedups across turns (Manlandia)", async (t) => {
+  const redis = statefulRedisMock(null);
+  t.mock.module("../lib/redis.js", redis);
+  mockGemini(t, [
+    "You find a key. [ITEM FOUND: A rusty iron key]",
+    "Nothing else here. [ITEM FOUND: A rusty iron key]",
+  ]);
+
+  const res1 = await callGm({ player: "player1", message: "search", type: "action" });
+  assert.deepEqual(res1.body.gameState.worldState.inventory, ["A rusty iron key"]);
+
+  const res2 = await callGm({ player: "player1", message: "search more", type: "action" });
+  assert.deepEqual(res2.body.gameState.worldState.inventory, ["A rusty iron key"]);
+});
+
+test("ITEM FOUND tag works for a non-adult custom world too (shared inventory)", async (t) => {
+  const redis = statefulRedisMock(null);
+  t.mock.module("../lib/redis.js", redis);
+  mockGemini(t, ["You find a map fragment. [ITEM FOUND: A torn map fragment]"]);
+
+  const res = await callGm({ player: "player1", message: "search the chest", type: "action" }, "c_test");
+  assert.deepEqual(res.body.gameState.worldState.inventory, ["A torn map fragment"]);
+});
+
+/* ── Inventory: per-character, adult games only ── */
+
+test("ITEM N tag adds to that hero's own inventory in an adult-flagged custom campaign", async (t) => {
+  const seeded = require("../lib/gamestate-custom").getInitialStateCustom({ adult: true });
+  const redis = statefulRedisMock(seeded);
+  t.mock.module("../lib/redis.js", redis);
+  mockGemini(t, ["You pocket the locket. [ITEM 1: A silver locket]"]);
+
+  const res = await callGm({ player: "player1", message: "take it", type: "action" }, "c_adult_test");
+  assert.deepEqual(res.body.gameState.characters.player1.inventory, ["A silver locket"]);
+  // The shared worldState.inventory array still gets lazily created (same
+  // defensive init every tag here uses), it just never gets anything pushed
+  // into it for an adult game — no [ITEM FOUND: ...] tag to match.
+  assert.deepEqual(res.body.gameState.worldState.inventory, []);
+});
+
+test("ITEM FEN/LYRA tags add to each character's own inventory (Resonance)", async (t) => {
+  const redis = statefulRedisMock(null);
+  t.mock.module("../lib/redis.js", redis);
+  mockGemini(t, ["Fen pockets a knife, Lyra tucks away a journal. [ITEM FEN: A pocketknife]\n[ITEM LYRA: A worn journal]"]);
+
+  const res = await callGm({ player: "fen", message: "gather supplies", type: "action" }, "resonance");
+  assert.deepEqual(res.body.gameState.characters.fen.inventory, ["A pocketknife"]);
+  assert.deepEqual(res.body.gameState.characters.lyra.inventory, ["A worn journal"]);
+});

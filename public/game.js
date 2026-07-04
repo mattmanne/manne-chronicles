@@ -1593,6 +1593,11 @@ function renderManlandiaCard(n, char) {
       backstoryEl.classList.add("hidden");
     }
   }
+
+  // Per-character inventory — only ever populated for adult-flagged custom
+  // campaigns (Manlandia and kid custom worlds use the shared party
+  // inventory instead, see renderInventory), so this stays hidden otherwise.
+  renderCharInventory(`p${n}`, char?.inventory);
 }
 
 /* ── Archive ── */
@@ -1652,6 +1657,52 @@ function renderMap(state) {
   else if (currentWorld.startsWith("c_")) renderCustomMap(state);
   else renderResonanceMap(state);
   renderObjectives(state);
+  renderLorebook(state);
+  renderInventory(state);
+}
+
+// NPC lorebook — shared across all world types, populated via [NPC: ...].
+function renderLorebook(state) {
+  const panel = document.getElementById("lorebook-panel");
+  const list  = document.getElementById("lorebook-list");
+  if (!panel || !list) return;
+
+  const npcs = state?.worldState?.npcs || [];
+  if (!npcs.length) { panel.classList.add("hidden"); list.innerHTML = ""; return; }
+
+  panel.classList.remove("hidden");
+  list.innerHTML = npcs.map(n => `
+    <li class="objective-item">
+      <span><strong>${escapeHtml(n.name)}</strong> — ${escapeHtml(n.description)}</span>
+    </li>
+  `).join("");
+}
+
+// Shared party inventory — kid-friendly worlds only ([ITEM FOUND: ...]).
+// Adult games track items per-character instead — see renderCharInventory.
+function renderInventory(state) {
+  const panel = document.getElementById("inventory-panel");
+  const list  = document.getElementById("inventory-list");
+  if (!panel || !list) return;
+
+  const items = state?.worldState?.inventory || [];
+  if (!items.length) { panel.classList.add("hidden"); list.innerHTML = ""; return; }
+
+  panel.classList.remove("hidden");
+  list.innerHTML = items.map(item => `<li class="objective-item"><span>${escapeHtml(item)}</span></li>`).join("");
+}
+
+// Per-character carried items — adult games only ([ITEM N: ...] / [ITEM
+// FEN|LYRA: ...]). Shared by both the Resonance cards and the Manlandia/
+// custom playerN cards; harmlessly stays hidden wherever inventory is empty
+// (which is always, for worlds using the shared party inventory instead).
+function renderCharInventory(idPrefix, items) {
+  const el = document.getElementById(`${idPrefix}-inventory`);
+  if (!el) return;
+  const list = items || [];
+  if (!list.length) { el.classList.add("hidden"); el.innerHTML = ""; return; }
+  el.classList.remove("hidden");
+  el.innerHTML = `🎒 ${list.map(escapeHtml).join(", ")}`;
 }
 
 // Shared across all world types — generalizes Manlandia's stone tracker
@@ -2137,6 +2188,9 @@ function updateCharacterUI(data) {
     updateAbility("fen-notmywatch", chars.fen?.not_on_my_watch_used);
     updateAbility("fen-luckybreak",  chars.fen?.lucky_break_used);
     updateAbility("lyra-knowing",    chars.lyra?.weight_of_knowing_used);
+
+    renderCharInventory("fen",  chars.fen?.inventory);
+    renderCharInventory("lyra", chars.lyra?.inventory);
 
     if (ws?.conclave_awareness !== undefined) {
       const badge = document.getElementById("awareness-badge");

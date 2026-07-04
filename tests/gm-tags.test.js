@@ -4,6 +4,8 @@ const {
   normalizeHarm, buildNameToKeyMap, extractRoll, extractCounterUpdate,
   extractCharacterHarmUpdates, extractResonanceHarmUpdates, extractAbilityUsedKeys,
   objectivesMatch, extractObjectiveUpdates,
+  extractLorebookUpdates, extractSharedItemAdditions,
+  extractCharacterItemAdditions, extractResonanceItemAdditions,
 } = require("../lib/gm-tags");
 
 /* ── extractRoll — every variant below is a real string captured from live campaigns ── */
@@ -286,4 +288,72 @@ test("extractObjectiveUpdates handles both an addition and a completion in the s
   );
   assert.deepEqual(additions, ["Return the sword to the shrine"]);
   assert.deepEqual(completedTexts, ["Find the ancient sword"]);
+});
+
+/* ── NPC lorebook ── */
+
+test("extractLorebookUpdates adds a new named NPC", () => {
+  const additions = extractLorebookUpdates("You meet a stranger. [NPC: Old Marrow: A one-eyed lighthouse keeper who knows every ship in the harbor]", []);
+  assert.deepEqual(additions, [{ name: "Old Marrow", description: "A one-eyed lighthouse keeper who knows every ship in the harbor" }]);
+});
+
+test("extractLorebookUpdates dedups by name, case-insensitively, against existing NPCs", () => {
+  const existing = [{ name: "Old Marrow", description: "A lighthouse keeper" }];
+  const additions = extractLorebookUpdates("[NPC: old marrow: He waves at you again]", existing);
+  assert.deepEqual(additions, []);
+});
+
+test("extractLorebookUpdates dedups two additions of the same name within one response", () => {
+  const additions = extractLorebookUpdates("[NPC: Bramble: A nervous scout]\n[NPC: Bramble: A nervous scout again]", []);
+  assert.equal(additions.length, 1);
+});
+
+/* ── Inventory: shared party loot ── */
+
+test("extractSharedItemAdditions adds a new item", () => {
+  const additions = extractSharedItemAdditions("You find a key. [ITEM FOUND: A rusty iron key]", []);
+  assert.deepEqual(additions, ["A rusty iron key"]);
+});
+
+test("extractSharedItemAdditions dedups against the existing inventory, case-insensitively", () => {
+  const additions = extractSharedItemAdditions("[ITEM FOUND: a rusty iron key]", ["A rusty iron key"]);
+  assert.deepEqual(additions, []);
+});
+
+/* ── Inventory: per-character (adult games) ── */
+
+test("extractCharacterItemAdditions adds an item to the numbered hero's inventory", () => {
+  const characters = { player1: { inventory: [] } };
+  const updates = extractCharacterItemAdditions("[ITEM 1: A silver locket]", characters);
+  assert.deepEqual(updates, [{ key: "player1", item: "A silver locket" }]);
+});
+
+test("extractCharacterItemAdditions accepts the hero's name instead of their number, same tolerance as extractCharacterHarmUpdates", () => {
+  const characters = { player2: { name: "Globak", inventory: [] } };
+  const updates = extractCharacterItemAdditions("[ITEM Globak: A cracked shield]", characters);
+  assert.deepEqual(updates, [{ key: "player2", item: "A cracked shield" }]);
+});
+
+test("extractCharacterItemAdditions dedups against that character's existing inventory", () => {
+  const characters = { player1: { inventory: ["A silver locket"] } };
+  const updates = extractCharacterItemAdditions("[ITEM 1: a silver locket]", characters);
+  assert.deepEqual(updates, []);
+});
+
+test("extractCharacterItemAdditions ignores an unknown player slot", () => {
+  const characters = { player1: { inventory: [] } };
+  const updates = extractCharacterItemAdditions("[ITEM 3: A map fragment]", characters);
+  assert.deepEqual(updates, []);
+});
+
+test("extractResonanceItemAdditions adds an item to Fen or Lyra's inventory", () => {
+  const characters = { fen: { inventory: [] }, lyra: { inventory: [] } };
+  const updates = extractResonanceItemAdditions("[ITEM FEN: A pocketknife]\n[ITEM LYRA: A worn journal]", characters);
+  assert.deepEqual(updates, [{ key: "fen", item: "A pocketknife" }, { key: "lyra", item: "A worn journal" }]);
+});
+
+test("extractResonanceItemAdditions dedups against the existing inventory", () => {
+  const characters = { fen: { inventory: ["A pocketknife"] } };
+  const updates = extractResonanceItemAdditions("[ITEM FEN: a pocketknife]", characters);
+  assert.deepEqual(updates, []);
 });

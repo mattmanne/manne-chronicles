@@ -70,6 +70,12 @@ function stripGMTags(content) {
     .replace(/\[SUGGESTIONS: [^\]]+\]/gi, "")
     .replace(/\[OBJECTIVE(?: COMPLETE)?: [^\]]+\]/gi, "")
     .replace(/\[XP \d: \+\d+\]/gi, "")
+    .replace(/\[NPC:\s*[^:\]]+:\s*[^\]]+\]/gi, "")
+    // Broader than the parser on purpose (display-only, see comment above) —
+    // one pattern catches [ITEM FOUND: ...], [ITEM N: ...], [ITEM FEN|LYRA:
+    // ...], and the model naming a hero directly instead of a slot number,
+    // same "name instead of number" tolerance CHARACTER harm needed.
+    .replace(/\[ITEM [^:\]]+:\s*[^\]]+\]/gi, "")
     .replace(new RegExp(`\\[[A-Za-z]+:\\s*[A-Za-z]+\\s*${ARROW}\\s*[A-Za-z]+[^\\]]*\\]`, "g"), "").trim();
 }
 

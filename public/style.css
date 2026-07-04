@@ -1226,6 +1226,13 @@ body.world-manlandia #villain-badge   { display: inline-block; }
 .objective-check { flex-shrink: 0; }
 .objective-item.done { color: var(--parch-dim); text-decoration: line-through; opacity: 0.7; }
 
+.char-inventory {
+  font-size: 0.78rem;
+  color: var(--parch-dim);
+  line-height: 1.4;
+  margin-top: 6px;
+}
+
 /* ── Help Overlay ── */
 #help-overlay {
   display: none;
