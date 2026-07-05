@@ -6,6 +6,7 @@ const {
   objectivesMatch, extractObjectiveUpdates,
   extractLorebookUpdates, extractSharedItemAdditions,
   extractCharacterItemAdditions, extractResonanceItemAdditions,
+  extractCombatStart, extractEnemyUpdates, extractEnemyDefeated, extractCombatEnd,
 } = require("../lib/gm-tags");
 
 /* ── extractRoll — every variant below is a real string captured from live campaigns ── */
@@ -356,4 +357,85 @@ test("extractResonanceItemAdditions dedups against the existing inventory", () =
   const characters = { fen: { inventory: ["A pocketknife"] } };
   const updates = extractResonanceItemAdditions("[ITEM FEN: a pocketknife]", characters);
   assert.deepEqual(updates, []);
+});
+
+/* ── Combat ── */
+
+test("extractCombatStart parses a comma-separated enemy list", () => {
+  assert.deepEqual(extractCombatStart("A fight breaks out! [COMBAT START: Goblin Scout, Wolf]"), ["Goblin Scout", "Wolf"]);
+});
+
+test("extractCombatStart tolerates 'and' in place of a comma", () => {
+  assert.deepEqual(extractCombatStart("[COMBAT START: Goblin Scout and Wolf]"), ["Goblin Scout", "Wolf"]);
+});
+
+test("extractCombatStart strips leading list-numbering per name", () => {
+  assert.deepEqual(extractCombatStart("[COMBAT START: 1. Goblin 2. Wolf]"), ["Goblin", "Wolf"]);
+});
+
+test("extractCombatStart fires mid-sentence, not just alone on its own line", () => {
+  assert.deepEqual(extractCombatStart("Suddenly! [COMBAT START: Bandit] the fight begins."), ["Bandit"]);
+});
+
+test("extractCombatStart returns null when the tag isn't present", () => {
+  assert.equal(extractCombatStart("Just narration, no fight yet."), null);
+});
+
+test("extractCombatStart returns a single name unmangled by 'and'-splitting", () => {
+  assert.deepEqual(extractCombatStart("[COMBAT START: Lone Wolf]"), ["Lone Wolf"]);
+});
+
+test("extractEnemyUpdates applies a harm update via the arrow format", () => {
+  const enemies = [{ name: "Goblin Scout", harm: "Unhurt", defeated: false }];
+  const { harmUpdates, defeats } = extractEnemyUpdates("[ENEMY: Goblin Scout: Unhurt → Hurt]", enemies);
+  assert.deepEqual(harmUpdates, [{ name: "Goblin Scout", harm: "Hurt" }]);
+  assert.deepEqual(defeats, []);
+});
+
+test("extractEnemyUpdates applies the arrow-less fallback", () => {
+  const enemies = [{ name: "Wolf", harm: "Unhurt", defeated: false }];
+  const { harmUpdates } = extractEnemyUpdates("[ENEMY: Wolf: Hurt]", enemies);
+  assert.deepEqual(harmUpdates, [{ name: "Wolf", harm: "Hurt" }]);
+});
+
+test("extractEnemyUpdates matches a shortened/fuzzy enemy name against the tracked list", () => {
+  const enemies = [{ name: "Grunk the Goblin Scout", harm: "Unhurt", defeated: false }];
+  const { harmUpdates } = extractEnemyUpdates("[ENEMY: the goblin: Unhurt → Hurt]", enemies);
+  assert.deepEqual(harmUpdates, [{ name: "Grunk the Goblin Scout", harm: "Hurt" }]);
+});
+
+test("extractEnemyUpdates treats a defeat synonym folded into the harm arrow as a defeat, not a dropped harm word", () => {
+  const enemies = [{ name: "Goblin Scout", harm: "Hurt", defeated: false }];
+  const { harmUpdates, defeats } = extractEnemyUpdates("[ENEMY: Goblin Scout: Hurt → Defeated]", enemies);
+  assert.deepEqual(harmUpdates, []);
+  assert.deepEqual(defeats, ["Goblin Scout"]);
+});
+
+test("extractEnemyUpdates ignores an unrecognized enemy name", () => {
+  const enemies = [{ name: "Goblin Scout", harm: "Unhurt", defeated: false }];
+  const { harmUpdates, defeats } = extractEnemyUpdates("[ENEMY: Dragon: Unhurt → Hurt]", enemies);
+  assert.deepEqual(harmUpdates, []);
+  assert.deepEqual(defeats, []);
+});
+
+test("extractEnemyUpdates ignores an already-defeated enemy", () => {
+  const enemies = [{ name: "Goblin Scout", harm: "Hurt", defeated: true }];
+  const { harmUpdates, defeats } = extractEnemyUpdates("[ENEMY: Goblin Scout: Hurt → Wounded]", enemies);
+  assert.deepEqual(harmUpdates, []);
+  assert.deepEqual(defeats, []);
+});
+
+test("extractEnemyDefeated marks a tracked enemy defeated via the dedicated tag", () => {
+  const enemies = [{ name: "Wolf", harm: "Hurt", defeated: false }];
+  assert.deepEqual(extractEnemyDefeated("[ENEMY DEFEATED: Wolf]", enemies), ["Wolf"]);
+});
+
+test("extractEnemyDefeated dedups two defeat mentions of the same enemy in one response", () => {
+  const enemies = [{ name: "Wolf", harm: "Hurt", defeated: false }];
+  assert.deepEqual(extractEnemyDefeated("[ENEMY DEFEATED: Wolf] [ENEMY DEFEATED: the wolf]", enemies), ["Wolf"]);
+});
+
+test("extractCombatEnd recognizes the tag anywhere in the text", () => {
+  assert.equal(extractCombatEnd("The dust settles. [COMBAT END]"), true);
+  assert.equal(extractCombatEnd("The fight rages on."), false);
 });

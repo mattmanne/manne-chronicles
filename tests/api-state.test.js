@@ -430,3 +430,28 @@ test("resolve_bond rejects an invalid bond index", async (t) => {
   const badIndex = await callState({ method: "POST", headers: { "x-adult-pin": ADULT_PIN }, query: { world: "resonance" }, body: { action: "resolve_bond", payload: { character: "fen", index: 0 } } });
   assert.equal(badIndex.statusCode, 400);
 });
+
+/* ── end_combat — manual escape hatch, no LLM round-trip ── */
+
+test("end_combat sets combat.active to false without touching the tracked enemies", async (t) => {
+  const seeded = {
+    session: 1, sessionLog: [], worldState: { combat: { active: true, round: 2, enemies: [{ name: "Goblin Scout", harm: "Hurt", defeated: false }] } },
+    characters: {},
+  };
+  const redis = statefulRedisMock(seeded);
+  t.mock.module("../lib/redis.js", redis);
+
+  const res = await callState({ method: "POST", headers: { "x-adult-pin": ADULT_PIN }, query: { world: "manlandia" }, body: { action: "end_combat", payload: {} } });
+  assert.equal(res.body.ok, true);
+  assert.equal(res.body.worldState.combat.active, false);
+  assert.equal(redis.state.worldState.combat.active, false);
+  assert.equal(redis.state.worldState.combat.enemies[0].name, "Goblin Scout");
+});
+
+test("end_combat is a harmless no-op when there's no combat state at all yet", async (t) => {
+  const redis = statefulRedisMock({ session: 1, sessionLog: [], worldState: {}, characters: {} });
+  t.mock.module("../lib/redis.js", redis);
+
+  const res = await callState({ method: "POST", headers: { "x-adult-pin": ADULT_PIN }, query: { world: "manlandia" }, body: { action: "end_combat", payload: {} } });
+  assert.equal(res.body.ok, true);
+});

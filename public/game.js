@@ -548,6 +548,7 @@ async function continueInit() {
   setupInputHandlers();
   setupAbilityToggles();
   setupHarmRecovery();
+  setupCombatTracker();
   setupNewSession();
   setupAutoRead();
   setupPushNotifications();
@@ -715,6 +716,18 @@ function setupInputHandlers() {
   sendBtn.addEventListener("click", submitAction);
   actionInput.addEventListener("keydown", (e) => {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submitAction(); }
+  });
+}
+
+/* ── Combat Tracker ── */
+function setupCombatTracker() {
+  document.getElementById("end-combat-btn")?.addEventListener("click", async () => {
+    const res = await authPost("/api/state", { action: "end_combat", payload: {} });
+    const data = await res.json();
+    if (data.ok) {
+      cachedGameState = { ...cachedGameState, worldState: data.worldState };
+      updateCharacterUI(cachedGameState);
+    }
   });
 }
 
@@ -2299,6 +2312,7 @@ function updateCharacterUI(data) {
   }
 
   renderWaitingBanner(ws, chars);
+  renderCombatTracker(ws);
   if (ws?.session) sessionLabel.textContent = `Session ${ws.session}`;
 }
 
@@ -2312,6 +2326,25 @@ function renderWaitingBanner(ws, characters) {
   const names = waitingOn.map(k => getPlayerDisplayName(k, { characters })).join(", ");
   banner.classList.remove("hidden");
   banner.innerHTML = `⏳ Waiting on: ${escapeHtml(names)}`;
+}
+
+// Still Dungeon-World-style underneath (one roll resolves one exchange) —
+// this just surfaces enemy state that now persists across several
+// exchanges within a fight instead of resolving in a single roll. Round is
+// server-derived (see api/gm.js), never something the GM narrates itself.
+function renderCombatTracker(ws) {
+  const tracker = document.getElementById("combat-tracker");
+  if (!tracker) return;
+  const combat = ws?.combat;
+  if (!combat?.active) { tracker.classList.add("hidden"); return; }
+  tracker.classList.remove("hidden");
+  document.getElementById("combat-round").textContent = combat.round || 0;
+  document.getElementById("combat-enemy-list").innerHTML = (combat.enemies || []).map(e => `
+    <li class="combat-enemy${e.defeated ? " defeated" : ""}">
+      <span>${escapeHtml(e.name)}</span>
+      <span class="harm-value ${e.harm}">${e.defeated ? "Defeated" : e.harm}</span>
+    </li>
+  `).join("");
 }
 
 function updateHarm(id, harm) {

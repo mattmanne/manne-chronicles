@@ -1,6 +1,6 @@
 const { getState, setState } = require("../lib/redis");
 const { HARM_LEVELS } = require("../lib/gamestate");
-const { getWorldConfig } = require("../lib/worldconfig");
+const { getWorldConfig, buildWorldStatePayload } = require("../lib/worldconfig");
 const { checkAdultAccess, isAdultWorld } = require("../lib/adultgate");
 const { GROWTH_CONFIG_KID, GROWTH_CONFIG_ADULT, applyXpGain, chooseAbility } = require("../lib/growth");
 
@@ -76,6 +76,18 @@ module.exports = async function handler(req, res) {
         return res.json({ ok: true, characters: current.characters });
       }
       return res.json({ ok: false, error: "Already unhurt", characters: current.characters });
+    }
+
+    // Manual escape hatch for combat — no LLM round-trip, same pattern as
+    // recover_harm. [COMBAT END]/all-enemies-defeated auto-detection covers
+    // most fights, but a fight that ends by retreat or negotiation rather
+    // than defeating everyone has no other way to close, so this exists as
+    // the safety net rather than trying to solve that detection perfectly.
+    if (action === "end_combat") {
+      const current = (await getState(key)) || getInitialState();
+      if (current.worldState.combat) current.worldState.combat.active = false;
+      await setState(key, current);
+      return res.json({ ok: true, worldState: buildWorldStatePayload(worldConfig, current) });
     }
 
     if (action === "choose_ability") {

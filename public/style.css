@@ -1638,6 +1638,62 @@ body.world-custom .manlandia-lore { display: none !important; }
 }
 #waiting-banner.hidden { display: none; }
 
+#combat-tracker {
+  margin: 10px 14px 0;
+  padding: 10px 12px;
+  background: rgba(192,57,43,0.08);
+  border: 1px solid var(--red);
+  border-radius: 6px;
+}
+#combat-tracker.hidden { display: none; }
+.combat-tracker-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.combat-tracker-title {
+  font-size: 0.78rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--red);
+  font-weight: 700;
+}
+.combat-end-btn {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--parch-dim);
+  border-radius: 6px;
+  font-size: 0.7rem;
+  padding: 5px 9px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.combat-end-btn:hover { border-color: var(--red); color: var(--red); }
+.combat-enemy-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.combat-enemy {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 0.82rem;
+  color: var(--parchment);
+}
+.combat-enemy.defeated { color: var(--parch-dim); text-decoration: line-through; opacity: 0.7; }
+/* Reuses .harm-value's pill-badge styling for enemy harm chips, but these
+   are read-only display (no recover-harm click handler like hero badges
+   get), so the hover/pointer affordance that implies clickability is off. */
+.combat-enemy .harm-value { cursor: default; }
+.combat-enemy .harm-value:hover { filter: none; }
+
 #recap-overlay {
   display: none;
   position: fixed; inset: 0;

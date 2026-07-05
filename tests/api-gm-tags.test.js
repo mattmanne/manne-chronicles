@@ -434,3 +434,157 @@ test("last_actor updates to whoever acts next, overwriting the previous value", 
   await callGm({ player: "player2", message: "go too", type: "action" });
   assert.equal(redis.state.worldState.last_actor, "player2");
 });
+
+/* ── Combat — still Dungeon-World-style (one roll resolves one exchange),
+   this just tracks enemy state persisting across several exchanges ── */
+
+test("COMBAT START adds enemies and marks combat active (Manlandia)", async (t) => {
+  const redis = statefulRedisMock(null);
+  t.mock.module("../lib/redis.js", redis);
+  mockGemini(t, ["A goblin and a wolf leap out! [COMBAT START: Goblin Scout, Wolf]"]);
+
+  const res = await callGm({ player: "player1", message: "walk into the clearing", type: "action" });
+  assert.equal(res.body.gameState.worldState.combat.active, true);
+  assert.deepEqual(res.body.gameState.worldState.combat.enemies, [
+    { name: "Goblin Scout", harm: "Unhurt", defeated: false },
+    { name: "Wolf", harm: "Unhurt", defeated: false },
+  ]);
+});
+
+test("COMBAT START works for Resonance and custom worlds too, not just Manlandia", async (t) => {
+  const redis = statefulRedisMock(null);
+  t.mock.module("../lib/redis.js", redis);
+  mockGemini(t, ["A Warden draws steel! [COMBAT START: Warden]"]);
+
+  const res = await callGm({ player: "fen", message: "stand ground", type: "action" }, "resonance");
+  assert.equal(res.body.gameState.worldState.combat.active, true);
+  assert.equal(res.body.gameState.worldState.combat.enemies[0].name, "Warden");
+});
+
+test("ENEMY tag updates harm across turns, tolerating a fuzzy name match", async (t) => {
+  const redis = statefulRedisMock(null);
+  t.mock.module("../lib/redis.js", redis);
+  mockGemini(t, [
+    "A fight breaks out! [COMBAT START: Grunk the Goblin Scout]",
+    "You land a hit! [ENEMY: the goblin: Unhurt → Hurt]",
+  ]);
+
+  await callGm({ player: "player1", message: "attack", type: "action" });
+  const res = await callGm({ player: "player1", message: "attack again", type: "action" });
+  assert.equal(res.body.gameState.worldState.combat.enemies[0].harm, "Hurt");
+});
+
+test("ENEMY DEFEATED marks that enemy defeated, and combat auto-ends once every enemy is down", async (t) => {
+  const redis = statefulRedisMock(null);
+  t.mock.module("../lib/redis.js", redis);
+  mockGemini(t, [
+    "[COMBAT START: Goblin Scout]",
+    "You strike true! [ENEMY DEFEATED: Goblin Scout]",
+  ]);
+
+  await callGm({ player: "player1", message: "attack", type: "action" });
+  const res = await callGm({ player: "player1", message: "finish it", type: "action" });
+  assert.equal(res.body.gameState.worldState.combat.enemies[0].defeated, true);
+  assert.equal(res.body.gameState.worldState.combat.active, false);
+});
+
+test("a defeat synonym folded into the ENEMY harm arrow still ends combat once it's the last enemy standing", async (t) => {
+  const redis = statefulRedisMock(null);
+  t.mock.module("../lib/redis.js", redis);
+  mockGemini(t, [
+    "[COMBAT START: Goblin Scout]",
+    "Down it goes! [ENEMY: Goblin Scout: Hurt → Defeated]",
+  ]);
+
+  await callGm({ player: "player1", message: "attack", type: "action" });
+  const res = await callGm({ player: "player1", message: "finish it", type: "action" });
+  assert.equal(res.body.gameState.worldState.combat.enemies[0].defeated, true);
+  assert.equal(res.body.gameState.worldState.combat.active, false);
+});
+
+test("COMBAT END explicitly ends a fight even with enemies still standing (e.g. the party flees)", async (t) => {
+  const redis = statefulRedisMock(null);
+  t.mock.module("../lib/redis.js", redis);
+  mockGemini(t, [
+    "[COMBAT START: Goblin Scout]",
+    "You break away and flee! [COMBAT END]",
+  ]);
+
+  await callGm({ player: "player1", message: "fight", type: "action" });
+  const res = await callGm({ player: "player1", message: "run!", type: "action" });
+  assert.equal(res.body.gameState.worldState.combat.active, false);
+  assert.equal(res.body.gameState.worldState.combat.enemies[0].defeated, false);
+});
+
+test("combat round only advances on an actual resolved roll, and only while combat is active", async (t) => {
+  const redis = statefulRedisMock(null);
+  t.mock.module("../lib/redis.js", redis);
+  mockGemini(t, [
+    "A fight begins! [COMBAT START: Goblin Scout]\nROLL:FORCE",
+    "You strike hard.",
+  ]);
+
+  const res1 = await callGm({ player: "player1", message: "attack", type: "action" });
+  assert.equal(res1.body.needsRoll, true);
+  // Combat tags are deferred while the roll is pending, same as every other tag.
+  assert.equal(res1.body.gameState.worldState.combat.active, false);
+
+  const res2 = await callGm({ player: "player1", message: "rolled a 12", type: "roll_result" });
+  assert.equal(res2.body.gameState.worldState.combat.active, true);
+  assert.equal(res2.body.gameState.worldState.combat.round, 1);
+});
+
+test("combat round does not advance on an ordinary narration turn (no roll involved)", async (t) => {
+  const seeded = require("../lib/gamestate-manlandia").getInitialStateManlandia();
+  seeded.worldState.combat = { active: true, round: 2, enemies: [{ name: "Goblin Scout", harm: "Hurt", defeated: false }] };
+  const redis = statefulRedisMock(seeded);
+  t.mock.module("../lib/redis.js", redis);
+  mockGemini(t, ["The goblin snarls but nothing else happens."]);
+
+  const res = await callGm({ player: "player1", message: "look around", type: "action" });
+  assert.equal(res.body.gameState.worldState.combat.round, 2);
+});
+
+test("kid-world combat caps a hero's harm at Broken, never Dying, while a fight is active (Manlandia)", async (t) => {
+  const seeded = require("../lib/gamestate-manlandia").getInitialStateManlandia();
+  seeded.worldState.combat = { active: true, round: 1, enemies: [{ name: "Goblin Scout", harm: "Unhurt", defeated: false }] };
+  const redis = statefulRedisMock(seeded);
+  t.mock.module("../lib/redis.js", redis);
+  mockGemini(t, ["A brutal blow lands! [CHARACTER 1: Broken → Dying]"]);
+
+  const res = await callGm({ player: "player1", message: "take the hit", type: "action" });
+  assert.equal(res.body.gameState.characters.player1.harm, "Broken");
+});
+
+test("the kid-world harm cap does not apply outside of combat", async (t) => {
+  const redis = statefulRedisMock(null);
+  t.mock.module("../lib/redis.js", redis);
+  mockGemini(t, ["A terrible curse takes hold. [CHARACTER 1: Broken → Dying]"]);
+
+  const res = await callGm({ player: "player1", message: "touch the cursed idol", type: "action" });
+  assert.equal(res.body.gameState.characters.player1.harm, "Dying");
+});
+
+test("the kid-world harm cap does not apply to Resonance (always adult)", async (t) => {
+  const redis = statefulRedisMock(null);
+  t.mock.module("../lib/redis.js", redis);
+  mockGemini(t, [
+    "[COMBAT START: Warden]",
+    "A killing blow! [FEN: Broken → Dying]",
+  ]);
+
+  await callGm({ player: "fen", message: "fight", type: "action" }, "resonance");
+  const res = await callGm({ player: "fen", message: "keep fighting", type: "action" }, "resonance");
+  assert.equal(res.body.gameState.characters.fen.harm, "Dying");
+});
+
+test("an adult-flagged custom world's combat harm is not capped either", async (t) => {
+  const seeded = require("../lib/gamestate-custom").getInitialStateCustom({ adult: true });
+  seeded.worldState.combat = { active: true, round: 1, enemies: [{ name: "Raider", harm: "Unhurt", defeated: false }] };
+  const redis = statefulRedisMock(seeded);
+  t.mock.module("../lib/redis.js", redis);
+  mockGemini(t, ["A killing blow! [CHARACTER 1: Broken → Dying]"]);
+
+  const res = await callGm({ player: "player1", message: "fight on", type: "action" }, "c_adult_combat_test");
+  assert.equal(res.body.gameState.characters.player1.harm, "Dying");
+});

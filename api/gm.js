@@ -212,6 +212,14 @@ module.exports = async function handler(req, res) {
   // roll — those are deferred until the matching roll_result comes back.
   if (!rolling) applyStateTags(cleanResponse, gameState, worldConfig, matchLocationId);
 
+  // Combat's round counter only advances on an actual resolved roll, never
+  // on narration alone, and is never something the model is asked to
+  // report itself — a server-derived value sidesteps a whole category of
+  // drift risk that every model-supplied tag in this app has to tolerate.
+  if (type === "roll_result" && gameState.worldState.combat?.active) {
+    gameState.worldState.combat.round += 1;
+  }
+
   const responseWorldState = buildWorldStatePayload(worldConfig, gameState);
 
   await setState(key, gameState);
