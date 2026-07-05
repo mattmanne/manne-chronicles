@@ -1984,6 +1984,7 @@ function renderResonanceMap(state) {
          <line x1="${loc.x+r+4}" y1="${loc.y-r-4}" x2="${loc.x+r-1}" y2="${loc.y-r+1}" stroke="#8b1a1a" stroke-width="1.3"/>` : "";
 
     return `<g class="map-location" onclick="showLocationInfo('resonance','${loc.id}')">
+      <circle cx="${loc.x}" cy="${loc.y}" r="${r + 6}" fill="transparent"/>
       ${pulse}
       <circle cx="${loc.x}" cy="${loc.y}" r="${r}" fill="${dotColor}" opacity="${dotOpacity}"/>
       ${center}${scarMark}
@@ -2068,6 +2069,7 @@ function renderManlandiaMap(state) {
       : "";
 
     return `<g class="map-location" onclick="showLocationInfo('manlandia','${loc.id}')">
+      <circle cx="${loc.x}" cy="${loc.y}" r="${r + 6}" fill="transparent"/>
       ${villainhalo}${pulse}
       <circle cx="${loc.x}" cy="${loc.y}" r="${r}" fill="${dotColor}" opacity="${dotOpacity}"/>
       ${center}${scarMark}

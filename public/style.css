@@ -685,6 +685,12 @@ html, body {
   }
 }
 
+/* Below ~400px the 2×2 hero grid gets cramped, especially now that each
+   card can carry a "Details" toggle too — single column instead. */
+@media (max-width: 400px) {
+  .manlandia-chars-grid { grid-template-columns: 1fr; }
+}
+
 /* ── Scrollbars ── */
 #log-area::-webkit-scrollbar,
 .tab-scroll::-webkit-scrollbar,
