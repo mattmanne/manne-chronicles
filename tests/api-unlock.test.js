@@ -67,7 +67,7 @@ test("OPTIONS preflight succeeds with no auth or rate-limit check", async (t) =>
   assert.equal(res.statusCode, 200);
 });
 
-test("rate-limits repeated PIN attempts from the same IP — a 4-digit PIN is only 10,000 combinations, so this must not be guessable at will", async (t) => {
+test("rate-limits repeated WRONG PIN attempts from the same IP — a 4-digit PIN is only 10,000 combinations, so this must not be guessable at will", async (t) => {
   process.env.ADULT_PIN = "1234";
   try {
     const redis = statefulRedisMock(null);
@@ -76,14 +76,30 @@ test("rate-limits repeated PIN attempts from the same IP — a 4-digit PIN is on
     const attempt = (pin) => handler({ method: "POST", headers: { "x-forwarded-for": "9.9.9.9" }, body: { pin } }, mockRes());
 
     for (let i = 0; i < 5; i++) await attempt("0000"); // exhausts the 5/60s limit
-    const res = await attempt("1234"); // even the CORRECT pin is throttled once the limit is hit
+    const res = await attempt("0000");
     assert.equal(res.statusCode, 429);
   } finally {
     delete process.env.ADULT_PIN;
   }
 });
 
-test("rate limit is tracked per IP — a different IP is unaffected by another IP's attempts", async (t) => {
+test("the CORRECT pin is never throttled, even right after exhausting the wrong-guess limit from the same IP — Matt's whole family shares one home IP", async (t) => {
+  process.env.ADULT_PIN = "1234";
+  try {
+    const redis = statefulRedisMock(null);
+    t.mock.module("../lib/redis.js", redis);
+    const handler = freshRequire("../api/unlock.js");
+    const attempt = (pin) => handler({ method: "POST", headers: { "x-forwarded-for": "9.9.9.9" }, body: { pin } }, mockRes());
+
+    for (let i = 0; i < 5; i++) await attempt("0000"); // exhausts the wrong-guess limit
+    const res = await attempt("1234"); // correct pin, same IP, same moment
+    assert.equal(res.body.ok, true);
+  } finally {
+    delete process.env.ADULT_PIN;
+  }
+});
+
+test("rate limit is tracked per IP — a different IP is unaffected by another IP's wrong guesses", async (t) => {
   process.env.ADULT_PIN = "1234";
   try {
     const redis = statefulRedisMock(null);
@@ -92,8 +108,8 @@ test("rate limit is tracked per IP — a different IP is unaffected by another I
     const attempt = (ip, pin) => handler({ method: "POST", headers: { "x-forwarded-for": ip }, body: { pin } }, mockRes());
 
     for (let i = 0; i < 5; i++) await attempt("1.1.1.1", "0000");
-    const res = await attempt("2.2.2.2", "1234");
-    assert.equal(res.body.ok, true);
+    const res = await attempt("2.2.2.2", "0000");
+    assert.equal(res.statusCode, 401); // still a normal wrong-pin rejection, not yet rate-limited
   } finally {
     delete process.env.ADULT_PIN;
   }
