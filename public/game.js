@@ -381,7 +381,10 @@ function setupWorldCreator() {
   // Player count buttons
   document.querySelectorAll(".wc-count-btn").forEach(btn => {
     btn.addEventListener("click", () => {
-      document.querySelectorAll(".wc-count-btn").forEach(b => b.classList.toggle("active", b === btn));
+      document.querySelectorAll(".wc-count-btn").forEach(b => {
+        b.classList.toggle("active", b === btn);
+        b.setAttribute("aria-pressed", String(b === btn));
+      });
     });
   });
 
@@ -391,8 +394,10 @@ function setupWorldCreator() {
   document.getElementById("wc-create-btn").addEventListener("click", async () => {
     const name  = document.getElementById("wc-name").value.trim();
     const theme = document.getElementById("wc-theme").value.trim();
-    if (!name)  { document.getElementById("wc-name").focus();  return; }
-    if (!theme) { document.getElementById("wc-theme").focus(); return; }
+    const errorEl = document.getElementById("wc-validation-error");
+    if (!name)  { errorEl.textContent = "Give your world a name first."; errorEl.classList.remove("hidden"); document.getElementById("wc-name").focus();  return; }
+    if (!theme) { errorEl.textContent = "Describe your world before creating it."; errorEl.classList.remove("hidden"); document.getElementById("wc-theme").focus(); return; }
+    errorEl.classList.add("hidden");
 
     const btn = document.getElementById("wc-create-btn");
     btn.disabled = true;
@@ -460,7 +465,9 @@ async function openWorldCreatorForEdit(id) {
   document.getElementById("wc-theme").value = fullTheme;
 
   document.querySelectorAll(".wc-count-btn").forEach(b => {
-    b.classList.toggle("active", parseInt(b.dataset.count) === camp.playerCount);
+    const selected = parseInt(b.dataset.count) === camp.playerCount;
+    b.classList.toggle("active", selected);
+    b.setAttribute("aria-pressed", String(selected));
     b.disabled = true;
   });
   document.getElementById("wc-count-field").classList.add("wc-locked");
@@ -475,9 +482,15 @@ function closeWorldCreator() {
   document.getElementById("world-creator").classList.remove("active");
   document.getElementById("wc-name").value = "";
   document.getElementById("wc-theme").value = "";
-  document.querySelectorAll(".wc-count-btn").forEach(b => { b.classList.toggle("active", b.dataset.count === "2"); b.disabled = false; });
+  document.querySelectorAll(".wc-count-btn").forEach(b => {
+    const selected = b.dataset.count === "2";
+    b.classList.toggle("active", selected);
+    b.setAttribute("aria-pressed", String(selected));
+    b.disabled = false;
+  });
   document.getElementById("wc-count-field").classList.remove("wc-locked");
   document.getElementById("wc-locked-hint").classList.add("hidden");
+  document.getElementById("wc-validation-error").classList.add("hidden");
   const adultCb = document.getElementById("wc-adult-checkbox");
   if (adultCb) { adultCb.checked = false; adultCb.disabled = false; }
 
@@ -557,7 +570,11 @@ function setupTabs() {
 }
 
 function switchTab(tab) {
-  document.querySelectorAll(".tab-btn").forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
+  document.querySelectorAll(".tab-btn").forEach(b => {
+    const selected = b.dataset.tab === tab;
+    b.classList.toggle("active", selected);
+    b.setAttribute("aria-selected", String(selected));
+  });
   document.querySelectorAll(".tab-panel").forEach(p => p.classList.toggle("active", p.id === `tab-${tab}`));
   if (tab === "story")   { setUnreadBadge(false); setTimeout(scrollToBottom, 50); }
   if (tab === "archive") loadArchive();
@@ -574,6 +591,7 @@ function setupAutoRead() {
   btn.addEventListener("click", () => {
     autoRead = !autoRead;
     btn.classList.toggle("active", autoRead);
+    btn.setAttribute("aria-pressed", String(autoRead));
     btn.title = autoRead ? "Auto-read ON — tap to turn off" : "Auto-read new narrations";
   });
 }
@@ -603,6 +621,7 @@ async function setupPushNotifications() {
 function updateNotifyButton(subscribed) {
   const btn = document.getElementById("notify-btn");
   btn.classList.toggle("active", subscribed);
+  btn.setAttribute("aria-pressed", String(subscribed));
   btn.title = subscribed ? "Notifications ON — tap to turn off" : "Notify me when someone else takes a turn";
 }
 
@@ -720,6 +739,22 @@ function setupHarmRecovery() {
       const res = await authPost("/api/state", { action: "recover_harm", payload: { character: player } });
       const data = await res.json();
       if (data.ok) updateCharacterUI({ characters: data.characters });
+    });
+  });
+
+  // Harm badges are clickable spans, not real buttons — keyboard/screen-reader
+  // users otherwise have no way to trigger recovery at all. Scoped to the
+  // harm elements specifically (by id suffix, not the broader [data-player]
+  // selector above, which also matches the hero-select buttons) so this
+  // doesn't touch anything except the badges themselves.
+  document.querySelectorAll('[id$="-harm"]').forEach(el => {
+    el.setAttribute("role", "button");
+    el.setAttribute("tabindex", "0");
+    el.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        el.click();
+      }
     });
   });
 }
@@ -1423,7 +1458,11 @@ function resizeForStorage(file, callback) {
 function setupToneSelector() {
   const btns = document.querySelectorAll(".tone-btn");
   function syncToneUI() {
-    btns.forEach(b => b.classList.toggle("active", b.dataset.tone === manlandiaTone));
+    btns.forEach(b => {
+      const selected = b.dataset.tone === manlandiaTone;
+      b.classList.toggle("active", selected);
+      b.setAttribute("aria-pressed", String(selected));
+    });
   }
   syncToneUI();
   btns.forEach(btn => {
@@ -2183,6 +2222,7 @@ function appendRollResult(player, stat, result) {
 function appendSystemMessage(msg, onRetry) {
   const entry = document.createElement("div");
   entry.className = "system-message";
+  entry.setAttribute("aria-live", "assertive");
   entry.textContent = msg;
   if (onRetry) {
     const btn = document.createElement("button");

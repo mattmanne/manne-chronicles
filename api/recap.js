@@ -2,7 +2,7 @@ const { getState } = require("../lib/redis");
 const { generateContent } = require("../lib/gemini");
 const { getWorldConfig } = require("../lib/worldconfig");
 const { formatTranscript, buildRecapSystemPrompt } = require("../lib/recap");
-const { checkAdultAccess } = require("../lib/adultgate");
+const { checkAdultAccess, isAdultWorld } = require("../lib/adultgate");
 const { checkRateLimit } = require("../lib/ratelimit");
 
 module.exports = async function handler(req, res) {
@@ -27,8 +27,7 @@ module.exports = async function handler(req, res) {
     return res.json({ recap: "The adventure hasn't begun yet — there's nothing to recap!" });
   }
 
-  const isKidWorld = worldConfig.id === "manlandia" ||
-    (worldConfig.type === "custom" && gameState.worldConfig?.adult !== true);
+  const isKidWorld = !isAdultWorld(worldConfig, gameState);
 
   const systemPrompt = buildRecapSystemPrompt(isKidWorld);
 

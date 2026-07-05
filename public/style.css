@@ -662,7 +662,7 @@ html, body {
 .loc-info-card strong { font-family: var(--font-serif); color: var(--gold); font-size: 0.9rem; }
 .loc-info-card span { font-size: 0.8rem; color: var(--parch-dim); line-height: 1.5; font-style: italic; }
 .loc-scars { display: flex; flex-direction: column; gap: 3px; margin-top: 2px; }
-.loc-scar { font-size: 0.72rem; color: #8b1a1a; letter-spacing: 0.02em; }
+.loc-scar { font-size: 0.72rem; color: var(--red); letter-spacing: 0.02em; }
 
 /* ── Animations ── */
 @keyframes fadeIn   { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
@@ -766,7 +766,7 @@ html, body {
 .custom-campaign-card { flex-direction: row; align-items: center; gap: 10px; }
 .custom-campaign-info { flex: 1; display: flex; flex-direction: column; gap: 5px; min-width: 0; }
 .custom-campaign-info .world-btn-sub { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.campaign-delete-btn { background: none; border: none; color: var(--parch-dim); opacity: 0.4; cursor: pointer; font-size: 1rem; padding: 4px 6px; flex-shrink: 0; }
+.campaign-delete-btn { background: none; border: none; color: var(--parch-dim); opacity: 0.4; cursor: pointer; font-size: 1rem; padding: 10px; min-width: 40px; min-height: 40px; flex-shrink: 0; }
 .campaign-delete-btn:hover { opacity: 1; color: #c0392b; }
 
 /* ── World Creator Overlay ── */
@@ -798,11 +798,12 @@ html, body {
 .wc-label { font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--parch-dim); }
 .wc-hint { font-size: 0.75rem; color: var(--parch-dim); opacity: 0.7; line-height: 1.4; margin: 0; }
 .wc-hint.hidden { display: none; }
+.wc-hint.wc-error { color: var(--red); opacity: 1; }
 #wc-count-field.wc-locked .wc-count-btn { opacity: 0.5; pointer-events: none; }
-.campaign-edit-btn { background: none; border: none; font-size: 0.9rem; cursor: pointer; opacity: 0.8; }
+.campaign-edit-btn { background: none; border: none; font-size: 0.9rem; cursor: pointer; opacity: 0.8; padding: 10px; min-width: 40px; min-height: 40px; }
 .campaign-edit-btn:hover { opacity: 1; }
-.custom-campaign-card .campaign-actions { display: flex; gap: 4px; align-items: center; }
-.campaign-archive-btn, .campaign-unarchive-btn { background: none; border: none; font-size: 0.9rem; cursor: pointer; opacity: 0.6; }
+.custom-campaign-card .campaign-actions { display: flex; gap: 6px; align-items: center; }
+.campaign-archive-btn, .campaign-unarchive-btn { background: none; border: none; font-size: 0.9rem; cursor: pointer; opacity: 0.6; padding: 10px; min-width: 40px; min-height: 40px; }
 .campaign-archive-btn:hover, .campaign-unarchive-btn:hover { opacity: 1; color: var(--gold); }
 .custom-campaign-card.archived { opacity: 0.6; }
 .archived-badge {
@@ -830,9 +831,9 @@ html, body {
 }
 .show-archived-toggle:hover { color: var(--gold-dim); }
 .show-archived-toggle.hidden { display: none; }
-.wc-input { width: 100%; padding: 11px 14px; font-size: 0.9rem; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; color: var(--parch); font-family: var(--font-sans); box-sizing: border-box; }
+.wc-input { width: 100%; padding: 11px 14px; font-size: 0.9rem; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; color: var(--parchment); font-family: var(--font-sans); box-sizing: border-box; }
 .wc-input:focus { border-color: var(--gold-dim); outline: none; }
-.wc-textarea { width: 100%; padding: 11px 14px; font-size: 0.85rem; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; color: var(--parch); font-family: var(--font-sans); resize: none; line-height: 1.5; box-sizing: border-box; }
+.wc-textarea { width: 100%; padding: 11px 14px; font-size: 0.85rem; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; color: var(--parchment); font-family: var(--font-sans); resize: none; line-height: 1.5; box-sizing: border-box; }
 .wc-textarea:focus { border-color: var(--gold-dim); outline: none; }
 
 .wc-count-btns { display: flex; gap: 10px; }
@@ -850,7 +851,7 @@ html, body {
 /* ── Custom Campaign Map ── */
 .custom-map-panel { padding: 24px; display: flex; flex-direction: column; gap: 16px; }
 .custom-map-name { font-family: var(--font-serif); color: var(--gold); font-size: 1.2rem; letter-spacing: 0.15em; text-align: center; }
-.custom-map-location { font-size: 0.85rem; color: var(--parch); text-align: center; }
+.custom-map-location { font-size: 0.85rem; color: var(--parchment); text-align: center; }
 .custom-map-meters { display: flex; flex-direction: column; gap: 10px; }
 .custom-map-meter { display: flex; align-items: center; gap: 8px; }
 .custom-map-meter-label { font-size: 0.72rem; color: var(--parch-dim); width: 60px; flex-shrink: 0; }
@@ -897,7 +898,7 @@ html, body {
 .journey-name { font-size: 0.82rem; color: var(--parch-dim); line-height: 1.3; }
 .journey-stop.current .journey-name { color: var(--gold); font-weight: 600; }
 .journey-scars { display: flex; flex-direction: column; gap: 2px; margin-top: 3px; }
-.journey-scar { font-size: 0.68rem; color: #8b1a1a; }
+.journey-scar { font-size: 0.68rem; color: var(--red); }
 
 /* ── Character Wizard ── */
 #character-wizard {
@@ -1607,7 +1608,7 @@ body.world-custom .manlandia-lore { display: none !important; }
 }
 
 .delete-confirm-title {
-  font-family: var(--font-display);
+  font-family: var(--font-serif);
   font-size: 1.1rem;
   color: var(--red);
   letter-spacing: 0.06em;
@@ -1663,7 +1664,7 @@ body.world-custom .manlandia-lore { display: none !important; }
 }
 
 .recap-title {
-  font-family: var(--font-display);
+  font-family: var(--font-serif);
   font-size: 1.1rem;
   color: var(--gold);
   letter-spacing: 0.06em;
@@ -1688,7 +1689,7 @@ body.world-custom .manlandia-lore { display: none !important; }
   padding: 9px 16px;
   font-size: 0.85rem;
   cursor: pointer;
-  font-family: var(--font-display);
+  font-family: var(--font-serif);
   letter-spacing: 0.04em;
 }
 .delete-confirm-delete-btn:hover { filter: brightness(1.15); }

@@ -1,17 +1,8 @@
 const { getState, setState } = require("../lib/redis");
 const { getWorldConfig } = require("../lib/worldconfig");
+const { ARCHETYPE_STATS, ARCHETYPE_IDS: VALID_ARCHETYPES, ABILITY_IDS: VALID_ABILITIES } = require("../lib/character-options");
 
-const ARCHETYPE_STATS = {
-  fighter: { force: 3, acuity: 1, agility: 2, will: 1, presence: 0 },
-  mage:    { force: 0, acuity: 3, agility: 1, will: 2, presence: 1 },
-  scout:   { force: 1, acuity: 2, agility: 3, will: 1, presence: 0 },
-  leader:  { force: 2, acuity: 1, agility: 0, will: 3, presence: 1 },
-  charmer: { force: 0, acuity: 2, agility: 1, will: 1, presence: 3 },
-};
-
-const VALID_ARCHETYPES = Object.keys(ARCHETYPE_STATS);
-const VALID_ABILITIES  = ["animal_friend", "lucky_break", "protect_friend", "ancient_magic"];
-const VALID_PLAYERS    = ["player1", "player2", "player3", "player4"];
+const VALID_PLAYERS = ["player1", "player2", "player3", "player4"];
 
 // A base64 data URL runs ~4/3 the size of the underlying bytes, so ~280,000
 // characters caps the stored image around 200KB — generous headroom over

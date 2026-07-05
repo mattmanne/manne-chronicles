@@ -63,13 +63,14 @@
         <div class="wc-field" id="wc-count-field">
           <label class="wc-label">How many heroes?</label>
           <div class="wc-count-btns">
-            <button class="wc-count-btn" data-count="1">1</button>
-            <button class="wc-count-btn active" data-count="2">2</button>
-            <button class="wc-count-btn" data-count="3">3</button>
-            <button class="wc-count-btn" data-count="4">4</button>
+            <button class="wc-count-btn" data-count="1" aria-pressed="false">1</button>
+            <button class="wc-count-btn active" data-count="2" aria-pressed="true">2</button>
+            <button class="wc-count-btn" data-count="3" aria-pressed="false">3</button>
+            <button class="wc-count-btn" data-count="4" aria-pressed="false">4</button>
           </div>
           <p class="wc-hint hidden" id="wc-locked-hint">Hero count and world type can't be changed after a world is created.</p>
         </div>
+        <p class="wc-hint wc-error hidden" id="wc-validation-error" role="alert"></p>
       </div>
       <div class="world-creator-footer">
         <button id="wc-cancel-btn" class="wc-cancel-btn">Cancel</button>
@@ -274,9 +275,9 @@
           <button id="recap-btn" class="secondary-btn">📜 Recap</button>
         </div>
         <main id="log-area">
-          <div id="log-entries"></div>
+          <div id="log-entries" aria-live="polite"></div>
         </main>
-        <div id="loading-bar" class="hidden">
+        <div id="loading-bar" class="hidden" aria-live="polite">
           <div class="loading-text">The GM considers…</div>
           <div class="loading-dots"><span>.</span><span>.</span><span>.</span></div>
         </div>
@@ -538,7 +539,7 @@
               <div class="awareness-status" id="map-curse-status">Manlandia's magic is intact</div>
             </div>
             <div class="stone-tracker">
-              <div class="stone-tracker-label">THE FIVE MAGICAL STONES</div>
+              <div class="stone-tracker-label">💎 THE FIVE MAGICAL STONES</div>
               <div class="stone-slots">
                 <div class="stone-slot" id="stone-earthstone" title="Earthstone — Mountain Peaks">
                   <span class="stone-icon">◆</span>
@@ -571,7 +572,7 @@
 
           <!-- Objective/quest checklist — shared across all world types -->
           <div id="objectives-panel" class="hidden">
-            <div class="objectives-label">QUEST LOG</div>
+            <div class="objectives-label">📋 QUEST LOG</div>
             <ul id="objectives-list" class="objectives-list"></ul>
           </div>
 
@@ -595,19 +596,19 @@
 
     <!-- Tab Bar -->
     <nav id="tab-bar">
-      <button class="tab-btn active" data-tab="story">
+      <button class="tab-btn active" data-tab="story" aria-selected="true">
         <span class="tab-icon">◈</span>
         <span class="tab-label">Story</span>
       </button>
-      <button class="tab-btn" data-tab="characters">
+      <button class="tab-btn" data-tab="characters" aria-selected="false">
         <span class="tab-icon">⚔</span>
         <span class="tab-label">Characters</span>
       </button>
-      <button class="tab-btn" data-tab="archive">
+      <button class="tab-btn" data-tab="archive" aria-selected="false">
         <span class="tab-icon">≡</span>
         <span class="tab-label">Archive</span>
       </button>
-      <button class="tab-btn" data-tab="map">
+      <button class="tab-btn" data-tab="map" aria-selected="false">
         <span class="tab-icon">⊕</span>
         <span class="tab-label">Map</span>
       </button>

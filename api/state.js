@@ -1,7 +1,7 @@
 const { getState, setState } = require("../lib/redis");
 const { HARM_LEVELS } = require("../lib/gamestate");
 const { getWorldConfig } = require("../lib/worldconfig");
-const { checkAdultAccess } = require("../lib/adultgate");
+const { checkAdultAccess, isAdultWorld } = require("../lib/adultgate");
 const { GROWTH_CONFIG_KID, GROWTH_CONFIG_ADULT, applyXpGain, chooseAbility } = require("../lib/growth");
 
 module.exports = async function handler(req, res) {
@@ -94,14 +94,9 @@ module.exports = async function handler(req, res) {
     // not a GM-narration tag like NPC/OBJECTIVE — the player decides when to
     // write and resolve one, so this goes through /api/state like the other
     // player-driven actions (recover_harm, choose_ability), not /api/gm.
-    function bondsAllowed(current) {
-      return worldConfig.id === "resonance"
-        || (worldConfig.type === "custom" && current.worldConfig?.adult === true);
-    }
-
     if (action === "add_bond") {
       const current = (await getState(key)) || getInitialState();
-      if (!bondsAllowed(current)) return res.status(400).json({ error: "Bonds are only available in adult games" });
+      if (!isAdultWorld(worldConfig, current)) return res.status(400).json({ error: "Bonds are only available in adult games" });
       const { character, target, text } = payload || {};
       const trimmed = typeof text === "string" ? text.trim().slice(0, 200) : "";
       if (!current.characters[character] || !current.characters[target] || character === target || !trimmed) {
@@ -115,7 +110,7 @@ module.exports = async function handler(req, res) {
 
     if (action === "resolve_bond") {
       const current = (await getState(key)) || getInitialState();
-      if (!bondsAllowed(current)) return res.status(400).json({ error: "Bonds are only available in adult games" });
+      if (!isAdultWorld(worldConfig, current)) return res.status(400).json({ error: "Bonds are only available in adult games" });
       const { character, index } = payload || {};
       const bond = current.characters[character]?.bonds?.[index];
       if (!bond) return res.status(400).json({ error: "Invalid character or bond" });
@@ -169,8 +164,7 @@ module.exports = async function handler(req, res) {
       // wiping the slate clean. `new_session` previously never touched harm
       // at all, which meant a character who ended a session "Broken" started
       // the next one still "Broken."
-      const isAdultGame = worldConfig.id === "resonance"
-        || (worldConfig.type === "custom" && current.worldConfig?.adult === true);
+      const isAdultGame = isAdultWorld(worldConfig, current);
 
       // Baseline XP growth (see lib/growth.js) — Resonance is excluded
       // entirely (Lyra/Fen already have 3 fixed, bespoke abilities apiece

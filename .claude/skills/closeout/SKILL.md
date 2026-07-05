@@ -15,11 +15,12 @@ Work through all steps below in order. Do not skip steps. Report a clear pass/fa
 Run `node --check` on every JS file:
 
 ```
-api/campaigns.js  api/characters.js  api/gm.js  api/help.js
-api/poll.js  api/push.js  api/recap.js  api/state.js  api/unlock.js
-api/vapid-public-key.js
-lib/adultgate.js  lib/gamestate-custom.js  lib/gamestate-manlandia.js
-lib/gamestate.js  lib/gemini.js  lib/gm-tags.js  lib/prompt-custom.js
+api/campaigns.js  api/characters.js  api/cron-turn-reminder.js  api/gm.js
+api/help.js  api/poll.js  api/push.js  api/recap.js  api/state.js
+api/unlock.js  api/vapid-public-key.js
+lib/adultgate.js  lib/apply-state-tags.js  lib/character-options.js
+lib/gamestate-custom.js  lib/gamestate-manlandia.js  lib/gamestate.js
+lib/gemini.js  lib/gm-tags.js  lib/growth.js  lib/prompt-custom.js
 lib/prompt-manlandia.js  lib/prompt.js  lib/push.js  lib/ratelimit.js
 lib/recap.js  lib/redis.js  lib/suggestions.js  lib/worldconfig.js
 public/game.js  public/pure.js

@@ -1,5 +1,5 @@
 const { getState } = require("../lib/redis");
-const { getWorldConfig } = require("../lib/worldconfig");
+const { getWorldConfig, buildWorldStatePayload } = require("../lib/worldconfig");
 const { checkAdultAccess } = require("../lib/adultgate");
 
 module.exports = async function handler(req, res) {
@@ -35,47 +35,7 @@ module.exports = async function handler(req, res) {
     pendingRoll = { stat: lastEntry.rollStat, advantage: !!lastEntry.rollAdvantage, player: userEntry?.player || null };
   }
 
-  let worldStatePayload;
-  if (worldConfig.id === "manlandia") {
-    worldStatePayload = {
-      villain_awareness: state.worldState.villain_awareness,
-      curse_level: state.worldState.curse_level,
-      stones_found: state.worldState.stones_found || [],
-      location: state.worldState.location,
-      session: state.session,
-      visited_locations: state.worldState.visited_locations || [],
-      location_scars: state.worldState.location_scars || [],
-      objectives: state.worldState.objectives || [],
-      npcs: state.worldState.npcs || [],
-      inventory: state.worldState.inventory || [],
-      last_actor: state.worldState.last_actor || null,
-    };
-  } else if (worldConfig.type === "custom") {
-    worldStatePayload = {
-      villain_awareness: state.worldState.villain_awareness,
-      curse_level: state.worldState.curse_level,
-      location: state.worldState.location,
-      session: state.session,
-      visited_locations: state.worldState.visited_locations || [],
-      location_scars: state.worldState.location_scars || [],
-      objectives: state.worldState.objectives || [],
-      npcs: state.worldState.npcs || [],
-      inventory: state.worldState.inventory || [],
-      last_actor: state.worldState.last_actor || null,
-    };
-  } else {
-    worldStatePayload = {
-      conclave_awareness: state.worldState.conclave_awareness,
-      fen_dissonance_awakening: state.worldState.fen_dissonance_awakening,
-      location: state.worldState.location,
-      session: state.session,
-      visited_locations: state.worldState.visited_locations || [],
-      location_scars: state.worldState.location_scars || [],
-      objectives: state.worldState.objectives || [],
-      npcs: state.worldState.npcs || [],
-      last_actor: state.worldState.last_actor || null,
-    };
-  }
+  const worldStatePayload = buildWorldStatePayload(worldConfig, state);
 
   return res.json({
     entries: newEntries,
