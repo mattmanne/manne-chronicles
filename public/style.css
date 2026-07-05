@@ -1059,12 +1059,6 @@ html, body {
 }
 .wiz-photo-btn:hover { border-color: var(--gold-dim); background: var(--surface2); color: var(--parchment); }
 
-.wiz-link {
-  background: none; border: none; color: var(--parch-dim);
-  font-size: 0.8rem; cursor: pointer; text-decoration: underline;
-  padding: 4px 0;
-}
-
 .wiz-cards {
   display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%;
 }
