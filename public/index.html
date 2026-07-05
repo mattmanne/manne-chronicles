@@ -370,14 +370,6 @@
 
           <!-- Manlandia characters (2×2 grid) -->
           <div class="manlandia-only">
-            <div class="tone-selector">
-              <div class="tone-selector-label">Story Mood</div>
-              <div class="tone-btns">
-                <button class="tone-btn" data-tone="epic">🏰 Epic</button>
-                <button class="tone-btn" data-tone="adventure">⚔️ Adventure</button>
-                <button class="tone-btn" data-tone="silly">🎪 Silly</button>
-              </div>
-            </div>
             <div class="manlandia-chars-grid">
               <div class="char-card manlandia-card" id="p1-card">
                 <div class="char-header manlandia-char-header">
@@ -470,8 +462,6 @@
             </div>
           </div>
 
-          <button id="new-session-btn" class="secondary-btn">End Session &amp; Save</button>
-
         </div>
       </div>
 
@@ -479,17 +469,6 @@
       <div id="tab-archive" class="tab-panel">
         <div class="archive-header">
           <button id="export-btn" class="export-btn">⬇ Export</button>
-        </div>
-        <div class="author-note-section">
-          <button id="author-note-toggle" class="secondary-btn" type="button" aria-expanded="false" aria-controls="author-note-panel">📝 Author's Note</button>
-          <div id="author-note-panel" class="hidden">
-            <p class="author-note-hint">Facts the GM should always remember and never contradict — e.g. "Grandpa Joe is secretly the villain."</p>
-            <textarea id="author-note-input" maxlength="1000" placeholder="Nothing set yet…" aria-label="Author's Note"></textarea>
-            <div class="author-note-actions">
-              <button id="author-note-save" class="secondary-btn" type="button">Save Note</button>
-              <span id="author-note-status" role="status"></span>
-            </div>
-          </div>
         </div>
         <div class="tab-scroll" id="archive-content">
           <div class="archive-empty">No sessions archived yet.<br>End a session to save it here.</div>
@@ -592,6 +571,38 @@
         </div>
       </div>
 
+      <!-- Settings -->
+      <div id="tab-settings" class="tab-panel">
+        <div class="tab-scroll">
+
+          <div class="manlandia-only">
+            <div class="tone-selector">
+              <div class="tone-selector-label">Story Mood</div>
+              <div class="tone-btns">
+                <button class="tone-btn" data-tone="epic">🏰 Epic</button>
+                <button class="tone-btn" data-tone="adventure">⚔️ Adventure</button>
+                <button class="tone-btn" data-tone="silly">🎪 Silly</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="author-note-section">
+            <button id="author-note-toggle" class="secondary-btn" type="button" aria-expanded="false" aria-controls="author-note-panel">📝 Author's Note</button>
+            <div id="author-note-panel" class="hidden">
+              <p class="author-note-hint">Facts the GM should always remember and never contradict — e.g. "Grandpa Joe is secretly the villain."</p>
+              <textarea id="author-note-input" maxlength="1000" placeholder="Nothing set yet…" aria-label="Author's Note"></textarea>
+              <div class="author-note-actions">
+                <button id="author-note-save" class="secondary-btn" type="button">Save Note</button>
+                <span id="author-note-status" role="status"></span>
+              </div>
+            </div>
+          </div>
+
+          <button id="new-session-btn" class="secondary-btn">End Session &amp; Save</button>
+
+        </div>
+      </div>
+
     </div>
 
     <!-- Tab Bar -->
@@ -611,6 +622,10 @@
       <button class="tab-btn" data-tab="map" aria-selected="false">
         <span class="tab-icon">⊕</span>
         <span class="tab-label">Map</span>
+      </button>
+      <button class="tab-btn" data-tab="settings" aria-selected="false">
+        <span class="tab-icon">⚙</span>
+        <span class="tab-label">Settings</span>
       </button>
     </nav>
 
