@@ -1966,19 +1966,26 @@ function renderCustomMap(state) {
           <span class="custom-map-meter-val">${ws.curse_level||0}/10</span>
         </div>
       </div>
-      ${renderJourneyTrail(ws)}
+      ${renderQuestGraph(ws)}
     </div>
   `;
 }
 
 // Custom worlds have no fixed geography to pin onto a curated map graphic
-// (the GM invents arbitrary locations per campaign) — so instead of a literal
-// map, this renders the places visited as a chronological scrapbook trail,
-// with any scars that happened there shown inline. Data comes from
-// worldState.visited_locations / location_scars, which for custom worlds
-// are keyed by the location's own text rather than a fixed ID (see
-// matchCustomLocationId() in api/gm.js).
-function renderJourneyTrail(ws) {
+// (the GM invents arbitrary locations per campaign, with no coordinates) —
+// so instead of a literal hand-drawn map, this lays visited_locations out as
+// a deterministic "quest trail" graph, purely driven by each location's
+// index in the array (a snake path: left-to-right, then right-to-left, and
+// so on). That keeps a location's position stable as new ones get appended
+// — visited_locations only ever grows, never reorders (matchCustomLocationId()
+// in lib/apply-state-tags.js dedupes by exact text, doesn't shuffle). Reuses
+// the same pulse/scar SVG primitives as Manlandia's real map for a
+// consistent visual language, just with no art or geography behind it.
+// PROVISIONAL DESIGN CALL (2026-07-04): this ships the "non-geographic graph
+// is an acceptable stand-in for a literal drawn map" answer rather than
+// pursuing AI-generated map art — see project_resonance_backlog_decisions.md;
+// flag to Matt for confirmation, not a fully closed decision yet.
+function renderQuestGraph(ws) {
   const visited = ws.visited_locations || [];
   if (!visited.length) return "";
 
@@ -1988,23 +1995,56 @@ function renderJourneyTrail(ws) {
     scarsByLocation[s.id].push(s.label);
   });
 
+  const COLS = 4, X_GAP = 74, Y_GAP = 56, PAD_X = 40, PAD_Y = 34;
+  const nodes = visited.map((loc, i) => {
+    const row = Math.floor(i / COLS);
+    const colInRow = i % COLS;
+    const col = row % 2 === 0 ? colInRow : (COLS - 1 - colInRow); // snake: alternate direction each row
+    return { loc, x: PAD_X + col * X_GAP, y: PAD_Y + row * Y_GAP };
+  });
+
+  const width  = PAD_X * 2 + (COLS - 1) * X_GAP;
+  const height = PAD_Y * 2 + Math.floor((visited.length - 1) / COLS) * Y_GAP;
+
+  const edges = nodes.slice(1).map((n, i) => {
+    const prev = nodes[i];
+    return `<line x1="${prev.x}" y1="${prev.y}" x2="${n.x}" y2="${n.y}" stroke="#5a4a2a" stroke-width="1.2" stroke-dasharray="3,4"/>`;
+  }).join("");
+
+  const dots = nodes.map(n => {
+    const isCurrent = n.loc === ws.location;
+    const scars = scarsByLocation[n.loc] || [];
+    const r = isCurrent ? 7 : 5;
+    const pulse  = isCurrent ? `<circle cx="${n.x}" cy="${n.y}" r="${r + 8}" fill="none" stroke="#c9a84c" stroke-width="1.5" class="loc-pulse"/>` : "";
+    const center = isCurrent ? `<circle cx="${n.x}" cy="${n.y}" r="3" fill="white" opacity="0.85"/>` : "";
+    const scarMark = scars.length
+      ? `<line x1="${n.x + r - 1}" y1="${n.y - r - 4}" x2="${n.x + r + 4}" y2="${n.y - r + 1}" stroke="#8b1a1a" stroke-width="1.3"/>
+         <line x1="${n.x + r + 4}" y1="${n.y - r - 4}" x2="${n.x + r - 1}" y2="${n.y - r + 1}" stroke="#8b1a1a" stroke-width="1.3"/>` : "";
+    // Long, free-text location names (unlike Manlandia's short curated list)
+    // would otherwise overlap at this node spacing — truncate on the label,
+    // keep the full name in a native <title> tooltip.
+    const displayName = n.loc.length > 16 ? `${n.loc.slice(0, 15)}…` : n.loc;
+    return `<g class="map-location">
+      <title>${escapeHtml(n.loc)}</title>
+      <circle cx="${n.x}" cy="${n.y}" r="${r + 6}" fill="transparent"/>
+      ${pulse}
+      <circle cx="${n.x}" cy="${n.y}" r="${r}" fill="#c9a84c" opacity="${isCurrent ? 1 : 0.55}"/>
+      ${center}${scarMark}
+      <text x="${n.x}" y="${n.y + r + 13}" text-anchor="middle" fill="#c9a84c" opacity="${isCurrent ? 1 : 0.65}"
+            font-size="8" font-family="Georgia,serif">${escapeHtml(displayName)}</text>
+    </g>`;
+  }).join("");
+
   return `
     <div class="journey-trail">
       <div class="journey-trail-label">YOUR JOURNEY</div>
-      <ul class="journey-trail-list">
-        ${visited.map(loc => {
-          const isCurrent = loc === ws.location;
-          const scars = scarsByLocation[loc] || [];
-          return `
-            <li class="journey-stop${isCurrent ? " current" : ""}">
-              <span class="journey-marker">${isCurrent ? "📍" : "○"}</span>
-              <div class="journey-content">
-                <span class="journey-name">${escapeHtml(loc)}</span>
-                ${scars.length ? `<div class="journey-scars">${scars.map(s => `<span class="journey-scar">✕ ${escapeHtml(s)}</span>`).join("")}</div>` : ""}
-              </div>
-            </li>`;
-        }).join("")}
-      </ul>
+      <svg viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg" class="map-svg quest-graph-svg">
+        <defs><style>
+          .loc-pulse { animation: locPulse 2s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+          @keyframes locPulse { 0%,100% { opacity: 0.5; transform: scale(1); } 50% { opacity: 0.1; transform: scale(1.7); } }
+        </style></defs>
+        ${edges}${dots}
+      </svg>
     </div>
   `;
 }

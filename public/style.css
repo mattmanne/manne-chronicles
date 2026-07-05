@@ -881,7 +881,7 @@ html, body {
 .danger-fill { background: #c0392b; }
 .peril-fill  { background: #7f8c8d; }
 .custom-map-meter-val { font-size: 0.7rem; color: var(--parch-dim); width: 30px; text-align: right; flex-shrink: 0; }
-/* ── Journey Trail (custom-world map — no fixed geography to pin to) ── */
+/* ── Quest Trail graph (custom-world map — no fixed geography to pin to) ── */
 .journey-trail { border-top: 1px solid var(--border); padding-top: 14px; }
 .journey-trail-label {
   font-size: 0.65rem;
@@ -890,36 +890,7 @@ html, body {
   color: var(--parch-dim);
   margin-bottom: 10px;
 }
-.journey-trail-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  position: relative;
-}
-.journey-stop {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  padding: 6px 0;
-  position: relative;
-}
-.journey-stop:not(:last-child)::before {
-  content: "";
-  position: absolute;
-  left: 7px;
-  top: 26px;
-  bottom: -6px;
-  width: 1px;
-  background: var(--border);
-}
-.journey-marker { flex-shrink: 0; font-size: 0.9rem; line-height: 1.3; width: 16px; text-align: center; }
-.journey-content { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.journey-name { font-size: 0.82rem; color: var(--parch-dim); line-height: 1.3; }
-.journey-stop.current .journey-name { color: var(--gold); font-weight: 600; }
-.journey-scars { display: flex; flex-direction: column; gap: 2px; margin-top: 3px; }
-.journey-scar { font-size: 0.68rem; color: var(--red); }
+.quest-graph-svg { background: #0c0a06; border-radius: 6px; }
 
 /* ── Character Wizard ── */
 #character-wizard {
