@@ -720,41 +720,30 @@ function setupInputHandlers() {
 
 /* ── Harm Recovery ── */
 function setupHarmRecovery() {
-  ["fen", "lyra"].forEach(character => {
-    const el = document.getElementById(`${character}-harm`);
-    if (!el) return;
-    el.addEventListener("click", async () => {
+  // Scoped to elements whose id ends in "-harm" specifically — NOT the
+  // broader [data-player] attribute, which also matches the hero-select
+  // buttons (#btn-p1..#btn-p4 carry data-player="playerN" too, to identify
+  // which character they switch to). A previous version of this selector
+  // matched both, so tapping "HERO 2" to switch to that character silently
+  // fired recover_harm for them as a side effect — confirmed live bug.
+  document.querySelectorAll('[id$="-harm"]').forEach(el => {
+    const character = el.id.startsWith("fen") ? "fen" : el.id.startsWith("lyra") ? "lyra" : el.dataset.player;
+    if (!character) return;
+
+    async function recover() {
       if (el.classList.contains("Unhurt")) return;
       const res = await authPost("/api/state", { action: "recover_harm", payload: { character } });
       const data = await res.json();
       if (data.ok) updateCharacterUI({ characters: data.characters });
-    });
-  });
+    }
+    el.addEventListener("click", recover);
 
-  document.querySelectorAll("[data-player]").forEach(el => {
-    const player = el.dataset.player;
-    if (!player || !player.startsWith("player")) return;
-    el.addEventListener("click", async () => {
-      if (el.classList.contains("Unhurt")) return;
-      const res = await authPost("/api/state", { action: "recover_harm", payload: { character: player } });
-      const data = await res.json();
-      if (data.ok) updateCharacterUI({ characters: data.characters });
-    });
-  });
-
-  // Harm badges are clickable spans, not real buttons — keyboard/screen-reader
-  // users otherwise have no way to trigger recovery at all. Scoped to the
-  // harm elements specifically (by id suffix, not the broader [data-player]
-  // selector above, which also matches the hero-select buttons) so this
-  // doesn't touch anything except the badges themselves.
-  document.querySelectorAll('[id$="-harm"]').forEach(el => {
+    // Harm badges are clickable spans, not real buttons — keyboard/screen-reader
+    // users otherwise have no way to trigger recovery at all.
     el.setAttribute("role", "button");
     el.setAttribute("tabindex", "0");
     el.addEventListener("keydown", (e) => {
-      if (e.key === "Enter" || e.key === " ") {
-        e.preventDefault();
-        el.click();
-      }
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); recover(); }
     });
   });
 }
