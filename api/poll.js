@@ -13,7 +13,7 @@ module.exports = async function handler(req, res) {
   const { key, getInitialState } = worldConfig;
 
   const state = (await getState(key)) || getInitialState();
-  if (!checkAdultAccess(req, res, worldConfig, state)) return;
+  if (!(await checkAdultAccess(req, res, worldConfig, state))) return;
 
   const since = parseInt(req.query.since || "0");
   // `player` identifies who's currently viewing — used only to filter out

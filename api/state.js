@@ -27,7 +27,7 @@ module.exports = async function handler(req, res) {
       return res.status(401).json({ error: "Unauthorized" });
     }
     const state = (await getState(key)) || getInitialState();
-    if (!checkAdultAccess(req, res, worldConfig, state)) return;
+    if (!(await checkAdultAccess(req, res, worldConfig, state))) return;
     return res.json(state);
   }
 
@@ -38,7 +38,7 @@ module.exports = async function handler(req, res) {
     }
 
     const stateForAdultCheck = (await getState(key)) || getInitialState();
-    if (!checkAdultAccess(req, res, worldConfig, stateForAdultCheck)) return;
+    if (!(await checkAdultAccess(req, res, worldConfig, stateForAdultCheck))) return;
 
     const { action, payload } = req.body;
 

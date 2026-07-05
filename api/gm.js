@@ -118,7 +118,7 @@ module.exports = async function handler(req, res) {
   const privateScene = isPrivate === true && worldConfig.id === "resonance";
 
   const gameState = (await getState(key)) || getInitialState();
-  if (!checkAdultAccess(req, res, worldConfig, gameState)) return;
+  if (!(await checkAdultAccess(req, res, worldConfig, gameState))) return;
 
   let systemPrompt = buildSystemPrompt(gameState);
 

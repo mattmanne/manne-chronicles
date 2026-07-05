@@ -29,7 +29,7 @@ module.exports = async function handler(req, res) {
 
   const worldConfig = getWorldConfig(req.query.world);
   const gameState = (await getState(worldConfig.key)) || worldConfig.getInitialState();
-  if (!checkAdultAccess(req, res, worldConfig, gameState)) return;
+  if (!(await checkAdultAccess(req, res, worldConfig, gameState))) return;
 
   let gameContext;
   if (worldConfig.id === "manlandia") {
