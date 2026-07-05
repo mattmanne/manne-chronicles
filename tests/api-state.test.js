@@ -470,6 +470,73 @@ test("resolve_bond rejects an invalid bond index", async (t) => {
   assert.equal(badIndex.statusCode, 400);
 });
 
+/* ── Solo/private scenes (Resonance-only) ── */
+
+test("set_scene_pin stores a valid 4-digit PIN", async (t) => {
+  const redis = statefulRedisMock({ session: 1, sessionLog: [], worldState: {}, characters: { lyra: {}, fen: {} } });
+  t.mock.module("../lib/redis.js", redis);
+
+  const res = await callState({ method: "POST", headers: { "x-adult-pin": ADULT_PIN }, query: { world: "resonance" }, body: { action: "set_scene_pin", payload: { character: "lyra", pin: "1234" } } });
+  assert.equal(res.body.ok, true);
+  assert.equal(redis.state.characters.lyra.scene_pin, "1234");
+});
+
+test("set_scene_pin clears the PIN when given a blank value", async (t) => {
+  const redis = statefulRedisMock({ session: 1, sessionLog: [], worldState: {}, characters: { lyra: { scene_pin: "1234" }, fen: {} } });
+  t.mock.module("../lib/redis.js", redis);
+
+  const res = await callState({ method: "POST", headers: { "x-adult-pin": ADULT_PIN }, query: { world: "resonance" }, body: { action: "set_scene_pin", payload: { character: "lyra", pin: "" } } });
+  assert.equal(res.body.ok, true);
+  assert.equal(redis.state.characters.lyra.scene_pin, "");
+});
+
+test("set_scene_pin rejects a PIN that isn't exactly 4 digits", async (t) => {
+  const redis = statefulRedisMock({ session: 1, sessionLog: [], worldState: {}, characters: { lyra: {}, fen: {} } });
+  t.mock.module("../lib/redis.js", redis);
+
+  const tooShort = await callState({ method: "POST", headers: { "x-adult-pin": ADULT_PIN }, query: { world: "resonance" }, body: { action: "set_scene_pin", payload: { character: "lyra", pin: "12" } } });
+  assert.equal(tooShort.statusCode, 400);
+
+  const notDigits = await callState({ method: "POST", headers: { "x-adult-pin": ADULT_PIN }, query: { world: "resonance" }, body: { action: "set_scene_pin", payload: { character: "lyra", pin: "abcd" } } });
+  assert.equal(notDigits.statusCode, 400);
+});
+
+test("set_scene_pin rejects worlds other than Resonance", async (t) => {
+  const redis = statefulRedisMock({ session: 1, sessionLog: [], worldState: {}, characters: { player1: {} } });
+  t.mock.module("../lib/redis.js", redis);
+
+  const res = await callState({ method: "POST", headers: {}, query: { world: "manlandia" }, body: { action: "set_scene_pin", payload: { character: "player1", pin: "1234" } } });
+  assert.equal(res.statusCode, 400);
+});
+
+test("reveal_scene clears private_to on that character's entries, leaving others alone", async (t) => {
+  const seeded = {
+    session: 1,
+    sessionLog: [
+      { role: "user", content: "Lyra: alone", private_to: "lyra", timestamp: 1 },
+      { role: "gm", content: "Quietly.", private_to: "lyra", timestamp: 1 },
+      { role: "gm", content: "Unrelated public entry.", timestamp: 2 },
+    ],
+    worldState: {},
+    characters: { lyra: {}, fen: {} },
+  };
+  const redis = statefulRedisMock(seeded);
+  t.mock.module("../lib/redis.js", redis);
+
+  const res = await callState({ method: "POST", headers: { "x-adult-pin": ADULT_PIN }, query: { world: "resonance" }, body: { action: "reveal_scene", payload: { character: "lyra" } } });
+  assert.equal(res.body.ok, true);
+  assert.equal(res.body.revealed, 2);
+  assert.ok(redis.state.sessionLog.every((e) => !("private_to" in e)));
+});
+
+test("reveal_scene rejects worlds other than Resonance", async (t) => {
+  const redis = statefulRedisMock({ session: 1, sessionLog: [], worldState: {}, characters: { player1: {} } });
+  t.mock.module("../lib/redis.js", redis);
+
+  const res = await callState({ method: "POST", headers: {}, query: { world: "manlandia" }, body: { action: "reveal_scene", payload: { character: "player1" } } });
+  assert.equal(res.statusCode, 400);
+});
+
 /* ── end_combat — manual escape hatch, no LLM round-trip ── */
 
 test("end_combat sets combat.active to false without touching the tracked enemies", async (t) => {

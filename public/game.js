@@ -120,6 +120,14 @@ function authGet(url) {
   return fetch(withWorld(url), { headers: { "X-Adult-Pin": adultPin || "" } });
 }
 
+// `player` tells /api/poll who's currently viewing, so it can filter out a
+// private_to entry belonging to the *other* character (see "Solo/private
+// scenes" in CLAUDE.md) — a no-op for every world/entry that never sets
+// private_to in the first place.
+function pollUrl(since) {
+  return `/api/poll?since=${since}&player=${encodeURIComponent(currentPlayer)}`;
+}
+
 // A 403 here means the stored pin is missing or wrong (most commonly: this
 // device unlocked before X-Adult-Pin enforcement existed, so it has the old
 // flag but never actually saved a pin). Clear the stale state and prompt
@@ -579,6 +587,8 @@ async function continueInit() {
   setupPushNotifications();
   setupExport();
   setupAuthorNote();
+  setupPrivateScene();
+  setupScenePinSettings();
   setupRecap();
   setupWizard();
   setupHelp();
@@ -804,15 +814,155 @@ function urlBase64ToUint8Array(base64String) {
 }
 
 /* ── Player buttons ── */
+// PINs unlocked this page load only — re-entering after a refresh is
+// acceptable friction for what's a family-trust device, not real security
+// (see "Solo/private scenes" in CLAUDE.md).
+const unlockedScenePins = new Set();
+
 function setupPlayerButtons() {
   document.querySelectorAll(".player-btn").forEach(btn => {
-    btn.addEventListener("click", () => {
-      document.querySelectorAll(".player-btn").forEach(b => b.classList.remove("active"));
-      btn.classList.add("active");
-      currentPlayer = btn.dataset.player;
-      const name = getPlayerDisplayName(currentPlayer);
-      actionInput.placeholder = `What does ${name} do?`;
-    });
+    btn.addEventListener("click", () => attemptPlayerSwitch(btn));
+  });
+  setupScenePinOverlay();
+}
+
+function attemptPlayerSwitch(btn) {
+  const target = btn.dataset.player;
+  if (target === currentPlayer) return;
+
+  const isResonanceChar = target === "lyra" || target === "fen";
+  const pin = isResonanceChar ? cachedGameState?.characters?.[target]?.scene_pin : "";
+  if (pin && !unlockedScenePins.has(target)) {
+    openScenePinPrompt(target, btn);
+    return;
+  }
+  completePlayerSwitch(btn, isResonanceChar);
+}
+
+// Resonance switches reload the log (private_to filtering depends on who's
+// viewing — see pollUrl()); Manlandia/custom hero switches never touch
+// private scenes at all, so they keep the old zero-reload behavior exactly.
+function completePlayerSwitch(btn, needsReload) {
+  document.querySelectorAll(".player-btn").forEach(b => b.classList.remove("active"));
+  btn.classList.add("active");
+  currentPlayer = btn.dataset.player;
+  const name = getPlayerDisplayName(currentPlayer);
+  actionInput.placeholder = `What does ${name} do?`;
+  if (needsReload) {
+    logEntries.innerHTML = "";
+    lastTimestamp = 0;
+    loadExistingLog();
+  }
+}
+
+function openScenePinPrompt(target, btn) {
+  const overlay = document.getElementById("scene-pin-overlay");
+  const input   = document.getElementById("scene-pin-input");
+  document.getElementById("scene-pin-name").textContent = getPlayerDisplayName(target);
+  input.value = "";
+  document.getElementById("scene-pin-error").classList.add("hidden");
+  overlay.dataset.pendingTarget = target;
+  overlay.dataset.pendingBtnId = btn.id;
+  overlay.classList.add("active");
+  setTimeout(() => input.focus(), 50);
+}
+
+function setupScenePinOverlay() {
+  const overlay = document.getElementById("scene-pin-overlay");
+  const input   = document.getElementById("scene-pin-input");
+  const errorEl = document.getElementById("scene-pin-error");
+
+  function trySubmit() {
+    const target   = overlay.dataset.pendingTarget;
+    const btn      = document.getElementById(overlay.dataset.pendingBtnId);
+    const expected = cachedGameState?.characters?.[target]?.scene_pin || "";
+    if (expected && input.value.trim() === expected) {
+      unlockedScenePins.add(target);
+      overlay.classList.remove("active");
+      if (btn) completePlayerSwitch(btn, true);
+    } else {
+      errorEl.classList.remove("hidden");
+      input.value = "";
+      input.focus();
+    }
+  }
+
+  document.getElementById("scene-pin-submit").addEventListener("click", trySubmit);
+  input.addEventListener("keydown", (e) => { if (e.key === "Enter") trySubmit(); });
+  document.getElementById("scene-pin-cancel").addEventListener("click", () => {
+    overlay.classList.remove("active");
+  });
+}
+
+/* ── Private scenes (Resonance) ── */
+let privateSceneActive = false;
+let hasPrivateScene    = false; // does the CURRENT viewer have an active, unrevealed private scene
+
+// Only ever set true by seeing a real private_to entry (loadExistingLog/
+// startPolling) — a poll tick with nothing new must never flip this back to
+// false, since it only reflects the entries that specific tick happened to
+// fetch, not the full history. resetRevealSceneState() is the only path
+// back to false, called on a genuine full reload (which does see everything)
+// or after a successful reveal.
+function setRevealSceneVisible(visible) {
+  hasPrivateScene = hasPrivateScene || visible;
+  document.getElementById("reveal-scene-btn")?.classList.toggle("hidden", !hasPrivateScene);
+}
+function resetRevealSceneState() {
+  hasPrivateScene = false;
+  document.getElementById("reveal-scene-btn")?.classList.add("hidden");
+}
+
+function setupPrivateScene() {
+  const toggle = document.getElementById("private-scene-toggle");
+  if (!toggle) return;
+
+  toggle.addEventListener("click", () => {
+    privateSceneActive = !privateSceneActive;
+    toggle.classList.toggle("active", privateSceneActive);
+    toggle.setAttribute("aria-pressed", String(privateSceneActive));
+  });
+
+  document.getElementById("reveal-scene-btn")?.addEventListener("click", async () => {
+    const res = await authPost("/api/state", { action: "reveal_scene", payload: { character: currentPlayer } });
+    const data = await res.json();
+    if (data.ok) {
+      resetRevealSceneState();
+      privateSceneActive = false;
+      toggle.classList.remove("active");
+      toggle.setAttribute("aria-pressed", "false");
+    }
+  });
+}
+
+/* ── Scene PIN settings (Resonance) ── */
+function setupScenePinSettings() {
+  const toggle = document.getElementById("scene-pin-set-toggle");
+  const panel  = document.getElementById("scene-pin-set-panel");
+  if (!toggle) return;
+
+  toggle.addEventListener("click", () => {
+    const opening = panel.classList.contains("hidden");
+    panel.classList.toggle("hidden");
+    toggle.setAttribute("aria-expanded", String(opening));
+  });
+
+  document.getElementById("scene-pin-set-save").addEventListener("click", async () => {
+    const input  = document.getElementById("scene-pin-set-input");
+    const status = document.getElementById("scene-pin-set-status");
+    const pin = input.value.trim();
+    if (pin !== "" && !/^\d{4}$/.test(pin)) {
+      status.textContent = "PIN must be exactly 4 digits";
+      return;
+    }
+    status.textContent = "Saving…";
+    try {
+      const res = await authPost("/api/state", { action: "set_scene_pin", payload: { character: currentPlayer, pin } });
+      const data = await res.json();
+      status.textContent = data.ok ? "Saved!" : "Save failed";
+      if (data.ok) { cachedGameState = { ...cachedGameState, characters: data.characters }; input.value = ""; }
+    } catch (_) { status.textContent = "Save failed"; }
+    setTimeout(() => { status.textContent = ""; }, 2000);
   });
 }
 
@@ -960,16 +1110,21 @@ function setupNewSession() {
 /* ── Load existing log ── */
 async function loadExistingLog() {
   try {
-    const res = await authGet("/api/poll?since=0");
+    const res = await authGet(pollUrl(0));
     if (handleLockedResponse(res.status)) return;
     const data = await res.json();
     cachedGameState = { worldState: data.worldState, characters: data.characters };
     sessionLabel.textContent = `Session ${data.worldState.session}`;
     updateCharacterUI(data);
+    // A full reload (this is always since=0) sees the complete picture, so
+    // it's the one place safe to reset the flag rather than only ever add
+    // to it — see setRevealSceneVisible()'s comment.
+    resetRevealSceneState();
     for (const entry of data.entries) {
-      if (entry.role === "gm") appendGMEntry(entry.content, false, entry.ambient);
-      else appendPlayerEntry(entry.player || currentPlayer, stripPlayerPrefix(entry.content), false);
+      if (entry.role === "gm") appendGMEntry(entry.content, false, entry.ambient, entry.private_to);
+      else appendPlayerEntry(entry.player || currentPlayer, stripPlayerPrefix(entry.content), false, entry.private_to);
       if (entry.timestamp > lastTimestamp) lastTimestamp = entry.timestamp;
+      if (entry.private_to === currentPlayer) setRevealSceneVisible(true);
     }
     scrollToBottom();
     resumePendingRollIfAny(data.pendingRoll);
@@ -983,13 +1138,14 @@ function startPolling() {
   pollTimer = setInterval(async () => {
     if (isLoading) return;
     try {
-      const res = await authGet(`/api/poll?since=${lastTimestamp}`);
+      const res = await authGet(pollUrl(lastTimestamp));
       if (res.status === 403) { clearInterval(pollTimer); pollTimer = null; handleLockedResponse(403); return; }
       const data = await res.json();
       if (data.entries && data.entries.length > 0) {
         for (const entry of data.entries) {
-          if (entry.role === "gm") appendGMEntry(entry.content, true, entry.ambient);
-          else appendPlayerEntry(entry.player || currentPlayer, stripPlayerPrefix(entry.content), true);
+          if (entry.role === "gm") appendGMEntry(entry.content, true, entry.ambient, entry.private_to);
+          else appendPlayerEntry(entry.player || currentPlayer, stripPlayerPrefix(entry.content), true, entry.private_to);
+          if (entry.private_to === currentPlayer) setRevealSceneVisible(true);
           if (entry.timestamp > lastTimestamp) lastTimestamp = entry.timestamp;
         }
         cachedGameState = { worldState: data.worldState, characters: data.characters };
@@ -1006,7 +1162,7 @@ function startPolling() {
 /* ── Opening narration ── */
 async function triggerOpeningIfNeeded() {
   try {
-    const res = await authGet("/api/poll?since=0");
+    const res = await authGet(pollUrl(0));
     if (handleLockedResponse(res.status)) return;
     const data = await res.json();
     if (data.entries.length === 0) await sendToGM(currentPlayer, "[SESSION BEGINS]", "begin");
@@ -1075,7 +1231,14 @@ function renderSuggestionChips(suggestions) {
 async function sendToGM(player, message, type) {
   setLoading(true);
   try {
-    const res = await authPost("/api/gm", { player, message, type, ...(isManlandiaLike() && { tone: manlandiaTone }) });
+    const res = await authPost("/api/gm", {
+      player, message, type,
+      ...(isManlandiaLike() && { tone: manlandiaTone }),
+      // Read fresh each call (including the roll_result recursion below), so
+      // a scene marked private stays private through its own roll without
+      // any extra plumbing — see "Solo/private scenes" in CLAUDE.md.
+      ...(privateSceneActive && currentWorld === "resonance" && { private: true }),
+    });
     if (handleLockedResponse(res.status)) return false;
     const data = await res.json();
     if (data.error) { appendSystemMessage("Error: " + data.error); return false; }
@@ -2452,15 +2615,15 @@ function updateStoneTracker(stonesFound) {
 }
 
 /* ── DOM Builders ── */
-function appendGMEntry(text, animate, ambient) {
+function appendGMEntry(text, animate, ambient, privateTo) {
   const cleanText    = getCleanText(text);
   const stateChanges = extractStateChanges(text);
 
   const entry = document.createElement("div");
-  entry.className = `log-entry gm${animate ? "" : " no-anim"}${ambient ? " ambient" : ""}`;
+  entry.className = `log-entry gm${animate ? "" : " no-anim"}${ambient ? " ambient" : ""}${privateTo ? " private" : ""}`;
   entry.innerHTML = `
     <div class="entry-header">
-      <span class="entry-label">${ambient ? "🌙 Meanwhile…" : "The Story"}</span>
+      <span class="entry-label">${ambient ? "🌙 Meanwhile…" : privateTo ? "🎭 Private Scene" : "The Story"}</span>
       <span class="entry-header-btns">
         <button class="pin-btn" title="Remember this" aria-label="Pin this moment">📌</button>
         <button class="speak-btn" title="Read aloud" aria-label="Read aloud">🔊</button>
@@ -2479,13 +2642,13 @@ function appendGMEntry(text, animate, ambient) {
   return entry;
 }
 
-function appendPlayerEntry(player, text, animate) {
+function appendPlayerEntry(player, text, animate, privateTo) {
   const displayName = getPlayerDisplayName(player);
   const entry = document.createElement("div");
-  entry.className = `log-entry player-${player}${animate ? "" : " no-anim"}`;
+  entry.className = `log-entry player-${player}${animate ? "" : " no-anim"}${privateTo ? " private" : ""}`;
   entry.innerHTML = `
     <div class="entry-header">
-      <span class="entry-label">${displayName}</span>
+      <span class="entry-label">${displayName}${privateTo ? " 🎭" : ""}</span>
       <button class="pin-btn" title="Remember this" aria-label="Pin this moment">📌</button>
     </div>
     <div class="entry-content">${escapeHtml(text)}</div>`;

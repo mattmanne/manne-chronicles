@@ -107,6 +107,39 @@ test("last_actor defaults to null when never set", async (t) => {
   assert.equal(res.body.worldState.last_actor, null);
 });
 
+/* ── Solo/private scenes ── */
+
+const PRIVATE_LOG = [
+  { role: "user", content: "Lyra: I go alone", player: "lyra", timestamp: 100, private_to: "lyra" },
+  { role: "gm", content: "You slip away unnoticed.", timestamp: 100, private_to: "lyra" },
+  { role: "user", content: "Fen: I pour a drink", player: "fen", timestamp: 200 },
+  { role: "gm", content: "Business as usual at the bar.", timestamp: 200 },
+];
+
+test("a private_to entry is visible to the character it's private to", async (t) => {
+  const stored = { session: 1, sessionLog: PRIVATE_LOG, characters: {}, worldState: { conclave_awareness: 0, fen_dissonance_awakening: 0, location: "x", visited_locations: [], location_scars: [] } };
+  const res = await callPoll(stored, { since: "0", world: "resonance", player: "lyra" })(t);
+  const contents = res.body.entries.map(e => e.content);
+  assert.ok(contents.includes("You slip away unnoticed."));
+  assert.ok(contents.includes("Business as usual at the bar."));
+});
+
+test("a private_to entry is hidden from the OTHER character", async (t) => {
+  const stored = { session: 1, sessionLog: PRIVATE_LOG, characters: {}, worldState: { conclave_awareness: 0, fen_dissonance_awakening: 0, location: "x", visited_locations: [], location_scars: [] } };
+  const res = await callPoll(stored, { since: "0", world: "resonance", player: "fen" })(t);
+  const contents = res.body.entries.map(e => e.content);
+  assert.ok(!contents.includes("You slip away unnoticed."));
+  assert.ok(contents.includes("Business as usual at the bar.")); // non-private entries stay visible to everyone
+});
+
+test("omitting the player param hides private entries by default (safe default for any caller that doesn't identify a viewer)", async (t) => {
+  const stored = { session: 1, sessionLog: PRIVATE_LOG, characters: {}, worldState: { conclave_awareness: 0, fen_dissonance_awakening: 0, location: "x", visited_locations: [], location_scars: [] } };
+  const res = await callPoll(stored, { since: "0", world: "resonance" })(t);
+  const contents = res.body.entries.map(e => e.content);
+  assert.equal(res.body.entries.length, 2);
+  assert.ok(contents.includes("Business as usual at the bar.")); // non-private entries are unaffected
+});
+
 test("resonance is locked to reads without the correct adult pin", async (t) => {
   const stored = { session: 1, sessionLog: [], characters: {}, worldState: { conclave_awareness: 0 } };
   t.mock.module("../lib/redis.js", statefulRedisMock(stored));

@@ -1,6 +1,11 @@
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
-const { mockRedisCommand } = require("./helpers");
+const { mockRedisCommand, statefulRedisMock } = require("./helpers");
+
+// Resonance is always adult-gated — set once for the private-scene tests
+// below (none of which are testing the gate itself).
+const ADULT_PIN = "0000";
+process.env.ADULT_PIN = ADULT_PIN;
 
 function mockRes() {
   return {
@@ -349,4 +354,49 @@ test("the lock is released even when generateContent throws, so an immediate ret
   const res2 = mockRes();
   await handler(req(), res2);
   assert.equal(res2.statusCode, 200);
+});
+
+/* ── Solo/private scenes (Resonance-only) ── */
+
+test("private: true stamps private_to on both the player and GM entries, for Resonance", async (t) => {
+  const redis = statefulRedisMock(null);
+  t.mock.module("../lib/redis.js", redis);
+  t.mock.module("../lib/gemini.js", { exports: { generateContent: async () => "Lyra investigates alone." } });
+
+  const handler = freshHandler("../api/gm.js");
+  const req = { method: "POST", headers: { "x-adult-pin": ADULT_PIN }, query: { world: "resonance" }, body: { player: "lyra", message: "I look around without Fen", type: "action", private: true } };
+  await handler(req, mockRes());
+
+  const log = redis.state.sessionLog;
+  assert.equal(log.length, 2);
+  assert.equal(log[0].private_to, "lyra");
+  assert.equal(log[1].private_to, "lyra");
+});
+
+test("private scenes are Resonance-only — the flag is silently ignored for other world types", async (t) => {
+  const redis = statefulRedisMock(null);
+  t.mock.module("../lib/redis.js", redis);
+  t.mock.module("../lib/gemini.js", { exports: { generateContent: async () => "You look around." } });
+
+  const handler = freshHandler("../api/gm.js");
+  const req = { method: "POST", headers: {}, query: { world: "manlandia" }, body: { player: "player1", message: "I look around", type: "action", private: true } };
+  await handler(req, mockRes());
+
+  const log = redis.state.sessionLog;
+  assert.equal(log[0].private_to, undefined);
+  assert.equal(log[1].private_to, undefined);
+});
+
+test("a normal (non-private) Resonance turn never gets a private_to field", async (t) => {
+  const redis = statefulRedisMock(null);
+  t.mock.module("../lib/redis.js", redis);
+  t.mock.module("../lib/gemini.js", { exports: { generateContent: async () => "Fen pours a drink." } });
+
+  const handler = freshHandler("../api/gm.js");
+  const req = { method: "POST", headers: { "x-adult-pin": ADULT_PIN }, query: { world: "resonance" }, body: { player: "fen", message: "I work the bar", type: "action" } };
+  await handler(req, mockRes());
+
+  const log = redis.state.sessionLog;
+  assert.equal(log[0].private_to, undefined);
+  assert.equal(log[1].private_to, undefined);
 });

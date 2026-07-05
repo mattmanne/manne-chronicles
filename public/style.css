@@ -391,6 +391,10 @@ html, body {
 }
 .log-entry.ambient .entry-label { color: var(--blue-dim); }
 
+/* ── Private scenes — visible only to the character it's private to ── */
+.log-entry.private .entry-content { border-left-color: #9b7fc9; box-shadow: inset 0 0 0 1px rgba(155,127,201,0.15); }
+.log-entry.private .entry-label { color: #9b7fc9; }
+
 .log-entry.player-fen .entry-content {
   font-size: 0.88rem;
   color: var(--blue);
@@ -596,6 +600,71 @@ html, body {
   font-size: 0.72rem;
   color: var(--gold-dim);
 }
+
+/* ── Solo/private scenes (Resonance) ── */
+.scene-pin-section {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+#scene-pin-set-panel.hidden { display: none; }
+#scene-pin-set-panel { margin-top: 10px; display: flex; flex-direction: column; gap: 8px; }
+.scene-pin-hint { font-size: 0.72rem; color: var(--parch-dim); font-style: italic; line-height: 1.5; margin: 0; }
+#scene-pin-set-input {
+  width: 140px; padding: 8px 10px; font-size: 0.9rem; letter-spacing: 0.2em;
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 6px; color: var(--parchment); outline: none;
+}
+#scene-pin-set-input:focus { border-color: var(--gold-dim); }
+.scene-pin-set-actions { display: flex; align-items: center; gap: 10px; }
+#scene-pin-set-status { font-size: 0.72rem; color: var(--gold-dim); }
+
+#private-scene-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 0 2px 6px;
+}
+.private-scene-toggle, .reveal-scene-btn {
+  font-size: 0.74rem; padding: 6px 10px;
+  background: none; border: 1px solid var(--border); border-radius: 20px;
+  color: var(--parch-dim); cursor: pointer; transition: all 0.2s;
+}
+.private-scene-toggle:hover, .reveal-scene-btn:hover { border-color: var(--gold-dim); color: var(--parchment); }
+.private-scene-toggle.active { border-color: var(--gold); background: rgba(201,168,76,0.12); color: var(--gold); }
+.reveal-scene-btn { border-color: var(--blue-dim); color: var(--blue); }
+.reveal-scene-btn.hidden { display: none; }
+
+#scene-pin-overlay {
+  display: none;
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.7);
+  z-index: 3000;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+#scene-pin-overlay.active { display: flex; }
+.scene-pin-box {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 24px 20px;
+  max-width: 320px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.scene-pin-title { font-family: var(--font-serif); font-size: 1.1rem; color: var(--gold); letter-spacing: 0.06em; }
+.scene-pin-msg { font-size: 0.9rem; color: var(--parch-dim); margin: 0; line-height: 1.5; }
+.scene-pin-input {
+  width: 100%; padding: 12px; font-size: 1.3rem; text-align: center; letter-spacing: 0.5em;
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 8px; color: var(--parchment); outline: none; box-sizing: border-box;
+}
+.scene-pin-input:focus { border-color: var(--gold-dim); }
+.scene-pin-error { font-size: 0.78rem; color: var(--red); margin: 0; }
+.scene-pin-error.hidden { display: none; }
+.scene-pin-actions { display: flex; gap: 10px; justify-content: flex-end; }
 
 .archive-empty {
   color: var(--parch-dim); font-style: italic;

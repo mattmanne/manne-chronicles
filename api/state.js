@@ -137,6 +137,38 @@ module.exports = async function handler(req, res) {
       return res.json({ ok: true, characters: current.characters });
     }
 
+    // Solo/private scenes — Resonance-specific (its fixed two-character
+    // shape is what makes "my partner isn't in the room" a meaningful
+    // mechanic). Not real security — see CLAUDE.md — just enough friction
+    // that switching to the other character on a shared device isn't a
+    // single accidental tap.
+    if (action === "set_scene_pin") {
+      const current = (await getState(key)) || getInitialState();
+      if (worldConfig.id !== "resonance") return res.status(400).json({ error: "Scene PINs are Resonance-only" });
+      const { character, pin } = payload || {};
+      if (!current.characters[character]) return res.status(400).json({ error: "Invalid character" });
+      const trimmed = typeof pin === "string" ? pin.trim() : "";
+      if (trimmed !== "" && !/^\d{4}$/.test(trimmed)) {
+        return res.status(400).json({ error: "PIN must be exactly 4 digits, or blank to clear it" });
+      }
+      current.characters[character].scene_pin = trimmed;
+      await setState(key, current);
+      return res.json({ ok: true, characters: current.characters });
+    }
+
+    if (action === "reveal_scene") {
+      const current = (await getState(key)) || getInitialState();
+      if (worldConfig.id !== "resonance") return res.status(400).json({ error: "Private scenes are Resonance-only" });
+      const { character } = payload || {};
+      if (!current.characters[character]) return res.status(400).json({ error: "Invalid character" });
+      let revealed = 0;
+      current.sessionLog.forEach((entry) => {
+        if (entry.private_to === character) { delete entry.private_to; revealed++; }
+      });
+      await setState(key, current);
+      return res.json({ ok: true, revealed });
+    }
+
     if (action === "set_author_note") {
       const current = (await getState(key)) || getInitialState();
       const note = typeof payload?.note === "string" ? payload.note.trim().slice(0, 1000) : "";

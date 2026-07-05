@@ -16,7 +16,16 @@ module.exports = async function handler(req, res) {
   if (!checkAdultAccess(req, res, worldConfig, state)) return;
 
   const since = parseInt(req.query.since || "0");
-  const newEntries = state.sessionLog.filter((e) => e.timestamp > since && !e.rolling);
+  // `player` identifies who's currently viewing — used only to filter out
+  // another character's private_to entries (see "Solo/private scenes" in
+  // CLAUDE.md). No `player` param at all hides every private entry (the
+  // safe default when nobody's identified as the viewer) — harmless for
+  // every world/entry that never sets private_to in the first place, which
+  // is everything except an active Resonance private scene.
+  const viewer = req.query.player;
+  const newEntries = state.sessionLog.filter((e) =>
+    e.timestamp > since && !e.rolling && (!e.private_to || e.private_to === viewer)
+  );
 
   // A roll that never resolved (client closed/dropped mid-flight before it
   // could submit the roll_result) leaves its entries hidden here forever

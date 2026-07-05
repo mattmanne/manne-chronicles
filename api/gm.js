@@ -108,9 +108,14 @@ module.exports = async function handler(req, res) {
   const worldConfig = getWorldConfig(req.query.world);
   const { key, getInitialState, buildSystemPrompt } = worldConfig;
 
-  const { player, message, type, tone } = req.body;
+  const { player, message, type, tone, private: isPrivate } = req.body;
   if (!player || !message) return res.status(400).json({ error: "Missing player or message" });
   if (message.length > 1000) return res.status(400).json({ error: "Message too long" });
+  // Solo/private scenes are Resonance-specific (its fixed two-character
+  // shape is what makes "my partner isn't in the room" meaningful) — a
+  // stray `private: true` from any other world type is just ignored rather
+  // than erroring, same tolerance every other world-specific field gets.
+  const privateScene = isPrivate === true && worldConfig.id === "resonance";
 
   const gameState = (await getState(key)) || getInitialState();
   if (!checkAdultAccess(req, res, worldConfig, gameState)) return;
@@ -194,6 +199,15 @@ module.exports = async function handler(req, res) {
   const rolling = needsRoll && type !== "roll_result";
   const userEntry = { role: "user", content: userMessage, player, timestamp: ts };
   const gmEntry   = { role: "gm",   content: cleanResponse,           timestamp: ts };
+  if (privateScene) {
+    // Hidden from the other player until a manual reveal_scene action (see
+    // api/state.js) — /api/poll filters on this. Not real security, just a
+    // UX device (see CLAUDE.md's "Solo/private scenes" section): the point
+    // is dramatic irony between two people who trust each other, not access
+    // control against a determined bypass.
+    userEntry.private_to = player;
+    gmEntry.private_to = player;
+  }
   if (rolling) {
     userEntry.rolling = true;
     gmEntry.rolling = true;
@@ -226,8 +240,10 @@ module.exports = async function handler(req, res) {
 
   // Only notify once the turn is fully resolved — while `rolling` is true the
   // entries are hidden from /api/poll, so a notification now would send the
-  // other player to content they can't see yet.
-  if (!rolling) {
+  // other player to content they can't see yet. Same reasoning suppresses it
+  // during a private scene: the whole point is the other player doesn't know
+  // yet, and a "took a turn" push would tip them off to go look for nothing.
+  if (!rolling && !privateScene) {
     const senderDisplayName = gameState.characters[player]?.name || playerLabel;
     await sendTurnNotifications(worldConfig, gameState, player, senderDisplayName);
   }
