@@ -84,6 +84,11 @@ test("stripGMTags removes OBJECTIVE and OBJECTIVE COMPLETE tags", () => {
   assert.equal(stripGMTags("Found it! [OBJECTIVE COMPLETE: Find the lost stones]"), "Found it!");
 });
 
+test("stripGMTags removes CLUE and CLUE RESOLVED tags", () => {
+  assert.equal(stripGMTags("Something's off. [CLUE: The ledger has been altered]"), "Something's off.");
+  assert.equal(stripGMTags("It clicks. [CLUE RESOLVED: The ledger has been altered]"), "It clicks.");
+});
+
 test("stripGMTags removes the XP bonus tag", () => {
   assert.equal(stripGMTags("Clever! [XP 2: +10]"), "Clever!");
 });

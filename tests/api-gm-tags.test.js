@@ -164,6 +164,47 @@ test("an OBJECTIVE tag in a roll-request turn is deferred until the roll resolve
   assert.deepEqual(res2.body.gameState.worldState.objectives, [{ text: "Track down the informant", done: false }]);
 });
 
+test("CLUE tags add and resolve leads, generalized to every world type, separate from Objectives", async (t) => {
+  const redis = statefulRedisMock(null);
+  t.mock.module("../lib/redis.js", redis);
+  mockGemini(t, [
+    "Something's off. [CLUE: The ledger has been altered]",
+    "It clicks into place. [CLUE RESOLVED: The ledger has been altered]",
+  ]);
+
+  const res1 = await callGm({ player: "player1", message: "check the ledger", type: "action" });
+  assert.deepEqual(res1.body.gameState.worldState.clues, [{ text: "The ledger has been altered", done: false }]);
+  assert.deepEqual(res1.body.gameState.worldState.objectives, []);
+
+  const res2 = await callGm({ player: "player1", message: "confront the clerk", type: "action" });
+  assert.deepEqual(res2.body.gameState.worldState.clues, [{ text: "The ledger has been altered", done: true }]);
+});
+
+test("CLUE tags work for Resonance too, not just Manlandia/custom", async (t) => {
+  const redis = statefulRedisMock(null);
+  t.mock.module("../lib/redis.js", redis);
+  mockGemini(t, ["A contradiction surfaces. [CLUE: Fen's alibi doesn't match the ledger]"]);
+
+  const res = await callGm({ player: "fen", message: "investigate", type: "action" }, "resonance");
+  assert.deepEqual(res.body.gameState.worldState.clues, [{ text: "Fen's alibi doesn't match the ledger", done: false }]);
+});
+
+test("a CLUE tag in a roll-request turn is deferred until the roll resolves, same as other state tags", async (t) => {
+  const redis = statefulRedisMock(null);
+  t.mock.module("../lib/redis.js", redis);
+  mockGemini(t, [
+    "A detail nags at you. [CLUE: The guard's story has a gap]\nROLL:ACUITY",
+    "You piece it together.",
+  ]);
+
+  const res1 = await callGm({ player: "player1", message: "press the guard", type: "action" });
+  assert.equal(res1.body.needsRoll, true);
+  assert.deepEqual(res1.body.gameState.worldState.clues, []);
+
+  const res2 = await callGm({ player: "player1", message: "rolled a 9", type: "roll_result" });
+  assert.deepEqual(res2.body.gameState.worldState.clues, [{ text: "The guard's story has a gap", done: false }]);
+});
+
 test("XP N tag awards bonus XP on top of any baseline already accumulated (Manlandia)", async (t) => {
   const seeded = require("../lib/gamestate-manlandia").getInitialStateManlandia();
   seeded.characters.player1 = { ...seeded.characters.player1, archetype: "fighter", ability_id: "lucky_break", xp: 5 };

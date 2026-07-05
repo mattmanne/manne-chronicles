@@ -1836,8 +1836,31 @@ function renderMap(state) {
   else if (currentWorld.startsWith("c_")) renderCustomMap(state);
   else renderResonanceMap(state);
   renderObjectives(state);
+  renderClues(state);
   renderLorebook(state);
   renderInventory(state);
+}
+
+// Investigation threads ("Leads") — shared across all world types, same
+// pattern as Objectives (see [CLUE: ...] / [CLUE RESOLVED: ...] in
+// lib/gm-tags.js), but goal-shaped Objectives ("find the sword") vs.
+// question-shaped Leads ("who lied about the ledger"). No "contradicts"
+// relationship yet — deferred until real transcripts justify it.
+function renderClues(state) {
+  const panel = document.getElementById("clues-panel");
+  const list  = document.getElementById("clues-list");
+  if (!panel || !list) return;
+
+  const clues = state?.worldState?.clues || [];
+  if (!clues.length) { panel.classList.add("hidden"); list.innerHTML = ""; return; }
+
+  panel.classList.remove("hidden");
+  list.innerHTML = clues.map(c => `
+    <li class="objective-item${c.done ? " done" : ""}">
+      <span class="objective-check">${c.done ? "✓" : "○"}</span>
+      <span>${escapeHtml(c.text)}</span>
+    </li>
+  `).join("");
 }
 
 // NPC lorebook — shared across all world types, populated via [NPC: ...].

@@ -3,7 +3,7 @@ const assert = require("node:assert/strict");
 const {
   normalizeHarm, buildNameToKeyMap, extractRoll, extractCounterUpdate,
   extractCharacterHarmUpdates, extractResonanceHarmUpdates, extractAbilityUsedKeys,
-  objectivesMatch, extractObjectiveUpdates,
+  objectivesMatch, extractObjectiveUpdates, extractClueUpdates,
   extractLorebookUpdates, extractSharedItemAdditions,
   extractCharacterItemAdditions, extractResonanceItemAdditions,
   extractCombatStart, extractEnemyUpdates, extractEnemyDefeated, extractCombatEnd,
@@ -289,6 +289,51 @@ test("extractObjectiveUpdates handles both an addition and a completion in the s
   );
   assert.deepEqual(additions, ["Return the sword to the shrine"]);
   assert.deepEqual(completedTexts, ["Find the ancient sword"]);
+});
+
+/* ── Clues / Leads (reuses objectivesMatch) ── */
+test("extractClueUpdates adds a new clue not already known", () => {
+  const { additions } = extractClueUpdates("Something's off. [CLUE: The ledger has been altered]", []);
+  assert.deepEqual(additions, ["The ledger has been altered"]);
+});
+
+test("extractClueUpdates does not re-add a clue that already exists (even reworded)", () => {
+  const existing = [{ text: "The ledger has been altered", done: false }];
+  const { additions } = extractClueUpdates("[CLUE: The old ledger has clearly been altered]", existing);
+  assert.deepEqual(additions, []);
+});
+
+test("extractClueUpdates dedups two near-identical additions within the same response", () => {
+  const { additions } = extractClueUpdates("[CLUE: Ledger altered] Later. [CLUE: The ledger has been altered]", []);
+  assert.equal(additions.length, 1);
+});
+
+test("extractClueUpdates marks a fuzzy-matching open clue resolved", () => {
+  const existing = [{ text: "Who altered the ledger", done: false }];
+  const { resolvedTexts } = extractClueUpdates("[CLUE RESOLVED: Who altered the ledger]", existing);
+  assert.deepEqual(resolvedTexts, ["Who altered the ledger"]);
+});
+
+test("extractClueUpdates ignores a resolution that doesn't match anything open", () => {
+  const existing = [{ text: "Who altered the ledger", done: false }];
+  const { resolvedTexts } = extractClueUpdates("[CLUE RESOLVED: Where is the missing coin]", existing);
+  assert.deepEqual(resolvedTexts, []);
+});
+
+test("extractClueUpdates does not re-resolve a clue that's already done", () => {
+  const existing = [{ text: "Who altered the ledger", done: true }];
+  const { resolvedTexts } = extractClueUpdates("[CLUE RESOLVED: Who altered the ledger]", existing);
+  assert.deepEqual(resolvedTexts, []);
+});
+
+test("extractClueUpdates handles both an addition and a resolution in the same response, and doesn't collide with [CLUE RESOLVED: ...]", () => {
+  const existing = [{ text: "Who altered the ledger", done: false }];
+  const { additions, resolvedTexts } = extractClueUpdates(
+    "[CLUE RESOLVED: Who altered the ledger]\n[CLUE: Where did the coin come from]",
+    existing
+  );
+  assert.deepEqual(additions, ["Where did the coin come from"]);
+  assert.deepEqual(resolvedTexts, ["Who altered the ledger"]);
 });
 
 /* ── NPC lorebook ── */

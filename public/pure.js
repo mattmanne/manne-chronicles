@@ -69,6 +69,7 @@ function stripGMTags(content) {
     .replace(/\[ABILITY (FEN|LYRA): [a-z_]+\]/gi, "")
     .replace(/\[SUGGESTIONS: [^\]]+\]/gi, "")
     .replace(/\[OBJECTIVE(?: COMPLETE)?: [^\]]+\]/gi, "")
+    .replace(/\[CLUE(?: RESOLVED)?: [^\]]+\]/gi, "")
     .replace(/\[XP \d: \+\d+\]/gi, "")
     .replace(/\[NPC:\s*[^:\]]+:\s*[^\]]+\]/gi, "")
     // Broader than the parser on purpose (display-only, see comment above) —
