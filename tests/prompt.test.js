@@ -48,3 +48,33 @@ test("buildSystemPromptCustom omits the Author's Note block when empty", () => {
   const prompt = buildSystemPromptCustom(gs);
   assert.doesNotMatch(prompt, /AUTHOR'S NOTE/);
 });
+
+test("buildSystemPrompt (Resonance) includes pinned notes when present", () => {
+  const gs = getInitialState();
+  gs.worldState.pinned_notes = [{ text: "Fen lied about the ledger", timestamp: 1 }];
+  const prompt = buildSystemPrompt(gs);
+  assert.match(prompt, /REMEMBERED MOMENTS/);
+  assert.match(prompt, /Fen lied about the ledger/);
+});
+
+test("buildSystemPrompt (Resonance) omits the pinned-notes block when empty", () => {
+  const gs = getInitialState();
+  const prompt = buildSystemPrompt(gs);
+  assert.doesNotMatch(prompt, /REMEMBERED MOMENTS/);
+});
+
+test("buildSystemPromptManlandia includes pinned notes when present", () => {
+  const gs = getInitialStateManlandia();
+  gs.worldState.pinned_notes = [{ text: "The stone was hidden under the oak", timestamp: 1 }];
+  const prompt = buildSystemPromptManlandia(gs);
+  assert.match(prompt, /REMEMBERED MOMENTS/);
+  assert.match(prompt, /The stone was hidden under the oak/);
+});
+
+test("buildSystemPromptCustom includes pinned notes when present", () => {
+  const gs = getInitialStateCustom({ name: "Star Reach", theme: "Space pirates", playerCount: 2, adult: false });
+  gs.worldState.pinned_notes = [{ text: "The captain trusts no one from the Reach", timestamp: 1 }];
+  const prompt = buildSystemPromptCustom(gs);
+  assert.match(prompt, /REMEMBERED MOMENTS/);
+  assert.match(prompt, /The captain trusts no one from the Reach/);
+});

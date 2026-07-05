@@ -301,6 +301,45 @@ test("set_author_note falls back to an empty string for a non-string note", asyn
   assert.equal(redis.state.worldState.author_note, "");
 });
 
+test("add_pinned_note appends a trimmed note with a timestamp", async (t) => {
+  const redis = statefulRedisMock({ session: 1, sessionLog: [], worldState: {}, characters: {} });
+  t.mock.module("../lib/redis.js", redis);
+
+  const res = await callState({ method: "POST", headers: { "x-adult-pin": ADULT_PIN }, query: { world: "resonance" }, body: { action: "add_pinned_note", payload: { text: "  Fen lied about the ledger  " } } });
+  assert.equal(res.body.ok, true);
+  assert.equal(redis.state.worldState.pinned_notes.length, 1);
+  assert.equal(redis.state.worldState.pinned_notes[0].text, "Fen lied about the ledger");
+  assert.equal(typeof redis.state.worldState.pinned_notes[0].timestamp, "number");
+});
+
+test("add_pinned_note rejects empty/whitespace-only text", async (t) => {
+  const redis = statefulRedisMock({ session: 1, sessionLog: [], worldState: {}, characters: {} });
+  t.mock.module("../lib/redis.js", redis);
+
+  const res = await callState({ method: "POST", headers: { "x-adult-pin": ADULT_PIN }, query: { world: "resonance" }, body: { action: "add_pinned_note", payload: { text: "   " } } });
+  assert.equal(res.statusCode, 400);
+});
+
+test("add_pinned_note works for a kid world too (universal scope, not Resonance-only)", async (t) => {
+  const redis = statefulRedisMock({ session: 1, sessionLog: [], worldState: {}, characters: {} });
+  t.mock.module("../lib/redis.js", redis);
+
+  const res = await callState({ method: "POST", headers: {}, query: { world: "manlandia" }, body: { action: "add_pinned_note", payload: { text: "The stone was hidden under the oak" } } });
+  assert.equal(res.body.ok, true);
+  assert.equal(redis.state.worldState.pinned_notes.length, 1);
+});
+
+test("add_pinned_note caps the list at 10, dropping the oldest", async (t) => {
+  const existing = Array.from({ length: 10 }, (_, i) => ({ text: `note ${i}`, timestamp: i }));
+  const redis = statefulRedisMock({ session: 1, sessionLog: [], worldState: { pinned_notes: existing }, characters: {} });
+  t.mock.module("../lib/redis.js", redis);
+
+  await callState({ method: "POST", headers: { "x-adult-pin": ADULT_PIN }, query: { world: "resonance" }, body: { action: "add_pinned_note", payload: { text: "note 10" } } });
+  assert.equal(redis.state.worldState.pinned_notes.length, 10);
+  assert.equal(redis.state.worldState.pinned_notes[0].text, "note 1");
+  assert.equal(redis.state.worldState.pinned_notes[9].text, "note 10");
+});
+
 test("an unknown action returns 400", async (t) => {
   t.mock.module("../lib/redis.js", statefulRedisMock(null));
   const res = await callState({ method: "POST", headers: { "x-adult-pin": ADULT_PIN }, query: { world: "resonance" }, body: { action: "not_a_real_action" } });

@@ -1225,15 +1225,21 @@ function setupAuthorNote() {
     const opening = panel.classList.contains("hidden");
     panel.classList.toggle("hidden");
     toggle.setAttribute("aria-expanded", String(opening));
-    if (opening && !authorNoteLoaded) {
-      try {
-        const res = await authGet("/api/state");
-        if (handleLockedResponse(res.status)) return;
-        const state = await res.json();
+    if (!opening) return;
+    try {
+      const res = await authGet("/api/state");
+      if (handleLockedResponse(res.status)) return;
+      const state = await res.json();
+      // The note textarea is only ever prefilled once, so a pin added after
+      // the player started typing an unsaved edit can't clobber it — but the
+      // pinned-notes list itself is read-only, so it's safe (and necessary)
+      // to refresh every time the panel opens.
+      if (!authorNoteLoaded) {
         input.value = state.worldState?.author_note || "";
         authorNoteLoaded = true;
-      } catch(_) { /* leave the field blank — save still works, just without a prefilled value */ }
-    }
+      }
+      renderPinnedNotes(state.worldState?.pinned_notes || []);
+    } catch(_) { /* leave fields as-is — save/pin still work without a prefilled view */ }
   });
 
   document.getElementById("author-note-save").addEventListener("click", async () => {
@@ -2296,13 +2302,19 @@ function appendGMEntry(text, animate) {
   entry.innerHTML = `
     <div class="entry-header">
       <span class="entry-label">The Story</span>
-      <button class="speak-btn" title="Read aloud" aria-label="Read aloud">🔊</button>
+      <span class="entry-header-btns">
+        <button class="pin-btn" title="Remember this" aria-label="Pin this moment">📌</button>
+        <button class="speak-btn" title="Read aloud" aria-label="Read aloud">🔊</button>
+      </span>
     </div>
     <div class="entry-content">${escapeHtml(cleanText)}</div>
     ${stateChanges.map(s => `<div class="state-change${s.positive ? " positive" : ""}">${s.text}</div>`).join("")}`;
 
   entry.querySelector(".speak-btn").addEventListener("click", function() {
     speakText(cleanText, this);
+  });
+  entry.querySelector(".pin-btn").addEventListener("click", function() {
+    pinLogEntry(cleanText, this);
   });
   logEntries.appendChild(entry);
   return entry;
@@ -2313,9 +2325,39 @@ function appendPlayerEntry(player, text, animate) {
   const entry = document.createElement("div");
   entry.className = `log-entry player-${player}${animate ? "" : " no-anim"}`;
   entry.innerHTML = `
-    <span class="entry-label">${displayName}</span>
+    <div class="entry-header">
+      <span class="entry-label">${displayName}</span>
+      <button class="pin-btn" title="Remember this" aria-label="Pin this moment">📌</button>
+    </div>
     <div class="entry-content">${escapeHtml(text)}</div>`;
+  entry.querySelector(".pin-btn").addEventListener("click", function() {
+    pinLogEntry(text, this);
+  });
   logEntries.appendChild(entry);
+}
+
+/* ── Pinned notes ("remember this") ── */
+async function pinLogEntry(text, btn) {
+  if (!text || !text.trim() || btn.disabled) return;
+  const original = btn.textContent;
+  btn.disabled = true;
+  try {
+    const res = await authPost("/api/state", { action: "add_pinned_note", payload: { text } });
+    if (handleLockedResponse(res.status)) return;
+    const data = await res.json();
+    btn.textContent = data.ok ? "✅" : "⚠️";
+  } catch (_) {
+    btn.textContent = "⚠️";
+  }
+  setTimeout(() => { btn.textContent = original; btn.disabled = false; }, 1500);
+}
+
+function renderPinnedNotes(notes) {
+  const section = document.getElementById("pinned-notes-section");
+  const list = document.getElementById("pinned-notes-list");
+  if (!section || !list) return;
+  section.classList.toggle("hidden", !notes || !notes.length);
+  list.innerHTML = (notes || []).map(n => `<li>${escapeHtml(n.text)}</li>`).join("");
 }
 
 function appendRollResult(player, stat, result) {

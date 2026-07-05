@@ -382,18 +382,33 @@ html, body {
   max-width: 90%;
 }
 
-.entry-header { display: flex; align-items: center; justify-content: space-between; }
+.entry-header { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.entry-header-btns { display: flex; align-items: center; gap: 2px; }
 .entry-label { font-size: 0.65rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--parch-dim); }
-.log-entry.player-lyra .entry-label { text-align: right; }
+.log-entry.player-lyra .entry-header { flex-direction: row-reverse; }
 
-.speak-btn {
+.speak-btn, .pin-btn {
   background: none; border: none;
   font-size: 0.85rem; cursor: pointer;
   padding: 2px 4px; border-radius: 4px;
   opacity: 0.5; transition: opacity 0.2s; line-height: 1;
 }
-.speak-btn:hover  { opacity: 1; }
+.speak-btn:hover, .pin-btn:hover { opacity: 1; }
 .speak-btn.speaking { opacity: 1; animation: pulse 1s infinite; }
+.pin-btn:disabled { opacity: 0.3; cursor: default; }
+
+/* ── Pinned notes (Settings → Author's Note panel) ── */
+.pinned-notes-section { margin-bottom: 14px; }
+.pinned-notes-label {
+  font-size: 0.65rem; letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--parch-dim); margin-bottom: 6px;
+}
+#pinned-notes-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+#pinned-notes-list li {
+  font-size: 0.82rem; color: var(--parchment); background: var(--surface2);
+  border: 1px solid var(--border); border-left: 3px solid var(--gold-dim);
+  border-radius: 4px 8px 8px 4px; padding: 6px 10px;
+}
 
 .log-entry .state-change {
   font-size: 0.72rem; font-family: monospace;

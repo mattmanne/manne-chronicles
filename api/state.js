@@ -145,6 +145,21 @@ module.exports = async function handler(req, res) {
       return res.json({ ok: true, author_note: note });
     }
 
+    if (action === "add_pinned_note") {
+      const current = (await getState(key)) || getInitialState();
+      const text = typeof payload?.text === "string" ? payload.text.trim().slice(0, 300) : "";
+      if (!text) return res.status(400).json({ error: "Note text is required" });
+      if (!current.worldState.pinned_notes) current.worldState.pinned_notes = [];
+      current.worldState.pinned_notes.push({ text, timestamp: Date.now() });
+      // Small, fixed cap — this is a handful of "don't lose this" flags, not
+      // a second session log; oldest pins roll off once the list is full.
+      if (current.worldState.pinned_notes.length > 10) {
+        current.worldState.pinned_notes = current.worldState.pinned_notes.slice(-10);
+      }
+      await setState(key, current);
+      return res.json({ ok: true, pinned_notes: current.worldState.pinned_notes });
+    }
+
     if (action === "new_session") {
       const current = (await getState(key)) || getInitialState();
       if (!current.worldState.session_archive) current.worldState.session_archive = [];
