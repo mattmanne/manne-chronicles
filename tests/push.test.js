@@ -1,6 +1,6 @@
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
-const { selectNotifyTargets, buildNotificationPayload } = require("../lib/push");
+const { selectNotifyTargets, buildNotificationPayload, buildAmbientPayload } = require("../lib/push");
 
 test("selectNotifyTargets excludes the sender's own devices but includes everyone else", () => {
   const subs = [
@@ -28,4 +28,10 @@ test("buildNotificationPayload is generic and never includes story content", () 
   const payload = buildNotificationPayload("Manlandia", "Taisha");
   assert.equal(payload.title, "Manlandia");
   assert.equal(payload.body, "Taisha took a turn — tap to see what happens!");
+});
+
+test("buildAmbientPayload is generic and never includes the actual ambient beat text", () => {
+  const payload = buildAmbientPayload("Resonance");
+  assert.equal(payload.title, "Resonance");
+  assert.doesNotMatch(payload.body, /Conclave|Varek|Low Quarter/);
 });

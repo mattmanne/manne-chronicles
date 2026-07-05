@@ -967,7 +967,7 @@ async function loadExistingLog() {
     sessionLabel.textContent = `Session ${data.worldState.session}`;
     updateCharacterUI(data);
     for (const entry of data.entries) {
-      if (entry.role === "gm") appendGMEntry(entry.content, false);
+      if (entry.role === "gm") appendGMEntry(entry.content, false, entry.ambient);
       else appendPlayerEntry(entry.player || currentPlayer, stripPlayerPrefix(entry.content), false);
       if (entry.timestamp > lastTimestamp) lastTimestamp = entry.timestamp;
     }
@@ -988,7 +988,7 @@ function startPolling() {
       const data = await res.json();
       if (data.entries && data.entries.length > 0) {
         for (const entry of data.entries) {
-          if (entry.role === "gm") appendGMEntry(entry.content, true);
+          if (entry.role === "gm") appendGMEntry(entry.content, true, entry.ambient);
           else appendPlayerEntry(entry.player || currentPlayer, stripPlayerPrefix(entry.content), true);
           if (entry.timestamp > lastTimestamp) lastTimestamp = entry.timestamp;
         }
@@ -2452,15 +2452,15 @@ function updateStoneTracker(stonesFound) {
 }
 
 /* ── DOM Builders ── */
-function appendGMEntry(text, animate) {
+function appendGMEntry(text, animate, ambient) {
   const cleanText    = getCleanText(text);
   const stateChanges = extractStateChanges(text);
 
   const entry = document.createElement("div");
-  entry.className = `log-entry gm${animate ? "" : " no-anim"}`;
+  entry.className = `log-entry gm${animate ? "" : " no-anim"}${ambient ? " ambient" : ""}`;
   entry.innerHTML = `
     <div class="entry-header">
-      <span class="entry-label">The Story</span>
+      <span class="entry-label">${ambient ? "🌙 Meanwhile…" : "The Story"}</span>
       <span class="entry-header-btns">
         <button class="pin-btn" title="Remember this" aria-label="Pin this moment">📌</button>
         <button class="speak-btn" title="Read aloud" aria-label="Read aloud">🔊</button>

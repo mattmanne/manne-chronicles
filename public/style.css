@@ -382,6 +382,15 @@ html, body {
   white-space: pre-wrap;
 }
 
+/* ── Living World ambient beats — visually distinct from real narration ── */
+.log-entry.ambient .entry-content {
+  font-style: italic;
+  color: var(--parch-dim);
+  border-left-style: dashed;
+  background: transparent;
+}
+.log-entry.ambient .entry-label { color: var(--blue-dim); }
+
 .log-entry.player-fen .entry-content {
   font-size: 0.88rem;
   color: var(--blue);
