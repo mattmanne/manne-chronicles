@@ -84,9 +84,11 @@
     <div class="delete-confirm-box">
       <div class="delete-confirm-title">Delete World</div>
       <p class="delete-confirm-msg">Delete "<strong id="delete-confirm-name"></strong>"? This cannot be undone.</p>
+      <label class="delete-confirm-type-label" for="delete-confirm-input">Type <strong>delete</strong> to confirm</label>
+      <input type="text" id="delete-confirm-input" class="delete-confirm-input" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="delete" aria-label="Type delete to confirm" />
       <div class="delete-confirm-actions">
         <button id="delete-confirm-cancel" class="wc-cancel-btn">Keep It</button>
-        <button id="delete-confirm-ok" class="delete-confirm-delete-btn">Delete Forever →</button>
+        <button id="delete-confirm-ok" class="delete-confirm-delete-btn" disabled>Delete Forever →</button>
       </div>
     </div>
   </div>

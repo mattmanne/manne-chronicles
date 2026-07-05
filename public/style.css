@@ -1682,6 +1682,17 @@ body.world-custom .manlandia-lore { display: none !important; }
   line-height: 1.5;
 }
 
+.delete-confirm-type-label {
+  font-size: 0.78rem; color: var(--parch-dim); margin-top: -6px;
+}
+.delete-confirm-type-label strong { color: var(--red); }
+.delete-confirm-input {
+  width: 100%; padding: 10px 12px; font-size: 0.9rem;
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 8px; color: var(--parchment); outline: none;
+}
+.delete-confirm-input:focus { border-color: var(--red); }
+
 .delete-confirm-actions { display: flex; gap: 10px; justify-content: flex-end; }
 
 /* Recap */
@@ -1809,5 +1820,6 @@ body.world-custom .manlandia-lore { display: none !important; }
   font-family: var(--font-serif);
   letter-spacing: 0.04em;
 }
-.delete-confirm-delete-btn:hover { filter: brightness(1.15); }
+.delete-confirm-delete-btn:hover:not(:disabled) { filter: brightness(1.15); }
+.delete-confirm-delete-btn:disabled { background: var(--surface2); color: var(--parch-dim); cursor: default; }
 

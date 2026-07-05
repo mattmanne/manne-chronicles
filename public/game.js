@@ -329,13 +329,22 @@ async function loadCampaigns() {
 }
 
 let pendingDeleteId = null;
+const DELETE_CONFIRM_WORD = "delete";
 
 function deleteCampaign(id) {
   const camp = campaignList.find(c => c.id === id);
   const nameEl = document.getElementById("delete-confirm-name");
   if (nameEl) nameEl.textContent = camp?.name || id;
   pendingDeleteId = id;
+  // Reset the type-to-confirm field every time this reopens — this overlay
+  // is reused across different campaigns, and leaving a prior "delete" typed
+  // in would defeat the whole point of the guard for the next one.
+  const input = document.getElementById("delete-confirm-input");
+  if (input) input.value = "";
+  const okBtn = document.getElementById("delete-confirm-ok");
+  if (okBtn) okBtn.disabled = true;
   document.getElementById("delete-confirm-overlay").classList.add("active");
+  setTimeout(() => input?.focus(), 50);
 }
 
 async function doDeleteCampaign(id) {
@@ -364,11 +373,25 @@ async function setCampaignArchived(id, archived) {
 }
 
 function setupDeleteConfirm() {
+  const input = document.getElementById("delete-confirm-input");
+  const okBtn = document.getElementById("delete-confirm-ok");
+
+  input?.addEventListener("input", () => {
+    if (okBtn) okBtn.disabled = input.value.trim().toLowerCase() !== DELETE_CONFIRM_WORD;
+  });
+  input?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && okBtn && !okBtn.disabled) okBtn.click();
+  });
+
   document.getElementById("delete-confirm-cancel")?.addEventListener("click", () => {
     document.getElementById("delete-confirm-overlay").classList.remove("active");
     pendingDeleteId = null;
   });
-  document.getElementById("delete-confirm-ok")?.addEventListener("click", async () => {
+  okBtn?.addEventListener("click", async () => {
+    // Defensive re-check, not just relying on the disabled attribute — same
+    // "don't trust client-side-only gating" instinct as everywhere else the
+    // server independently validates what the UI already prevents.
+    if ((input?.value.trim().toLowerCase() || "") !== DELETE_CONFIRM_WORD) return;
     const id = pendingDeleteId;
     pendingDeleteId = null;
     document.getElementById("delete-confirm-overlay").classList.remove("active");
