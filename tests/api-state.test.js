@@ -40,6 +40,27 @@ test("POST is rejected without the correct X-Game-Secret when one is configured"
   }
 });
 
+test("GET is rejected without the correct X-Game-Secret when one is configured — this is a full raw-state dump, not a filtered read", async (t) => {
+  const stored = { session: 1, sessionLog: [{ role: "gm", content: "secret narration" }], worldState: {}, characters: {} };
+  t.mock.module("../lib/redis.js", statefulRedisMock(stored));
+  process.env.GAME_SECRET = "supersecret";
+  try {
+    const wrong = await callState({ method: "GET", headers: {}, query: { world: "manlandia" } });
+    assert.equal(wrong.statusCode, 401);
+
+    const right = await callState({ method: "GET", headers: { "x-game-secret": "supersecret" }, query: { world: "manlandia" } });
+    assert.equal(right.statusCode, 200);
+  } finally {
+    delete process.env.GAME_SECRET;
+  }
+});
+
+test("GET fails open (like every other X-Game-Secret check) when GAME_SECRET isn't configured at all", async (t) => {
+  t.mock.module("../lib/redis.js", statefulRedisMock({ session: 1, sessionLog: [], worldState: {}, characters: {} }));
+  const res = await callState({ method: "GET", headers: {}, query: { world: "manlandia" } });
+  assert.equal(res.statusCode, 200);
+});
+
 test("reset on a built-in world replaces state with a fresh initial state", async (t) => {
   const dirty = { session: 5, sessionLog: [{ role: "gm", content: "..." }], worldState: { conclave_awareness: 9 }, characters: { fen: { harm: "Dying" }, lyra: { harm: "Wounded" } } };
   const redis = statefulRedisMock(dirty);
@@ -131,6 +152,23 @@ test("new_session archives the log, increments the session, and resets Resonance
   assert.equal(redis.state.characters.lyra.magic_uses_remaining, 3);
   assert.equal(redis.state.characters.fen.not_on_my_watch_used, false);
   assert.equal(redis.state.characters.fen.lucky_break_used, false);
+});
+
+test("new_session trims and caps an oversized summary at 2000 chars", async (t) => {
+  const redis = statefulRedisMock({ session: 1, sessionLog: [], worldState: {}, characters: { lyra: {}, fen: {} } });
+  t.mock.module("../lib/redis.js", redis);
+
+  await callState({ method: "POST", headers: { "x-adult-pin": ADULT_PIN }, query: { world: "resonance" }, body: { action: "new_session", payload: { summary: "  " + "x".repeat(2100) + "  " } } });
+  assert.equal(redis.state.worldState.session_archive[0].summary.length, 2000);
+  assert.equal(redis.state.worldState.session_summaries[0].length, 2000);
+});
+
+test("new_session falls back to an empty summary for a non-string", async (t) => {
+  const redis = statefulRedisMock({ session: 1, sessionLog: [], worldState: {}, characters: { lyra: {}, fen: {} } });
+  t.mock.module("../lib/redis.js", redis);
+
+  await callState({ method: "POST", headers: { "x-adult-pin": ADULT_PIN }, query: { world: "resonance" }, body: { action: "new_session", payload: { summary: 12345 } } });
+  assert.equal(redis.state.worldState.session_archive[0].summary, "");
 });
 
 test("new_session fully resets harm to Unhurt for kid games (Manlandia)", async (t) => {

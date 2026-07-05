@@ -113,6 +113,32 @@ test("rejects a photo over the size cap", async (t) => {
   assert.equal(res.statusCode, 400);
 });
 
+test("rejects a photo that isn't a real image data URL, even under the size cap", async (t) => {
+  const { run } = callCharacters(null, { ...VALID_BODY, photo: "not-an-image-data-url" });
+  const res = await run(t);
+  assert.equal(res.statusCode, 400);
+});
+
+test("rejects a photo data URL with a disallowed MIME type", async (t) => {
+  const { run } = callCharacters(null, { ...VALID_BODY, photo: "data:text/html;base64,PHNjcmlwdD4=" });
+  const res = await run(t);
+  assert.equal(res.statusCode, 400);
+});
+
+test("accepts real jpeg/png/gif/webp data URLs", async (t) => {
+  const redis = statefulRedisMock(null);
+  t.mock.module("../lib/redis.js", redis);
+  const handler = freshRequire("../api/characters.js");
+
+  for (const mime of ["image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp"]) {
+    const req = { method: "POST", headers: {}, query: { world: "manlandia" }, body: { ...VALID_BODY, photo: `data:${mime};base64,AAAA` } };
+    const res = mockRes();
+    await handler(req, res);
+    assert.equal(res.statusCode, 200, `expected ${mime} to be accepted`);
+    assert.equal(redis.state.characters.player1.photo, `data:${mime};base64,AAAA`);
+  }
+});
+
 test("stores a curated color and symbol on creation", async (t) => {
   const { run, redis } = callCharacters(null, { ...VALID_BODY, color: "teal", symbol: "🐉" });
   const res = await run(t);

@@ -134,6 +134,35 @@ test("removes a subscription that comes back as gone (410), keeps the others", a
   });
 });
 
+test("does not send any notification for a private scene, even though the turn is fully resolved", async (t) => {
+  await withVapidConfigured(async () => {
+    process.env.ADULT_PIN = "0000";
+    try {
+      const seeded = {
+        "resonance:gamestate": null,
+        "push:resonance:subscriptions": [
+          { player: "fen", endpoint: "https://push.example/fen-device", keys: { p256dh: "a", auth: "b" } },
+        ],
+      };
+      const redis = keyedRedisMock(seeded);
+      t.mock.module("../lib/redis.js", redis);
+      mockGemini(t, "You slip away unnoticed.");
+
+      let sendCalls = 0;
+      t.mock.module("web-push", {
+        exports: { setVapidDetails: () => {}, sendNotification: async () => { sendCalls++; return {}; } },
+      });
+
+      const handler = freshRequire("../api/gm.js");
+      const req = { method: "POST", headers: { "x-adult-pin": "0000" }, query: { world: "resonance" }, body: { player: "lyra", message: "I go alone", type: "action", private: true } };
+      await handler(req, mockRes());
+      assert.equal(sendCalls, 0);
+    } finally {
+      delete process.env.ADULT_PIN;
+    }
+  });
+});
+
 test("skips sending entirely when VAPID isn't configured, without erroring", async (t) => {
   const redis = keyedRedisMock({
     "manlandia:gamestate": null,

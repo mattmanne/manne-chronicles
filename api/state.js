@@ -15,6 +15,17 @@ module.exports = async function handler(req, res) {
   const { key, getInitialState } = worldConfig;
 
   if (req.method === "GET") {
+    // This returns the full raw gamestate — unlike /api/poll's filtered
+    // payload, that includes photos, the complete sessionLog, and (for
+    // adult worlds) private-scene content and scene_pin values. Previously
+    // only checkAdultAccess() gated this, which is a no-op for Manlandia
+    // and non-adult custom worlds — meaning it was readable by anyone who
+    // knew a campaign id, with no secret of any kind. Same X-Game-Secret
+    // check as every other state-mutating/state-reading endpoint now.
+    const gameSecret = process.env.GAME_SECRET;
+    if (gameSecret && req.headers["x-game-secret"] !== gameSecret) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
     const state = (await getState(key)) || getInitialState();
     if (!checkAdultAccess(req, res, worldConfig, state)) return;
     return res.json(state);
@@ -193,16 +204,21 @@ module.exports = async function handler(req, res) {
     }
 
     if (action === "new_session") {
+      // Every sibling free-text action (set_author_note, add_pinned_note,
+      // add_bond) caps its input — this one didn't, despite being stored
+      // twice (session_archive and session_summaries) and fed back into
+      // every future prompt via session_summaries.
+      const summary = typeof payload?.summary === "string" ? payload.summary.trim().slice(0, 2000) : "";
       const current = (await getState(key)) || getInitialState();
       if (!current.worldState.session_archive) current.worldState.session_archive = [];
       current.worldState.session_archive.push({
         session: current.session,
-        summary: payload.summary,
+        summary,
         log: [...current.sessionLog],
       });
       current.session += 1;
       if (!current.worldState.session_summaries) current.worldState.session_summaries = [];
-      current.worldState.session_summaries.push(payload.summary);
+      current.worldState.session_summaries.push(summary);
       current.sessionLog = [];
 
       if (worldConfig.id === "resonance") {

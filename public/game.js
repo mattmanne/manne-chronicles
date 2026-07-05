@@ -117,7 +117,11 @@ function authPost(url, body) {
 }
 
 function authGet(url) {
-  return fetch(withWorld(url), { headers: { "X-Adult-Pin": adultPin || "" } });
+  // Sent even though most GET endpoints (poll, campaigns) don't check it —
+  // GET /api/state does (it returns the full raw gamestate, unlike poll's
+  // filtered payload), so every GET caller needs to carry it the same way
+  // authPost() already does, not just the ones that currently require it.
+  return fetch(withWorld(url), { headers: { "X-Game-Secret": gameSecret || "", "X-Adult-Pin": adultPin || "" } });
 }
 
 // `player` tells /api/poll who's currently viewing, so it can filter out a
@@ -253,18 +257,20 @@ function renderCampaignList() {
 
   container.innerHTML = visible.map(c => {
     const archived = c.status === "archived";
+    const safeName = escapeHtml(c.name);
+    const safeNameUpper = escapeHtml(c.name.toUpperCase());
     return `
     <div class="world-btn custom-campaign-card${c.adult ? " adult-only" : ""}${archived ? " archived" : ""}" data-world="${c.id}">
       <div class="custom-campaign-info">
-        <span class="world-btn-name">${c.name.toUpperCase()}${c.adult ? ' <span class="adult-badge">18+</span>' : ""}${archived ? ' <span class="archived-badge">Archived</span>' : ""}</span>
-        <span class="world-btn-sub">${c.playerCount} hero${c.playerCount > 1 ? "es" : ""} · ${c.subtitle || "Custom world"}</span>
+        <span class="world-btn-name">${safeNameUpper}${c.adult ? ' <span class="adult-badge">18+</span>' : ""}${archived ? ' <span class="archived-badge">Archived</span>' : ""}</span>
+        <span class="world-btn-sub">${c.playerCount} hero${c.playerCount > 1 ? "es" : ""} · ${escapeHtml(c.subtitle || "Custom world")}</span>
       </div>
       <div class="campaign-actions">
-        <button class="campaign-edit-btn" data-id="${c.id}" title="Edit this world" aria-label="Edit ${c.name}">✏️</button>
+        <button class="campaign-edit-btn" data-id="${c.id}" title="Edit this world" aria-label="Edit ${safeName}">✏️</button>
         ${archived
-          ? `<button class="campaign-unarchive-btn" data-id="${c.id}" title="Restore this world" aria-label="Restore ${c.name}">↩</button>`
-          : `<button class="campaign-archive-btn" data-id="${c.id}" title="Archive this world" aria-label="Archive ${c.name}">🗄</button>`}
-        <button class="campaign-delete-btn" data-id="${c.id}" title="Delete this world" aria-label="Delete ${c.name}">🗑</button>
+          ? `<button class="campaign-unarchive-btn" data-id="${c.id}" title="Restore this world" aria-label="Restore ${safeName}">↩</button>`
+          : `<button class="campaign-archive-btn" data-id="${c.id}" title="Archive this world" aria-label="Archive ${safeName}">🗄</button>`}
+        <button class="campaign-delete-btn" data-id="${c.id}" title="Delete this world" aria-label="Delete ${safeName}">🗑</button>
       </div>
     </div>
   `;
@@ -1706,7 +1712,7 @@ function openWizard(player) {
     document.getElementById("wiz-backstory").value = existing.backstory;
   }
   if (existing?.photo) {
-    document.getElementById("wiz-photo-preview").innerHTML = `<img src="${existing.photo}" alt="hero photo" />`;
+    document.getElementById("wiz-photo-preview").innerHTML = `<img src="${escapeHtml(existing.photo)}" alt="hero photo" />`;
   }
   if (existing?.archetype) {
     wizardData.archetype = existing.archetype;
@@ -1946,11 +1952,11 @@ function renderManlandiaCard(n, char) {
   // Avatar (photo from the character record, synced across devices, or initial letter)
   const avatarEl = document.getElementById(`p${n}-avatar`);
   if (avatarEl) {
-    const symbolBadge = char?.symbol ? `<span class="char-avatar-symbol">${char.symbol}</span>` : "";
+    const symbolBadge = char?.symbol ? `<span class="char-avatar-symbol">${escapeHtml(char.symbol)}</span>` : "";
     if (char?.photo) {
-      avatarEl.innerHTML = `<img src="${char.photo}" alt="${char?.name || "Hero"}" />${symbolBadge}`;
+      avatarEl.innerHTML = `<img src="${escapeHtml(char.photo)}" alt="${escapeHtml(char?.name || "Hero")}" />${symbolBadge}`;
     } else {
-      const initial = (char?.name || `H${n}`).charAt(0).toUpperCase();
+      const initial = escapeHtml((char?.name || `H${n}`).charAt(0).toUpperCase());
       avatarEl.innerHTML = `<div class="char-avatar-initials">${initial}</div>${symbolBadge}`;
     }
   }
@@ -2234,8 +2240,8 @@ function renderCustomMap(state) {
   el.style.display = "block";
   el.innerHTML = `
     <div class="custom-map-panel">
-      <div class="custom-map-name">${camp.name || "Your World"}</div>
-      <div class="custom-map-location">📍 ${ws.location || "The Beginning"}</div>
+      <div class="custom-map-name">${escapeHtml(camp.name || "Your World")}</div>
+      <div class="custom-map-location">📍 ${escapeHtml(ws.location || "The Beginning")}</div>
       <div class="custom-map-meters">
         <div class="custom-map-meter">
           <span class="custom-map-meter-label">👁 Danger</span>
@@ -2630,7 +2636,7 @@ function appendGMEntry(text, animate, ambient, privateTo) {
       </span>
     </div>
     <div class="entry-content">${escapeHtml(cleanText)}</div>
-    ${stateChanges.map(s => `<div class="state-change${s.positive ? " positive" : ""}">${s.text}</div>`).join("")}`;
+    ${stateChanges.map(s => `<div class="state-change${s.positive ? " positive" : ""}">${escapeHtml(s.text)}</div>`).join("")}`;
 
   entry.querySelector(".speak-btn").addEventListener("click", function() {
     speakText(cleanText, this);
@@ -2643,7 +2649,7 @@ function appendGMEntry(text, animate, ambient, privateTo) {
 }
 
 function appendPlayerEntry(player, text, animate, privateTo) {
-  const displayName = getPlayerDisplayName(player);
+  const displayName = escapeHtml(getPlayerDisplayName(player));
   const entry = document.createElement("div");
   entry.className = `log-entry player-${player}${animate ? "" : " no-anim"}${privateTo ? " private" : ""}`;
   entry.innerHTML = `
@@ -2685,7 +2691,7 @@ function renderPinnedNotes(notes) {
 function appendRollResult(player, stat, result) {
   const entry = document.createElement("div");
   entry.className = "roll-result-entry";
-  const name = getPlayerDisplayName(player);
+  const name = escapeHtml(getPlayerDisplayName(player));
   const mod  = result.modifier >= 0 ? `+${result.modifier}` : `${result.modifier}`;
   entry.innerHTML = `
     <span>${name} rolled ${stat.toUpperCase()}: ${result.die1}+${result.die2}${mod} = <strong>${result.total}</strong></span>

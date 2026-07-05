@@ -36,8 +36,18 @@ module.exports = async function handler(req, res) {
   if (!name || typeof name !== "string" || !name.trim())      return res.status(400).json({ error: "Name required" });
   if (!VALID_ARCHETYPES.includes(archetype))                  return res.status(400).json({ error: "Invalid archetype" });
   if (!VALID_ABILITIES.includes(ability_id))                  return res.status(400).json({ error: "Invalid ability" });
-  if (typeof photo === "string" && photo.length > MAX_PHOTO_LENGTH) {
-    return res.status(400).json({ error: "Photo is too large" });
+  if (typeof photo === "string" && photo) {
+    if (photo.length > MAX_PHOTO_LENGTH) return res.status(400).json({ error: "Photo is too large" });
+    // Only length was checked before this — a crafted non-image string sent
+    // directly to this API (bypassing the client's own canvas/resize flow,
+    // which always produces a real image data URL) would otherwise be stored
+    // and later rendered as an <img src="..."> unescaped-by-necessity, since
+    // a real data URL legitimately contains characters escapeHtml would
+    // otherwise mangle. Requiring the real data:image/ prefix closes that
+    // off at the one point it can be checked cheaply.
+    if (!/^data:image\/(png|jpe?g|gif|webp);base64,/.test(photo)) {
+      return res.status(400).json({ error: "Photo must be a valid image" });
+    }
   }
   if (color !== undefined && color !== "" && !VALID_COLORS.includes(color)) {
     return res.status(400).json({ error: "Invalid color" });
