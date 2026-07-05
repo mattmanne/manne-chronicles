@@ -12,6 +12,7 @@ let currentSuggestions = [];
 let gameSecret       = null;
 let continueInitDone = false;
 let manlandiaTone    = localStorage.getItem("manlandia_tone") || "adventure";
+let soundFxEnabled   = localStorage.getItem("sound_fx") === "true";
 let campaignList     = [];
 let resumingRoll     = false;
 let adultPin         = localStorage.getItem("adult_pin") || "";
@@ -551,6 +552,7 @@ async function continueInit() {
   setupCombatTracker();
   setupNewSession();
   setupAutoRead();
+  setupSoundEffects();
   setupPushNotifications();
   setupExport();
   setupAuthorNote();
@@ -595,6 +597,89 @@ function setupAutoRead() {
     btn.setAttribute("aria-pressed", String(autoRead));
     btn.title = autoRead ? "Auto-read ON — tap to turn off" : "Auto-read new narrations";
   });
+}
+
+/* ── Sound Effects (synthesized tones — no audio files, no dependency) ── */
+let audioCtx = null;
+function getAudioCtx() {
+  if (!soundFxEnabled) return null;
+  const AC = window.AudioContext || window.webkitAudioContext;
+  if (!AC) return null;
+  if (!audioCtx) audioCtx = new AC();
+  if (audioCtx.state === "suspended") audioCtx.resume();
+  return audioCtx;
+}
+
+function playTone(freq, { delay = 0, duration = 0.12, type = "sine", gain = 0.15 } = {}) {
+  const ctx = getAudioCtx();
+  if (!ctx) return;
+  const osc  = ctx.createOscillator();
+  const amp  = ctx.createGain();
+  osc.type = type;
+  osc.frequency.value = freq;
+  const t0 = ctx.currentTime + delay;
+  amp.gain.setValueAtTime(0.0001, t0);
+  amp.gain.linearRampToValueAtTime(gain, t0 + 0.008);
+  amp.gain.exponentialRampToValueAtTime(0.0001, t0 + duration);
+  osc.connect(amp).connect(ctx.destination);
+  osc.start(t0);
+  osc.stop(t0 + duration + 0.02);
+}
+
+function playDiceTick() {
+  playTone(320 + Math.random() * 120, { duration: 0.045, type: "square", gain: 0.05 });
+}
+
+function playRollResultSound(level) {
+  const notesByLevel = {
+    success:  [523.25, 659.25, 783.99],  // C5 E5 G5 — bright ascending
+    partial:  [440],                     // A4 — single neutral tone
+    failure:  [349.23, 293.66],          // F4 -> D4 — short descend
+    disaster: [146.83],                  // D3 — low ominous buzz
+  };
+  const notes = notesByLevel[level] || notesByLevel.partial;
+  const type  = level === "disaster" ? "sawtooth" : "triangle";
+  const dur   = level === "disaster" ? 0.4 : 0.18;
+  notes.forEach((freq, i) => playTone(freq, { delay: i * 0.09, duration: dur, type, gain: 0.14 }));
+}
+
+function playBadgeChime() {
+  [783.99, 987.77].forEach((freq, i) => playTone(freq, { delay: i * 0.1, duration: 0.15, type: "triangle", gain: 0.12 }));
+}
+
+function playLevelUpChime() {
+  [523.25, 659.25, 783.99, 1046.5].forEach((freq, i) => playTone(freq, { delay: i * 0.1, duration: 0.22, type: "triangle", gain: 0.16 }));
+}
+
+function setupSoundEffects() {
+  const btn = document.getElementById("sound-fx-toggle");
+  function syncBtn() {
+    btn.textContent = soundFxEnabled ? "🔊 On" : "🔈 Off";
+    btn.classList.toggle("active", soundFxEnabled);
+    btn.setAttribute("aria-pressed", String(soundFxEnabled));
+  }
+  syncBtn();
+  btn.addEventListener("click", () => {
+    soundFxEnabled = !soundFxEnabled;
+    localStorage.setItem("sound_fx", String(soundFxEnabled));
+    if (soundFxEnabled) getAudioCtx(); // unlock audio now, on this user gesture
+    syncBtn();
+  });
+}
+
+// Milestone badges / ability unlocks have no "just happened" signal anywhere
+// else (renderManlandiaCard re-renders the full list from scratch on every
+// poll) — this tracks the last-seen count per hero purely to fire a sound
+// once when it grows, without touching how the badges themselves render.
+const growthSoundState = {};
+function checkGrowthSound(player, char, hasPendingChoice) {
+  const milestoneCount = (char.milestones || []).length;
+  const prev = growthSoundState[player];
+  if (prev) {
+    if (hasPendingChoice && !prev.pendingChoice) playLevelUpChime();
+    else if (milestoneCount > prev.milestones) playBadgeChime();
+  }
+  growthSoundState[player] = { milestones: milestoneCount, pendingChoice: hasPendingChoice };
 }
 
 /* ── Push notifications ── */
@@ -1027,6 +1112,7 @@ function animateRoll(player, stat, advantage = false) {
     let shuffleCount = 0;
     const shuffle = setInterval(() => {
       die1El.textContent = rollDie(); die2El.textContent = rollDie();
+      playDiceTick();
       if (++shuffleCount >= 8) {
         clearInterval(shuffle);
         let d1 = rollDie(), d2 = rollDie();
@@ -1047,6 +1133,7 @@ function animateRoll(player, stat, advantage = false) {
         else                 { level = "disaster"; label = "Disaster"; }
 
         totalEl.className = level; labelEl.textContent = label;
+        playRollResultSound(level);
         setTimeout(() => {
           diceOverlay.classList.add("hidden");
           resolve({ die1: d1, die2: d2, modifier, total, level, label, stat });
@@ -1655,6 +1742,7 @@ function renderManlandiaCard(n, char) {
       growthEl.innerHTML = "";
     }
   }
+  if (isSetup) checkGrowthSound(p, char, hasPendingChoice);
 
   // Create/Edit button
   const actionsEl = document.getElementById(`p${n}-card-actions`);
