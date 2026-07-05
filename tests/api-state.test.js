@@ -33,7 +33,7 @@ test("POST is rejected without the correct X-Game-Secret when one is configured"
   t.mock.module("../lib/redis.js", statefulRedisMock(null));
   process.env.GAME_SECRET = "supersecret";
   try {
-    const res = await callState({ method: "POST", headers: { "x-adult-pin": ADULT_PIN }, query: { world: "resonance" }, body: { action: "reset" } });
+    const res = await callState({ method: "POST", headers: { "x-adult-pin": ADULT_PIN }, query: { world: "resonance" }, body: { action: "set_author_note", payload: { note: "x" } } });
     assert.equal(res.statusCode, 401);
   } finally {
     delete process.env.GAME_SECRET;
@@ -59,35 +59,6 @@ test("GET fails open (like every other X-Game-Secret check) when GAME_SECRET isn
   t.mock.module("../lib/redis.js", statefulRedisMock({ session: 1, sessionLog: [], worldState: {}, characters: {} }));
   const res = await callState({ method: "GET", headers: {}, query: { world: "manlandia" } });
   assert.equal(res.statusCode, 200);
-});
-
-test("reset on a built-in world replaces state with a fresh initial state", async (t) => {
-  const dirty = { session: 5, sessionLog: [{ role: "gm", content: "..." }], worldState: { conclave_awareness: 9 }, characters: { fen: { harm: "Dying" }, lyra: { harm: "Wounded" } } };
-  const redis = statefulRedisMock(dirty);
-  t.mock.module("../lib/redis.js", redis);
-
-  const res = await callState({ method: "POST", headers: { "x-adult-pin": ADULT_PIN }, query: { world: "resonance" }, body: { action: "reset" } });
-  assert.deepEqual(res.body, { ok: true });
-  assert.equal(redis.state.session, 1);
-  assert.equal(redis.state.characters.fen.harm, "Unhurt");
-});
-
-test("reset on a custom world preserves worldConfig but clears session progress", async (t) => {
-  const dirty = {
-    session: 4,
-    sessionLog: [{ role: "gm", content: "..." }],
-    worldConfig: { id: "c_1", name: "Star Reach", theme: "Space pirates", playerCount: 2, adult: false },
-    worldState: { villain_awareness: 7 },
-    characters: { player1: { name: "Zeb", harm: "Hurt" } },
-  };
-  const redis = statefulRedisMock(dirty);
-  t.mock.module("../lib/redis.js", redis);
-
-  const res = await callState({ method: "POST", headers: { "x-adult-pin": ADULT_PIN }, query: { world: "c_1" }, body: { action: "reset" } });
-  assert.equal(res.body.ok, true);
-  assert.equal(redis.state.worldConfig.name, "Star Reach");
-  assert.equal(redis.state.sessionLog.length, 0);
-  assert.equal(redis.state.characters.player1.harm, "Unhurt");
 });
 
 test("toggle_ability flips a valid boolean ability and rejects an invalid one", async (t) => {

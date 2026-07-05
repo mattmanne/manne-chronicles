@@ -42,19 +42,6 @@ module.exports = async function handler(req, res) {
 
     const { action, payload } = req.body;
 
-    if (action === "reset") {
-      let fresh;
-      if (worldConfig.type === "custom") {
-        const cur = await getState(key);
-        const { getInitialStateCustom } = require('../lib/gamestate-custom');
-        fresh = getInitialStateCustom(cur?.worldConfig || {});
-      } else {
-        fresh = getInitialState();
-      }
-      await setState(key, fresh);
-      return res.json({ ok: true });
-    }
-
     if (action === "toggle_ability") {
       const current = (await getState(key)) || getInitialState();
       const { character, ability } = payload;

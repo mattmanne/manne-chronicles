@@ -2880,6 +2880,18 @@ function setupUnlockOverlay() {
         document.body.classList.add("adult-unlocked");
         overlayEl.classList.remove("active");
         renderCampaignList();
+        // If the very first load hit the lock (e.g. opening an adult world's
+        // URL directly, before any pin was known), loadExistingLog() bailed
+        // out early with nothing loaded and lastTimestamp still at 0 — the
+        // normal poll loop (already running, see below) would eventually
+        // pick that up on its own next tick, but that's up to 8s of a
+        // visibly empty story for no reason. Reload immediately instead of
+        // waiting on the timer.
+        if (continueInitDone && logEntries && logEntries.children.length === 0) {
+          logEntries.innerHTML = "";
+          lastTimestamp = 0;
+          loadExistingLog();
+        }
         // If polling had been stopped by a locked-response (see handleLockedResponse),
         // this picks it back up now that the pin is valid again.
         if (continueInitDone && !pollTimer) startPolling();
