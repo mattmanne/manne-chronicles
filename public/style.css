@@ -1043,6 +1043,26 @@ html, body {
 
 /* ── Character Growth (XP, badges, ability-choice moments) ── */
 .char-growth:empty { display: none; }
+.char-growth-choice:empty { display: none; }
+
+/* Backstory and the passive XP/badge summary are "look up occasionally,"
+   not per-turn essentials — collapsed by default so the card shows only
+   what matters turn-to-turn (harm, ability, an actionable power choice).
+   The pending-choice prompt itself stays in .char-growth-choice, outside
+   this wrapper, since it needs attention now, not "one tap away." */
+.char-details-toggle {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--parch-dim);
+  border-radius: 6px;
+  font-size: 0.68rem;
+  padding: 4px 8px;
+  cursor: pointer;
+  align-self: flex-start;
+}
+.char-details-toggle.hidden { display: none; }
+.char-details.hidden { display: none; }
+.char-details { display: flex; flex-direction: column; gap: 4px; }
 .growth-summary { font-size: 0.72rem; color: var(--parch-dim); display: flex; align-items: center; gap: 4px; }
 .growth-badge { font-size: 0.8rem; cursor: default; }
 .growth-choice {

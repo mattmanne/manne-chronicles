@@ -1305,6 +1305,16 @@ function setupWizard() {
     const heroBtn = e.target.closest(".create-hero-btn, .edit-hero-btn");
     if (heroBtn) { openWizard(heroBtn.dataset.player); return; }
 
+    const detailsToggle = e.target.closest(".char-details-toggle");
+    if (detailsToggle) {
+      const details = document.getElementById(detailsToggle.getAttribute("aria-controls"));
+      const opening = details.classList.contains("hidden");
+      details.classList.toggle("hidden", !opening);
+      detailsToggle.setAttribute("aria-expanded", String(opening));
+      detailsToggle.textContent = opening ? "▴ Hide Details" : "▾ Details";
+      return;
+    }
+
     const abilBtn = e.target.closest(".manlandia-ability-btn");
     if (abilBtn && !abilBtn.classList.contains("used")) {
       const p = abilBtn.dataset.player;
@@ -1616,25 +1626,33 @@ function renderManlandiaCard(n, char) {
     }
   }
 
-  // Growth: XP, earned badges, and (if crossed a bigger milestone) a choice
-  // of new power to unlock. See lib/growth.js — this only ever applies to
+  // Growth: an actionable choice of new power to unlock stays always-visible
+  // (it needs attention now, not "look it up later") — but the passive XP/
+  // badge summary moves into the collapsible .char-details section below,
+  // alongside backstory. See lib/growth.js — this only ever applies to
   // Manlandia/custom heroes, never Resonance's Lyra/Fen.
-  const growthEl = document.getElementById(`p${n}-growth`);
-  if (growthEl) {
-    if (!isSetup) {
-      growthEl.innerHTML = "";
-    } else if (char.pending_choice?.options?.length) {
-      growthEl.innerHTML = `
+  const growthChoiceEl = document.getElementById(`p${n}-growth-choice`);
+  const hasPendingChoice = isSetup && !!char.pending_choice?.options?.length;
+  if (growthChoiceEl) {
+    growthChoiceEl.innerHTML = hasPendingChoice ? `
         <div class="growth-choice">
           <div class="growth-choice-label">🎉 New power unlocked! Choose one:</div>
           <div class="growth-choice-options">
             ${char.pending_choice.options.map(a => `<button class="growth-choice-btn" data-player="${p}" data-ability="${a}">${ABILITY_DISPLAY[a] || a}</button>`).join("")}
           </div>
-        </div>`;
-    } else {
+        </div>` : "";
+  }
+
+  const growthEl = document.getElementById(`p${n}-growth`);
+  let hasGrowthSummary = false;
+  if (growthEl) {
+    if (isSetup && !hasPendingChoice) {
       const xp = char.xp || 0;
       const badges = (char.milestones || []).map(m => `<span class="growth-badge" title="${m}">🏅</span>`).join("");
       growthEl.innerHTML = xp ? `<div class="growth-summary">XP: ${xp}${badges ? ` ${badges}` : ""}</div>` : "";
+      hasGrowthSummary = !!xp;
+    } else {
+      growthEl.innerHTML = "";
     }
   }
 
@@ -1648,17 +1666,17 @@ function renderManlandiaCard(n, char) {
     }
   }
 
-  // Backstory
+  // Backstory — lives inside the same collapsible .char-details section as
+  // the growth summary above. Only the *content* is refreshed here; the
+  // expanded/collapsed state itself is left alone (toggled only by the user
+  // clicking #p{n}-details-toggle) so a poll-driven re-render never
+  // collapses a section the player just opened.
   const backstoryEl = document.getElementById(`p${n}-backstory`);
-  if (backstoryEl) {
-    if (char?.backstory) {
-      backstoryEl.textContent = char.backstory;
-      backstoryEl.classList.remove("hidden");
-    } else {
-      backstoryEl.textContent = "";
-      backstoryEl.classList.add("hidden");
-    }
-  }
+  const hasBackstory = !!char?.backstory;
+  if (backstoryEl) backstoryEl.textContent = hasBackstory ? char.backstory : "";
+
+  const detailsToggle = document.getElementById(`p${n}-details-toggle`);
+  if (detailsToggle) detailsToggle.classList.toggle("hidden", !(hasBackstory || hasGrowthSummary));
 
   // Per-character inventory — only ever populated for adult-flagged custom
   // campaigns (Manlandia and kid custom worlds use the shared party
