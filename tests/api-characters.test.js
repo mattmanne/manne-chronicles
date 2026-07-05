@@ -113,6 +113,34 @@ test("rejects a photo over the size cap", async (t) => {
   assert.equal(res.statusCode, 400);
 });
 
+test("stores a curated color and symbol on creation", async (t) => {
+  const { run, redis } = callCharacters(null, { ...VALID_BODY, color: "teal", symbol: "🐉" });
+  const res = await run(t);
+  assert.equal(res.body.ok, true);
+  assert.equal(redis.state.characters.player1.color, "teal");
+  assert.equal(redis.state.characters.player1.symbol, "🐉");
+});
+
+test("rejects a color outside the curated list", async (t) => {
+  const { run } = callCharacters(null, { ...VALID_BODY, color: "chartreuse" });
+  const res = await run(t);
+  assert.equal(res.statusCode, 400);
+});
+
+test("rejects a symbol outside the curated list", async (t) => {
+  const { run } = callCharacters(null, { ...VALID_BODY, symbol: "💩" });
+  const res = await run(t);
+  assert.equal(res.statusCode, 400);
+});
+
+test("omitting color/symbol on an edit preserves the existing ones", async (t) => {
+  const seeded = { characters: { player1: { color: "purple", symbol: "⚡" } } };
+  const { run, redis } = callCharacters(seeded, VALID_BODY);
+  await run(t);
+  assert.equal(redis.state.characters.player1.color, "purple");
+  assert.equal(redis.state.characters.player1.symbol, "⚡");
+});
+
 test("works for custom campaigns as well as Manlandia", async (t) => {
   const { run, redis } = callCharacters(null, VALID_BODY, "c_test123");
   const res = await run(t);

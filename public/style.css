@@ -184,6 +184,28 @@ html, body {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  position: relative;
+}
+
+/* ── Level-up moment (in-place banner + border pulse, not a full takeover) ── */
+.level-up-banner {
+  position: absolute; top: -10px; left: 50%; transform: translateX(-50%);
+  background: var(--gold); color: #1a1408; font-weight: 700; font-size: 0.7rem;
+  padding: 4px 10px; border-radius: 20px; white-space: nowrap;
+  animation: levelUpBanner 2.2s ease-out forwards; z-index: 5;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.35);
+}
+@keyframes levelUpBanner {
+  0%   { opacity: 0; transform: translateX(-50%) translateY(4px) scale(0.8); }
+  15%  { opacity: 1; transform: translateX(-50%) translateY(-10px) scale(1.05); }
+  25%  { transform: translateX(-50%) translateY(-10px) scale(1); }
+  80%  { opacity: 1; }
+  100% { opacity: 0; transform: translateX(-50%) translateY(-14px) scale(0.95); }
+}
+.level-up-pulse { animation: levelUpCardPulse 0.7s ease-out; }
+@keyframes levelUpCardPulse {
+  0%   { box-shadow: 0 0 0 0 rgba(201,168,76,0.6); }
+  100% { box-shadow: 0 0 0 14px rgba(201,168,76,0); }
 }
 
 .char-header { display: flex; justify-content: space-between; align-items: baseline; }
@@ -1003,14 +1025,20 @@ html, body {
 
 .char-avatar {
   width: 44px; height: 44px; flex-shrink: 0;
-  border-radius: 50%; overflow: hidden;
+  border-radius: 50%; overflow: visible; position: relative;
   background: var(--surface2); border: 2px solid var(--border);
   display: flex; align-items: center; justify-content: center;
 }
-.char-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.char-avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
 .char-avatar-initials {
   font-family: var(--font-serif); font-size: 1.1rem;
   color: var(--gold); font-weight: bold; line-height: 1;
+}
+.char-avatar-symbol {
+  position: absolute; bottom: -3px; right: -3px;
+  width: 16px; height: 16px; font-size: 0.68rem; line-height: 1;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
 }
 
 .create-hero-btn, .edit-hero-btn {
@@ -1466,6 +1494,27 @@ body.world-manlandia #villain-badge   { display: inline-block; }
   resize: none; font-family: var(--font-sans); line-height: 1.5;
 }
 .wiz-backstory:focus { border-color: var(--gold-dim); }
+
+/* ── Wizard color/symbol pickers (hero customization) ── */
+.wiz-picker-row { margin-top: 12px; text-align: left; }
+.wiz-picker-label {
+  display: block; font-size: 0.68rem; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--parch-dim); margin-bottom: 6px;
+}
+.wiz-swatches, .wiz-symbols { display: flex; gap: 8px; flex-wrap: wrap; }
+.wiz-swatch {
+  width: 30px; height: 30px; border-radius: 50%; border: 2px solid transparent;
+  cursor: pointer; padding: 0; transition: transform 0.15s, border-color 0.15s;
+}
+.wiz-swatch:hover { transform: scale(1.1); }
+.wiz-swatch.selected { border-color: var(--parchment); transform: scale(1.12); }
+.wiz-symbol-btn {
+  width: 34px; height: 34px; font-size: 1.05rem; line-height: 1;
+  background: var(--surface2); border: 1px solid var(--border); border-radius: 8px;
+  cursor: pointer; transition: all 0.15s;
+}
+.wiz-symbol-btn:hover { border-color: var(--gold-dim); }
+.wiz-symbol-btn.selected { border-color: var(--gold); background: rgba(201,168,76,0.15); }
 
 /* ── Tone selector (Manlandia Characters tab) ── */
 .tone-selector {

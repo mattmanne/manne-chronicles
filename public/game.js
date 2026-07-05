@@ -669,17 +669,43 @@ function setupSoundEffects() {
 
 // Milestone badges / ability unlocks have no "just happened" signal anywhere
 // else (renderManlandiaCard re-renders the full list from scratch on every
-// poll) — this tracks the last-seen count per hero purely to fire a sound
-// once when it grows, without touching how the badges themselves render.
-const growthSoundState = {};
-function checkGrowthSound(player, char, hasPendingChoice) {
+// poll) — this tracks the last-seen count per hero purely to fire a sound +
+// a small in-place celebratory moment once when it grows, without touching
+// how the badges themselves render.
+const growthMomentState = {};
+function checkGrowthMoment(player, char, hasPendingChoice) {
+  const n = player.slice(6);
   const milestoneCount = (char.milestones || []).length;
-  const prev = growthSoundState[player];
+  const prev = growthMomentState[player];
   if (prev) {
-    if (hasPendingChoice && !prev.pendingChoice) playLevelUpChime();
-    else if (milestoneCount > prev.milestones) playBadgeChime();
+    if (hasPendingChoice && !prev.pendingChoice) {
+      playLevelUpChime();
+      flashLevelUpBanner(n, "🎉 New power unlocked!");
+    } else if (milestoneCount > prev.milestones) {
+      playBadgeChime();
+      flashLevelUpBanner(n, "🏅 New milestone!");
+    }
   }
-  growthSoundState[player] = { milestones: milestoneCount, pendingChoice: hasPendingChoice };
+  growthMomentState[player] = { milestones: milestoneCount, pendingChoice: hasPendingChoice };
+}
+
+// A small in-place banner + border pulse on the hero's own card — chosen
+// over a full-screen takeover to match this app's existing "don't over-
+// interrupt" feel (see the tap-to-expand character details, also in-place).
+// Respects prefers-reduced-motion for free via the app's existing blanket
+// rule, since this is plain CSS @keyframes like everything else here.
+function flashLevelUpBanner(n, text) {
+  const card = document.getElementById(`p${n}-card`);
+  if (!card) return;
+  const banner = document.createElement("div");
+  banner.className = "level-up-banner";
+  banner.textContent = text;
+  card.appendChild(banner);
+  card.classList.add("level-up-pulse");
+  setTimeout(() => {
+    banner.remove();
+    card.classList.remove("level-up-pulse");
+  }, 2200);
 }
 
 /* ── Push notifications ── */
@@ -1340,6 +1366,14 @@ const ABILITY_DISPLAY = {
   protect_friend: "Protect a Friend",
   ancient_magic:  "Ancient Magic",
 };
+// Mirrors lib/character-options.js's HERO_COLORS — kept in sync by hand,
+// same "duplicated on purpose" pattern as the display maps above (this
+// plain-script client has no import from lib/, so some duplication with
+// server-side validation lists is accepted elsewhere in this file too).
+const HERO_COLOR_HEX = {
+  gold: "#c9a84c", blue: "#7fb3d3", green: "#4a8a4a",
+  red: "#c0524a", purple: "#9b7fc9", teal: "#4ab8a8",
+};
 
 let wizardPlayer = null;
 let wizardData   = {};
@@ -1376,6 +1410,24 @@ function setupWizard() {
       btn.classList.add("selected");
       wizardData.ability_id = btn.dataset.ability;
       setTimeout(() => wizSetStep(4), 280);
+    });
+  });
+
+  // Step 4: color/symbol pickers — optional, no auto-advance (unlike the
+  // archetype/ability cards above, these sit alongside photo/backstory on
+  // the same step rather than being their own step).
+  document.querySelectorAll(".wiz-swatch").forEach(btn => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".wiz-swatch").forEach(b => b.classList.remove("selected"));
+      btn.classList.add("selected");
+      wizardData.color = btn.dataset.color;
+    });
+  });
+  document.querySelectorAll(".wiz-symbol-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".wiz-symbol-btn").forEach(b => b.classList.remove("selected"));
+      btn.classList.add("selected");
+      wizardData.symbol = btn.dataset.symbol;
     });
   });
 
@@ -1456,6 +1508,7 @@ function openWizard(player) {
   wizardData   = {};
   document.getElementById("wiz-name").value = "";
   document.querySelectorAll("[data-archetype], [data-ability]").forEach(b => b.classList.remove("selected"));
+  document.querySelectorAll(".wiz-swatch, .wiz-symbol-btn").forEach(b => b.classList.remove("selected"));
   document.getElementById("wiz-photo-preview").innerHTML = "";
   document.getElementById("wiz-backstory").value = "";
   const existing = cachedGameState?.characters?.[player];
@@ -1474,6 +1527,14 @@ function openWizard(player) {
     wizardData.ability_id = existing.ability_id;
     document.querySelector(`[data-archetype="${existing.archetype}"]`)?.classList.add("selected");
     document.querySelector(`[data-ability="${existing.ability_id}"]`)?.classList.add("selected");
+  }
+  if (existing?.color) {
+    wizardData.color = existing.color;
+    document.querySelector(`.wiz-swatch[data-color="${existing.color}"]`)?.classList.add("selected");
+  }
+  if (existing?.symbol) {
+    wizardData.symbol = existing.symbol;
+    document.querySelector(`.wiz-symbol-btn[data-symbol="${existing.symbol}"]`)?.classList.add("selected");
   }
   wizSetStep(1);
   document.getElementById("character-wizard").classList.add("active");
@@ -1512,6 +1573,8 @@ async function wizFinish() {
       // character record itself (not localStorage) so it syncs across every
       // family member's device instead of only the phone it was uploaded from.
       ...(wizardData.photo && { photo: wizardData.photo }),
+      ...(wizardData.color && { color: wizardData.color }),
+      ...(wizardData.symbol && { symbol: wizardData.symbol }),
     });
     const data = await res.json();
     if (!data.ok) { alert("Oops — try again!"); return; }
@@ -1685,14 +1748,24 @@ function renderManlandiaCard(n, char) {
   const p     = `player${n}`;
   const isSetup = !!(char?.archetype);
 
+  // Hero customization (color accent + symbol badge) — cosmetic only, no
+  // effect on stats/mechanics. Card border picks up the curated color;
+  // the symbol renders as a small badge on the avatar corner.
+  const cardEl = document.getElementById(`p${n}-card`);
+  if (cardEl) {
+    const hex = char?.color ? HERO_COLOR_HEX[char.color] : null;
+    cardEl.style.borderColor = hex || "";
+  }
+
   // Avatar (photo from the character record, synced across devices, or initial letter)
   const avatarEl = document.getElementById(`p${n}-avatar`);
   if (avatarEl) {
+    const symbolBadge = char?.symbol ? `<span class="char-avatar-symbol">${char.symbol}</span>` : "";
     if (char?.photo) {
-      avatarEl.innerHTML = `<img src="${char.photo}" alt="${char?.name || "Hero"}" />`;
+      avatarEl.innerHTML = `<img src="${char.photo}" alt="${char?.name || "Hero"}" />${symbolBadge}`;
     } else {
       const initial = (char?.name || `H${n}`).charAt(0).toUpperCase();
-      avatarEl.innerHTML = `<div class="char-avatar-initials">${initial}</div>`;
+      avatarEl.innerHTML = `<div class="char-avatar-initials">${initial}</div>${symbolBadge}`;
     }
   }
 
@@ -1748,7 +1821,7 @@ function renderManlandiaCard(n, char) {
       growthEl.innerHTML = "";
     }
   }
-  if (isSetup) checkGrowthSound(p, char, hasPendingChoice);
+  if (isSetup) checkGrowthMoment(p, char, hasPendingChoice);
 
   // Create/Edit button
   const actionsEl = document.getElementById(`p${n}-card-actions`);

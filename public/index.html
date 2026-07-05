@@ -172,6 +172,33 @@
         <label for="wiz-photo-input" class="wiz-btn wiz-photo-btn">📷 Choose a Picture</label>
         <input type="file" id="wiz-photo-input" accept="image/*" style="display:none" />
         <textarea id="wiz-backstory" class="wiz-backstory" placeholder="Write a sentence about your hero… Who are they? Why are they on this quest? (optional)" rows="3"></textarea>
+
+        <div class="wiz-picker-row">
+          <span class="wiz-picker-label">Pick a color (optional)</span>
+          <div class="wiz-swatches">
+            <button type="button" class="wiz-swatch" data-color="gold" style="background:#c9a84c" aria-label="Gold" title="Gold"></button>
+            <button type="button" class="wiz-swatch" data-color="blue" style="background:#7fb3d3" aria-label="Blue" title="Blue"></button>
+            <button type="button" class="wiz-swatch" data-color="green" style="background:#4a8a4a" aria-label="Green" title="Green"></button>
+            <button type="button" class="wiz-swatch" data-color="red" style="background:#c0524a" aria-label="Red" title="Red"></button>
+            <button type="button" class="wiz-swatch" data-color="purple" style="background:#9b7fc9" aria-label="Purple" title="Purple"></button>
+            <button type="button" class="wiz-swatch" data-color="teal" style="background:#4ab8a8" aria-label="Teal" title="Teal"></button>
+          </div>
+        </div>
+
+        <div class="wiz-picker-row">
+          <span class="wiz-picker-label">Pick a symbol (optional)</span>
+          <div class="wiz-symbols">
+            <button type="button" class="wiz-symbol-btn" data-symbol="⭐">⭐</button>
+            <button type="button" class="wiz-symbol-btn" data-symbol="🔥">🔥</button>
+            <button type="button" class="wiz-symbol-btn" data-symbol="🌙">🌙</button>
+            <button type="button" class="wiz-symbol-btn" data-symbol="🍀">🍀</button>
+            <button type="button" class="wiz-symbol-btn" data-symbol="⚡">⚡</button>
+            <button type="button" class="wiz-symbol-btn" data-symbol="🌊">🌊</button>
+            <button type="button" class="wiz-symbol-btn" data-symbol="🦋">🦋</button>
+            <button type="button" class="wiz-symbol-btn" data-symbol="🐉">🐉</button>
+          </div>
+        </div>
+
         <button class="wiz-btn" id="wiz-finish-btn">🎉 Create My Hero!</button>
       </div>
 

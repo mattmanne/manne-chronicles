@@ -1,6 +1,6 @@
 const { getState, setState } = require("../lib/redis");
 const { getWorldConfig } = require("../lib/worldconfig");
-const { ARCHETYPE_STATS, ARCHETYPE_IDS: VALID_ARCHETYPES, ABILITY_IDS: VALID_ABILITIES } = require("../lib/character-options");
+const { ARCHETYPE_STATS, ARCHETYPE_IDS: VALID_ARCHETYPES, ABILITY_IDS: VALID_ABILITIES, HERO_COLOR_IDS: VALID_COLORS, HERO_SYMBOLS: VALID_SYMBOLS } = require("../lib/character-options");
 
 const VALID_PLAYERS = ["player1", "player2", "player3", "player4"];
 
@@ -30,7 +30,7 @@ module.exports = async function handler(req, res) {
   }
 
   const { key } = worldConfig;
-  const { player, name, archetype, ability_id, backstory, photo } = req.body;
+  const { player, name, archetype, ability_id, backstory, photo, color, symbol } = req.body;
 
   if (!VALID_PLAYERS.includes(player))                        return res.status(400).json({ error: "Invalid player" });
   if (!name || typeof name !== "string" || !name.trim())      return res.status(400).json({ error: "Name required" });
@@ -38,6 +38,12 @@ module.exports = async function handler(req, res) {
   if (!VALID_ABILITIES.includes(ability_id))                  return res.status(400).json({ error: "Invalid ability" });
   if (typeof photo === "string" && photo.length > MAX_PHOTO_LENGTH) {
     return res.status(400).json({ error: "Photo is too large" });
+  }
+  if (color !== undefined && color !== "" && !VALID_COLORS.includes(color)) {
+    return res.status(400).json({ error: "Invalid color" });
+  }
+  if (symbol !== undefined && symbol !== "" && !VALID_SYMBOLS.includes(symbol)) {
+    return res.status(400).json({ error: "Invalid symbol" });
   }
 
   const gameState = (await getState(key)) || worldConfig.getInitialState();
@@ -57,6 +63,9 @@ module.exports = async function handler(req, res) {
     // uploaded from — omitting the field on later edits (e.g. just fixing a
     // typo'd name) preserves whatever photo was already saved.
     photo:        typeof photo === "string" && photo ? photo : (existing.photo ?? ""),
+    // Same "omit to keep whatever was already saved" pattern as photo above.
+    color:        color  || (existing.color  ?? ""),
+    symbol:       symbol || (existing.symbol ?? ""),
     // Growth fields (see lib/growth.js) — untouched by name/archetype edits,
     // just defaulted here so a brand-new character starts from zero instead
     // of undefined.
