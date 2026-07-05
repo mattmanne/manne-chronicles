@@ -175,6 +175,20 @@ module.exports = async function handler(req, res) {
       return res.json({ ok: true, author_note: note });
     }
 
+    // TEMP CLEANUP: one-off action to strip a leftover "[VERIFICATION-ONLY"
+    // test artifact out of real Manlandia's pinned_notes (there is no
+    // general-purpose "remove a pinned note" action). Used once, then
+    // reverted — same pattern as the earlier ROLL: text cleanup.
+    if (action === "debug_strip_verification_pins") {
+      const current = (await getState(key)) || getInitialState();
+      const before = (current.worldState.pinned_notes || []).length;
+      current.worldState.pinned_notes = (current.worldState.pinned_notes || [])
+        .filter((n) => !n.text.startsWith("[VERIFICATION-ONLY"));
+      const removed = before - current.worldState.pinned_notes.length;
+      await setState(key, current);
+      return res.json({ ok: true, removed });
+    }
+
     if (action === "add_pinned_note") {
       const current = (await getState(key)) || getInitialState();
       const text = typeof payload?.text === "string" ? payload.text.trim().slice(0, 300) : "";
