@@ -16,20 +16,21 @@ what was already decided instead of re-litigating it.
 ## Pending decisions (need a call)
 
 ### Review the remaining 2026-07-05 playtest findings
-Two of the six confirmed findings are now fixed (see Resolved below):
-malformed `(Name)`-padded `CHARACTER`/`ABILITY` tags, and the roll-request-
-with-no-`ROLL:`-anchor bug (the headline, most-corroborated finding).
+Three of the six confirmed findings are now fixed (see Resolved below):
+malformed `(Name)`-padded `CHARACTER`/`ABILITY` tags, the roll-request-with-
+no-`ROLL:`-anchor bug (the headline finding), and combat tracking. The
+combat fix is implemented and tested but **not yet deployed** — see the
+Resolved entry for what it does and why a parser-side fallback (unlike the
+roll fix) was deliberately not attempted.
 
 Still open, in suggested priority order — full detail in
 `playtest_findings_2026-07-05.md`:
-1. **Combat tracker not engaging during clear physical fights.** Likely
-   needs the same kind of prompt-adherence attention as the roll-trigger fix
-   did, though a parser-side fallback (inferring combat start from narration)
-   is riskier here than it was for rolls — worth discussing approach before
-   diving in.
-2. Items/location tags and `[SUGGESTIONS: ...]` not firing reliably —
-   lower urgency, cosmetic/completeness gaps.
-3. `type: "begin"` not being idempotent — quick, low-risk guard.
+1. Items/location tags and `[SUGGESTIONS: ...]` not firing reliably —
+   lower urgency, cosmetic/completeness gaps. Live evidence of the
+   `SUGGESTIONS` gap specifically surfaced again during this session's
+   deployment verification: the model wrote `(SUGGESTIONS: ...)` with
+   parentheses instead of `[SUGGESTIONS: ...]` brackets.
+2. `type: "begin"` not being idempotent — quick, low-risk guard.
 - **What's needed from you**: same "real bug vs. accepted quirk" judgment
   call as everything else in this doc — pick what's next, or say "all of it."
 
@@ -89,14 +90,15 @@ pattern.
   and `extractAbilityUsedKeys()` now tolerate a `(Name)` parenthetical
   between the number and colon, plus a literal `Harm:` label before the harm
   word — matching `public/pure.js`'s `stripGMTags()` so it doesn't leak into
-  display either. 9 new tests, 448/448 pass. Not yet deployed.
+  display either. 9 new tests, 448/448 pass. Deployed and verified live
+  2026-07-06.
 - **2026-07-06 — Roll request with no `ROLL:` anchor at all (playtest
   finding #1, headline finding)**: fixed. `extractRoll()` now falls back to
   a natural-language scan for "Roll(ing) [.../Name's] STAT" phrasing when no
   literal `ROLL:` tag is found, resolving stat + roller the same way the
   explicit tag does. Verified against every real "roll"-mentioning
   production GM entry with zero false positives. 8 new tests, 448/448 pass.
-  Not yet deployed.
+  Deployed and verified live 2026-07-06 (byte-check on the deployed `pure.js`, a live GM round-trip against the Dark Wars test campaign, and a clean `check-drift` pass).
 - **2026-07-06 — Roll-trigger prompt-wording reinforcement (belt-and-
   suspenders alongside the parser fallback above)**: all three prompt files
   (`lib/prompt.js`, `lib/prompt-manlandia.js`, `lib/prompt-custom.js`) now
@@ -108,4 +110,19 @@ pattern.
   reliably emits the real tag is strictly better (real dice math, proper
   advantage/roller-name support) than one that only gets caught by the
   fallback. 448/448 tests still pass (no test asserts exact prompt text).
-  Not yet deployed.
+  Deployed and verified live 2026-07-06 (byte-check on the deployed `pure.js`, a live GM round-trip against the Dark Wars test campaign, and a clean `check-drift` pass).
+- **2026-07-06 — Combat tracker not engaging / drifting out of sync
+  (playtest finding #2)**: implemented, not yet deployed. Two changes: (1)
+  `lib/prompt-shared.js`'s new `buildCombatStatusBlock(ws)`, wired into all
+  three prompt files, echoes the live combat state (round number, every
+  tracked enemy's current harm/defeat) back to the model every turn — the
+  same way character harm already was via `charLine()`, but enemy state
+  never was, so the model had no anchor for what it still owed the tracker.
+  (2) All three prompt files' COMBAT instructions gained a concrete ✗ WRONG
+  / ✓ RIGHT example pair targeting the exact observed failure (a clear
+  physical clash narrated with zero tags). Deliberately **not** attempted: a
+  parser-side fallback like the `ROLL:` fix got — "a fight is starting" has
+  no narrow, reliable grammatical signal the way "a roll is being requested"
+  does, so a regex-based combat-start detector would carry real false-
+  positive risk with no clear bound. Both changes here are prompt-adherence
+  mitigations only. 6 new tests, 454/454 pass.

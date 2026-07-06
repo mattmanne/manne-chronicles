@@ -78,3 +78,51 @@ test("buildSystemPromptCustom includes pinned notes when present", () => {
   assert.match(prompt, /REMEMBERED MOMENTS/);
   assert.match(prompt, /The captain trusts no one from the Reach/);
 });
+
+// buildCombatStatusBlock (lib/prompt-shared.js) — added 2026-07-06 after a
+// live playtest found enemy harm/defeat drifting out of sync with narration,
+// or combat never engaging at all. Echoing the tracker's own current state
+// back every turn (the same way character harm already is) gives the model
+// something to check its narration against instead of tracking blind.
+test("buildSystemPrompt (Resonance) shows 'no active fight' when combat isn't active", () => {
+  const gs = getInitialState();
+  const prompt = buildSystemPrompt(gs);
+  assert.match(prompt, /No active fight right now/);
+});
+
+test("buildSystemPrompt (Resonance) shows the live enemy roster when combat is active", () => {
+  const gs = getInitialState();
+  gs.worldState.combat = { active: true, round: 2, enemies: [{ name: "Warden", harm: "Hurt", defeated: false }, { name: "Guard", harm: "Unhurt", defeated: true }] };
+  const prompt = buildSystemPrompt(gs);
+  assert.match(prompt, /Combat: ACTIVE \(round 2\)/);
+  assert.match(prompt, /Warden: Hurt/);
+  assert.match(prompt, /Guard: Defeated/);
+});
+
+test("buildSystemPromptManlandia shows 'no active fight' when combat isn't active", () => {
+  const gs = getInitialStateManlandia();
+  const prompt = buildSystemPromptManlandia(gs);
+  assert.match(prompt, /No active fight right now/);
+});
+
+test("buildSystemPromptManlandia shows the live enemy roster when combat is active", () => {
+  const gs = getInitialStateManlandia();
+  gs.worldState.combat = { active: true, round: 1, enemies: [{ name: "Wolf", harm: "Scratched", defeated: false }] };
+  const prompt = buildSystemPromptManlandia(gs);
+  assert.match(prompt, /Combat: ACTIVE \(round 1\)/);
+  assert.match(prompt, /Wolf: Scratched/);
+});
+
+test("buildSystemPromptCustom shows 'no active fight' when combat isn't active", () => {
+  const gs = getInitialStateCustom({ name: "Star Reach", theme: "Space pirates", playerCount: 2, adult: false });
+  const prompt = buildSystemPromptCustom(gs);
+  assert.match(prompt, /No active fight right now/);
+});
+
+test("buildSystemPromptCustom shows the live enemy roster when combat is active", () => {
+  const gs = getInitialStateCustom({ name: "Star Reach", theme: "Space pirates", playerCount: 2, adult: false });
+  gs.worldState.combat = { active: true, round: 3, enemies: [{ name: "Raider", harm: "Wounded", defeated: false }] };
+  const prompt = buildSystemPromptCustom(gs);
+  assert.match(prompt, /Combat: ACTIVE \(round 3\)/);
+  assert.match(prompt, /Raider: Wounded/);
+});
