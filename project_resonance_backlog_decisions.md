@@ -19,17 +19,22 @@ what was already decided instead of re-litigating it.
 Three of the six confirmed findings are now fixed (see Resolved below):
 malformed `(Name)`-padded `CHARACTER`/`ABILITY` tags, the roll-request-with-
 no-`ROLL:`-anchor bug (the headline finding), and combat tracking. The
-combat fix is implemented and tested but **not yet deployed** — see the
-Resolved entry for what it does and why a parser-side fallback (unlike the
-roll fix) was deliberately not attempted.
+combat fix is deployed and verified live — see the Resolved entry for what
+it does and why a parser-side fallback (unlike the roll fix) was
+deliberately not attempted. Unlike the roll fix, this one can't be
+definitively confirmed working from a single non-deterministic live call —
+it makes the model more likely to comply, not a compliance-independent
+safety net — so it's worth an `npm run check-drift` re-check once more real
+combat happens.
 
 Still open, in suggested priority order — full detail in
 `playtest_findings_2026-07-05.md`:
 1. Items/location tags and `[SUGGESTIONS: ...]` not firing reliably —
    lower urgency, cosmetic/completeness gaps. Live evidence of the
-   `SUGGESTIONS` gap specifically surfaced again during this session's
-   deployment verification: the model wrote `(SUGGESTIONS: ...)` with
-   parentheses instead of `[SUGGESTIONS: ...]` brackets.
+   `SUGGESTIONS` gap specifically surfaced twice more during this session's
+   deployment verification (both live test round-trips): the model wrote
+   `(SUGGESTIONS: ...)` with parentheses instead of `[SUGGESTIONS: ...]`
+   brackets both times.
 2. `type: "begin"` not being idempotent — quick, low-risk guard.
 - **What's needed from you**: same "real bug vs. accepted quirk" judgment
   call as everything else in this doc — pick what's next, or say "all of it."
@@ -112,7 +117,9 @@ pattern.
   fallback. 448/448 tests still pass (no test asserts exact prompt text).
   Deployed and verified live 2026-07-06 (byte-check on the deployed `pure.js`, a live GM round-trip against the Dark Wars test campaign, and a clean `check-drift` pass).
 - **2026-07-06 — Combat tracker not engaging / drifting out of sync
-  (playtest finding #2)**: implemented, not yet deployed. Two changes: (1)
+  (playtest finding #2)**: deployed and verified live 2026-07-06 (a live
+  combat-themed GM round-trip against the Dark Wars test campaign completed
+  cleanly with no crash, plus a clean `check-drift` pass). Two changes: (1)
   `lib/prompt-shared.js`'s new `buildCombatStatusBlock(ws)`, wired into all
   three prompt files, echoes the live combat state (round number, every
   tracked enemy's current harm/defeat) back to the model every turn — the
