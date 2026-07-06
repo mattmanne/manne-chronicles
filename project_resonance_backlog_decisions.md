@@ -16,28 +16,26 @@ what was already decided instead of re-litigating it.
 ## Pending decisions (need a call)
 
 ### Review the remaining 2026-07-05 playtest findings
-Three of the six confirmed findings are now fixed (see Resolved below):
+**All six confirmed findings are now addressed** (see Resolved below):
 malformed `(Name)`-padded `CHARACTER`/`ABILITY` tags, the roll-request-with-
-no-`ROLL:`-anchor bug (the headline finding), and combat tracking. The
-combat fix is deployed and verified live — see the Resolved entry for what
-it does and why a parser-side fallback (unlike the roll fix) was
-deliberately not attempted. Unlike the roll fix, this one can't be
-definitively confirmed working from a single non-deterministic live call —
-it makes the model more likely to comply, not a compliance-independent
-safety net — so it's worth an `npm run check-drift` re-check once more real
-combat happens.
+no-`ROLL:`-anchor bug (the headline finding), combat tracking, item/location
+tags, `[SUGGESTIONS: ...]` parentheses drift, and `begin` idempotency.
+Everything is implemented and locally tested (457/457); the last three
+(items/location prompt reinforcement, SUGGESTIONS parentheses tolerance,
+begin idempotency) are **not yet deployed** as of this writing.
 
-Still open, in suggested priority order — full detail in
-`playtest_findings_2026-07-05.md`:
-1. Items/location tags and `[SUGGESTIONS: ...]` not firing reliably —
-   lower urgency, cosmetic/completeness gaps. Live evidence of the
-   `SUGGESTIONS` gap specifically surfaced twice more during this session's
-   deployment verification (both live test round-trips): the model wrote
-   `(SUGGESTIONS: ...)` with parentheses instead of `[SUGGESTIONS: ...]`
-   brackets both times.
-2. `type: "begin"` not being idempotent — quick, low-risk guard.
-- **What's needed from you**: same "real bug vs. accepted quirk" judgment
-  call as everything else in this doc — pick what's next, or say "all of it."
+Two of these can't be definitively confirmed working from a single
+non-deterministic live call the way the roll-tag fix could (prompt
+reinforcement makes compliance more likely, it isn't a compliance-
+independent safety net) — worth an `npm run check-drift` re-check on both
+once more real combat/location/item transcripts exist:
+- Combat tracker (deployed 2026-07-06)
+- Items/location tags (pending deployment)
+
+- **What's needed from you**: read through `playtest_findings_2026-07-05.md`
+  once more if you want the full picture, but there's no remaining "pick
+  what's next" decision on this list — it's all done or in flight. Approve
+  deployment of the last three fixes when ready.
 
 ## Known simplifications, deliberately deferred
 
@@ -133,3 +131,28 @@ pattern.
   does, so a regex-based combat-start detector would carry real false-
   positive risk with no clear bound. Both changes here are prompt-adherence
   mitigations only. 6 new tests, 454/454 pass.
+- **2026-07-06 — `[SUGGESTIONS: ...]` parentheses drift (playtest finding
+  #5)**: fixed. `lib/suggestions.js`'s `extractSuggestions()` and
+  `public/pure.js`'s `stripGMTags()` now both tolerate the tag wrapped in
+  parentheses instead of brackets — live evidence came from this session's
+  own deployment-verification calls (twice): `"(SUGGESTIONS: a | b | c)"`
+  instead of `"[SUGGESTIONS: a | b | c]"`, silently dropped by the original
+  bracket-only regex. Same "parser tolerance" pattern as the CHARACTER/
+  ABILITY `(Name)` padding fix — cheap, low-risk, no prompt change needed.
+  2 new tests, 457/457 pass. Not yet deployed.
+- **2026-07-06 — `type: "begin"` not idempotent (playtest finding #6)**:
+  fixed. `api/gm.js` now checks `sessionLog.length > 0` before calling Groq
+  for a `begin` submission and returns `{ alreadyBegun: true, gameState }`
+  as a true no-op if the campaign already has content — not an error, since
+  a duplicate begin from a device race isn't a client bug worth surfacing.
+  `public/game.js`'s `sendToGM()` handles it the same way it already
+  handles `data.waiting` (resync state, append nothing). 1 new test,
+  457/457 pass. Not yet deployed.
+- **2026-07-06 — Item/location tags not firing reliably (playtest finding
+  #4)**: mitigated via prompt reinforcement, same treatment/reasoning as the
+  combat fix above (no parser-side fallback attempted — no narrow, reliable
+  grammatical signal for "the party moved" or "the party picked something
+  up" the way there is for a roll request). All three prompt files' LOCATION
+  CHANGE and ITEM(S) instructions gained a concrete ✗ WRONG / ✓ RIGHT example
+  pair targeting the exact failures observed live (a real move or a clear
+  pickup narrated with zero tags). Not yet deployed.

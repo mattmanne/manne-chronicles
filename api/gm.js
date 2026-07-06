@@ -143,6 +143,27 @@ module.exports = async function handler(req, res) {
     }
   }
 
+  // "begin" is meant to be a one-time opening narration, but nothing ever
+  // enforced that — a race between devices loading the same fresh campaign
+  // at once (confirmed live: three separate [SESSION BEGINS] narrations
+  // landing in the same sessionLog, one of them for characters that never
+  // actually existed) or a client retry after a dropped response could both
+  // resubmit it once the log already has real content. A true no-op rather
+  // than an error: unlike a stale roll_result (a client bug worth surfacing),
+  // a duplicate begin is an expected race in a system with no server-side
+  // "has this campaign started" flag of its own — sessionLog.length is that
+  // flag. Checked before any Groq call, same as the roll_result guard above.
+  if (type === "begin" && gameState.sessionLog.length > 0) {
+    return res.json({
+      alreadyBegun: true,
+      needsRoll: false,
+      gameState: {
+        characters: gameState.characters,
+        worldState: buildWorldStatePayload(worldConfig, gameState),
+      },
+    });
+  }
+
   // Wait-for-all-players turn gating: in any world with more than one real
   // character, a single player's action used to advance the story
   // immediately — the other character's player would come back to find the

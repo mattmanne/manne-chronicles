@@ -79,6 +79,10 @@ test("stripGMTags removes a CHARACTER/ABILITY tag with a '(Name)' parenthetical 
   assert.equal(stripGMTags("Hurt! [CHARACTER 1 (Kestra): Harm: Scratched → Hurt]"), "Hurt!");
 });
 
+test("stripGMTags removes a SUGGESTIONS tag wrapped in parentheses instead of brackets (live, 2026-07-06: '(SUGGESTIONS: a | b | c)')", () => {
+  assert.equal(stripGMTags("What do you do?\n\n(SUGGESTIONS: Interrogate the woman | Try to calm her down | Search her)"), "What do you do?");
+});
+
 test("stripGMTags tolerates trailing commentary after a harm transition (live: '[CHARACTER 1: Scratched → Scratched, no change]')", () => {
   assert.equal(stripGMTags("Still fine. [CHARACTER 1: Scratched → Scratched, no change]"), "Still fine.");
   assert.equal(stripGMTags("Ouch! [Globak: Scratched → Hurt, wincing]"), "Ouch!");

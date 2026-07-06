@@ -104,6 +104,24 @@ test("the opening [SESSION BEGINS] turn is never held pending", async (t) => {
   assert.equal(res.body.response, "The pub is warm and busy this evening.");
 });
 
+test("a duplicate [SESSION BEGINS] once the log already has content is a no-op, not a second opening narration (live: 3 contradictory openings landed in one campaign from a device race)", async (t) => {
+  const redis = statefulRedisMock({
+    session: 1,
+    sessionLog: [{ role: "gm", content: "The pub is warm and busy this evening.", timestamp: 1 }],
+    worldState: { pending_turn: {} },
+    characters: { fen: {}, lyra: {} },
+  });
+  t.mock.module("../lib/redis.js", redis);
+  let generateContentCalls = 0;
+  t.mock.module("../lib/gemini.js", { exports: { generateContent: async () => { generateContentCalls++; return "A second, contradictory opening."; } } });
+
+  const res = await callGm({ player: "fen", message: "[SESSION BEGINS]", type: "begin" });
+
+  assert.equal(res.body.alreadyBegun, true);
+  assert.equal(generateContentCalls, 0);
+  assert.equal(redis.state.sessionLog.length, 1); // unchanged — nothing new was pushed
+});
+
 test("a roll_result is never held pending, even though it's not soloOverride", async (t) => {
   const redis = statefulRedisMock(null);
   t.mock.module("../lib/redis.js", redis);

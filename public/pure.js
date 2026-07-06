@@ -72,7 +72,10 @@ function stripGMTags(content) {
     // live: "[ABILITY 1 (Kestra): Protect Friend used]".
     .replace(/\[ABILITY \d(?:\s*\([^)]*\))?: [^\]]*used[^\]]*\]/gi, "")
     .replace(/\[ABILITY (FEN|LYRA): [a-z_]+\]/gi, "")
-    .replace(/\[SUGGESTIONS: [^\]]+\]/gi, "")
+    // Tolerates the model wrapping the tag in parentheses instead of
+    // brackets — live (2026-07-06): "(SUGGESTIONS: a | b | c)" — matching
+    // the same tolerance lib/suggestions.js's extractSuggestions() now has.
+    .replace(/[[(]SUGGESTIONS:\s*[^\])]+[\])]/gi, "")
     .replace(/\[OBJECTIVE(?: COMPLETE)?: [^\]]+\]/gi, "")
     .replace(/\[CLUE(?: RESOLVED)?: [^\]]+\]/gi, "")
     .replace(/\[XP \d: \+\d+\]/gi, "")

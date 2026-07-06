@@ -1289,6 +1289,14 @@ async function sendToGM(player, message, type) {
       return true;
     }
 
+    if (data.alreadyBegun) {
+      // A duplicate [SESSION BEGINS] — the campaign already has real content
+      // (another device's begin call won the race, or this is a retry after
+      // a dropped response). Nothing new to append; just resync state.
+      if (data.gameState) { cachedGameState = data.gameState; updateCharacterUI(data.gameState); }
+      return true;
+    }
+
     if (data.needsRoll) {
       hideSuggestionChips();
       // Whoever the GM actually named as the roller (needed once a merged

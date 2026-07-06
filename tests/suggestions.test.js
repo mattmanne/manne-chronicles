@@ -40,3 +40,10 @@ test("drops empty options from stray separators", () => {
   const { suggestions } = extractSuggestions(raw);
   assert.deepEqual(suggestions, ["Look around", "Talk to the fox"]);
 });
+
+test("tolerates the model wrapping the tag in parentheses instead of brackets — live (2026-07-06): '(SUGGESTIONS: a | b | c)'", () => {
+  const raw = "The woman begs for help.\n\n(SUGGESTIONS: Interrogate the woman | Try to calm her down | Search her for any useful items)";
+  const { clean, suggestions } = extractSuggestions(raw);
+  assert.equal(clean, "The woman begs for help.");
+  assert.deepEqual(suggestions, ["Interrogate the woman", "Try to calm her down", "Search her for any useful items"]);
+});
