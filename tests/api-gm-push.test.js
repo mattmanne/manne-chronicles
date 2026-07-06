@@ -1,6 +1,7 @@
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
-const { mockRes, freshRequire, keyedRedisMock } = require("./helpers");
+const { mockRes, freshRequire, keyedRedisMock, seedPendingRoll } = require("./helpers");
+const { getWorldConfig } = require("../lib/worldconfig");
 
 function withVapidConfigured(fn) {
   process.env.VAPID_PUBLIC_KEY = "test-public";
@@ -73,7 +74,7 @@ test("does not send any notification while a roll is pending (needsRoll true)", 
 test("sends a notification for the roll_result follow-up turn (the turn is resolved by then)", async (t) => {
   await withVapidConfigured(async () => {
     const seeded = {
-      "manlandia:gamestate": null,
+      "manlandia:gamestate": seedPendingRoll(getWorldConfig("manlandia").getInitialState(), "player1"),
       "push:manlandia:subscriptions": [
         { player: "player2", endpoint: "https://push.example/other", keys: { p256dh: "c", auth: "d" } },
       ],

@@ -14,9 +14,13 @@ function mockGemini(t, responses) {
   });
 }
 
+// soloOverride is forced on for every call here — these tests are about tag
+// parsing, not the wait-for-both-players turn gating (that has its own test
+// file), and Resonance's two always-real characters (fen/lyra) would
+// otherwise get held pending after a single-player submission.
 function callGm(body, world = "manlandia") {
   const handler = freshRequire("../api/gm.js");
-  const req = { method: "POST", headers: { "x-adult-pin": ADULT_PIN }, query: { world }, body };
+  const req = { method: "POST", headers: { "x-adult-pin": ADULT_PIN }, query: { world }, body: { soloOverride: true, ...body } };
   const res = mockRes();
   return handler(req, res).then(() => res);
 }

@@ -36,6 +36,33 @@ test("returns a recap string built from the session transcript", async (t) => {
   assert.match(receivedSystemPrompt, /child aged 8/);
 });
 
+test("writes the recap from the requesting player's POV when a player param is given", async (t) => {
+  process.env.ADULT_PIN = ADULT_PIN;
+  try {
+    let receivedSystemPrompt = null;
+    const gameState = {
+      sessionLog: [
+        { role: "user", player: "fen", content: "I enter the pub." },
+        { role: "gm", content: "The pub is loud and warm." },
+      ],
+      worldState: {},
+    };
+    t.mock.module("../lib/redis.js", statefulRedisMock(gameState));
+    t.mock.module("../lib/gemini.js", {
+      exports: { generateContent: async (systemPrompt) => { receivedSystemPrompt = systemPrompt; return "Recap."; } },
+    });
+
+    const handler = freshHandler();
+    const req = { method: "GET", headers: { "x-adult-pin": ADULT_PIN }, query: { world: "resonance", player: "lyra" } };
+    const res = mockRes();
+    await handler(req, res);
+
+    assert.match(receivedSystemPrompt, /Lyra's point of view/);
+  } finally {
+    delete process.env.ADULT_PIN;
+  }
+});
+
 test("uses adult-tone copy for the resonance world, once unlocked with the adult pin", async (t) => {
   process.env.ADULT_PIN = ADULT_PIN;
   try {

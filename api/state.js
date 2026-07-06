@@ -207,6 +207,10 @@ module.exports = async function handler(req, res) {
       if (!current.worldState.session_summaries) current.worldState.session_summaries = [];
       current.worldState.session_summaries.push(summary);
       current.sessionLog = [];
+      // A held action from the ending session (someone acted, still waiting
+      // on another real character) must not bleed into the new session and
+      // get merged with an unrelated future turn — wipe it along with the log.
+      current.worldState.pending_turn = {};
 
       if (worldConfig.id === "resonance") {
         current.characters.lyra.weight_of_knowing_used = false;

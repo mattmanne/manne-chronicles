@@ -594,6 +594,7 @@ async function continueInit() {
   setupExport();
   setupAuthorNote();
   setupPrivateScene();
+  setupSoloMode();
   setupScenePinSettings();
   setupRecap();
   setupWizard();
@@ -941,6 +942,26 @@ function setupPrivateScene() {
   });
 }
 
+/* ── Solo mode (all multiplayer worlds) — a session-long "my partner isn't
+   around tonight" toggle, so a single player's actions send immediately
+   instead of waiting for every other real character to also act. Persistent
+   for the session (unlike a per-message choice) since it's meant to cover
+   a whole night of playing alone, not one message at a time. Resets on
+   reload, same as privateSceneActive — deliberately not persisted to
+   localStorage, so a shared device doesn't silently stay in solo mode for
+   the next person who opens the app. ── */
+let soloModeActive = false;
+
+function setupSoloMode() {
+  const toggle = document.getElementById("solo-mode-toggle");
+  if (!toggle) return;
+  toggle.addEventListener("click", () => {
+    soloModeActive = !soloModeActive;
+    toggle.classList.toggle("active", soloModeActive);
+    toggle.setAttribute("aria-pressed", String(soloModeActive));
+  });
+}
+
 /* ── Scene PIN settings (Resonance) ── */
 function setupScenePinSettings() {
   const toggle = document.getElementById("scene-pin-set-toggle");
@@ -1051,12 +1072,19 @@ function setupHarmRecovery() {
   });
 }
 
-/* ── Ability Toggles (Resonance only) ── */
+/* ── Ability Toggles (Resonance only) ──
+   Both handlers below confirm before spending a limited, once-per-session
+   resource — a bare tap-to-use with no confirmation let a stray/curious tap
+   silently burn a real charge (confirmed live: an accidental magic-button
+   tap used up one of Lyra's uses). A native confirm() is enough friction to
+   stop an accidental tap while still being one click for an intentional one. */
 function setupAbilityToggles() {
   document.querySelectorAll(".ability[data-ability]").forEach(btn => {
     btn.addEventListener("click", async () => {
       if (btn.classList.contains("used")) return;
       const { character, ability } = btn.dataset;
+      const label = btn.textContent.trim();
+      if (!confirm(`Use "${label}"? This can only be used once per session.`)) return;
       const res = await authPost("/api/state", { action: "toggle_ability", payload: { character, ability } });
       const data = await res.json();
       if (data.ok) updateCharacterUI({ characters: data.characters });
@@ -1068,6 +1096,7 @@ function setupAbilityToggles() {
     lyraM.addEventListener("click", async () => {
       const count = parseInt(document.getElementById("magic-count").textContent);
       if (count <= 0) return;
+      if (!confirm(`Use one Resonance charge? Lyra has ${count} remaining.`)) return;
       const res = await authPost("/api/state", { action: "use_magic", payload: {} });
       const data = await res.json();
       if (data.ok) updateCharacterUI({ characters: data.characters });
@@ -1244,16 +1273,32 @@ async function sendToGM(player, message, type) {
       // a scene marked private stays private through its own roll without
       // any extra plumbing — see "Solo/private scenes" in CLAUDE.md.
       ...(privateSceneActive && currentWorld === "resonance" && { private: true }),
+      // "Solo tonight" — see setupSoloMode. Read fresh on every call so it
+      // still applies through a roll_result recursion, same as private above.
+      ...(soloModeActive && { soloOverride: true }),
     });
     if (handleLockedResponse(res.status)) return false;
     const data = await res.json();
     if (data.error) { appendSystemMessage("Error: " + data.error); return false; }
 
+    if (data.waiting) {
+      // Held pending — every real character hasn't acted yet this round, so
+      // there's no GM response to show. Just refresh the waiting banner
+      // (via worldState.pending_turn) so the player sees their action is in.
+      if (data.gameState) { cachedGameState = data.gameState; updateCharacterUI(data.gameState); }
+      return true;
+    }
+
     if (data.needsRoll) {
       hideSuggestionChips();
-      const rollResult = await animateRoll(player, data.rollStat, data.rollAdvantage);
-      appendRollResult(player, data.rollStat, rollResult);
-      return await sendToGM(player, formatRollMessage(player, data.rollStat, rollResult), "roll_result");
+      // Whoever the GM actually named as the roller (needed once a merged
+      // turn means the response might not be about the device that
+      // completed the merge) — falls back to the submitter, unchanged
+      // single-actor behavior, when the GM never named anyone.
+      const roller = data.rollPlayer || player;
+      const rollResult = await animateRoll(roller, data.rollStat, data.rollAdvantage);
+      appendRollResult(roller, data.rollStat, rollResult);
+      return await sendToGM(roller, formatRollMessage(roller, data.rollStat, rollResult), "roll_result");
     } else {
       const entry = appendGMEntry(data.response, true);
       if (autoRead && entry) speakText(getCleanText(data.response), entry.querySelector(".speak-btn"));
@@ -1505,7 +1550,7 @@ async function loadRecap() {
   textEl.textContent = "Loading recap…";
   overlay.classList.add("active");
   try {
-    const res  = await authGet("/api/recap");
+    const res  = await authGet(`/api/recap?player=${encodeURIComponent(currentPlayer)}`);
     const data = await res.json();
     textEl.textContent = data.recap || data.error || "Could not load a recap right now.";
   } catch(_) {
@@ -1655,6 +1700,8 @@ function setupWizard() {
     const abilBtn = e.target.closest(".manlandia-ability-btn");
     if (abilBtn && !abilBtn.classList.contains("used")) {
       const p = abilBtn.dataset.player;
+      const label = abilBtn.textContent.trim();
+      if (!confirm(`Use "${label}"? This can only be used once per session.`)) return;
       const res = await authPost("/api/state", { action: "toggle_ability", payload: { character: p, ability: "ability_used" } });
       const data = await res.json();
       if (data.ok) { cachedGameState = { ...cachedGameState, characters: data.characters }; updateCharacterUI({ characters: data.characters }); }
@@ -2794,11 +2841,32 @@ function updateCharacterUI(data) {
   if (ws?.session) sessionLabel.textContent = `Session ${ws.session}`;
 }
 
-// Informational only — turn order isn't enforced in this app (anyone can act
-// anytime), so this is a reminder, not a gate. See getWaitingOn in pure.js.
+// worldState.pending_turn (when non-empty) means the story is actually held
+// up — a real gate, not just informational — waiting on whoever hasn't
+// submitted their action yet this round (see "wait for all players" in
+// CLAUDE.md). Falls back to the old purely-informational last_actor banner
+// (turn order still isn't enforced outside of this gate) once nobody's
+// action is actually pending.
 function renderWaitingBanner(ws, characters) {
   const banner = document.getElementById("waiting-banner");
   if (!banner) return;
+  const pending = ws?.pending_turn || {};
+  const pendingKeys = Object.keys(pending);
+  if (pendingKeys.length) {
+    const stillWaitingOn = getRealCharacterKeys(currentWorld, characters).filter((k) => !pending[k]);
+    const actedNames = pendingKeys.map((k) => getPlayerDisplayName(k, { characters })).join(", ");
+    banner.classList.remove("hidden");
+    if (stillWaitingOn.includes(currentPlayer)) {
+      banner.innerHTML = `⏳ ${escapeHtml(actedNames)} acted — the story continues once you act too!`;
+    } else if (stillWaitingOn.length) {
+      const waitingNames = stillWaitingOn.map((k) => getPlayerDisplayName(k, { characters })).join(", ");
+      banner.innerHTML = `⏳ Your action is in — waiting on ${escapeHtml(waitingNames)}`;
+    } else {
+      banner.classList.add("hidden");
+      banner.innerHTML = "";
+    }
+    return;
+  }
   const waitingOn = getWaitingOn(ws?.last_actor, currentWorld, characters);
   if (!waitingOn.length) { banner.classList.add("hidden"); banner.innerHTML = ""; return; }
   const names = waitingOn.map(k => getPlayerDisplayName(k, { characters })).join(", ");

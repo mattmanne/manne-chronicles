@@ -105,4 +105,21 @@ function keyedRedisMock(initial = {}) {
   };
 }
 
-module.exports = { mockRes, freshRequire, statefulRedisMock, keyedRedisMock, mockRedisCommand };
+// Appends a still-pending rolling exchange (the shape api/gm.js itself
+// writes when a turn calls for a roll) onto a base gameState — for tests
+// that submit a bare `type: "roll_result"` and need api/gm.js's
+// stillPending guard to see a real roll waiting to be resolved for that
+// player, instead of being rejected as a stale/duplicate submission.
+function seedPendingRoll(initialState, player, stat = "agility") {
+  const ts = Date.now() - 100;
+  return {
+    ...initialState,
+    sessionLog: [
+      ...(initialState.sessionLog || []),
+      { role: "user", content: `${player}: an earlier action`, player, timestamp: ts, rolling: true },
+      { role: "gm", content: "The GM calls for a roll.", timestamp: ts, rolling: true, rollStat: stat, rollAdvantage: false },
+    ],
+  };
+}
+
+module.exports = { mockRes, freshRequire, statefulRedisMock, keyedRedisMock, mockRedisCommand, seedPendingRoll };

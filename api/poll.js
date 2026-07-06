@@ -40,8 +40,14 @@ module.exports = async function handler(req, res) {
   let pendingRoll = null;
   const lastEntry = state.sessionLog[state.sessionLog.length - 1];
   if (lastEntry && lastEntry.role === "gm" && lastEntry.rolling && lastEntry.rollStat) {
+    // rollPlayer is the authoritative "who's actually rolling" — set
+    // directly on the GM entry since api/gm.js knows it either way (from an
+    // explicit in-text attribution, or the single submitter). The preceding
+    // user entry's own .player is only a fallback for entries saved before
+    // this field existed, and only reliable there because a merged turn
+    // (more than one user entry ahead of the GM entry) didn't exist yet either.
     const userEntry = state.sessionLog[state.sessionLog.length - 2];
-    pendingRoll = { stat: lastEntry.rollStat, advantage: !!lastEntry.rollAdvantage, player: userEntry?.player || null };
+    pendingRoll = { stat: lastEntry.rollStat, advantage: !!lastEntry.rollAdvantage, player: lastEntry.rollPlayer || userEntry?.player || null };
   }
 
   const worldStatePayload = buildWorldStatePayload(worldConfig, state);

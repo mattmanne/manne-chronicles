@@ -4,6 +4,7 @@ const { getWorldConfig } = require("../lib/worldconfig");
 const { formatTranscript, buildRecapSystemPrompt } = require("../lib/recap");
 const { checkAdultAccess, isAdultWorld } = require("../lib/adultgate");
 const { checkRateLimit } = require("../lib/ratelimit");
+const { getPlayerDisplayName } = require("../public/pure.js");
 
 module.exports = async function handler(req, res) {
   const allowedOrigin = process.env.ALLOWED_ORIGIN || "*";
@@ -28,8 +29,9 @@ module.exports = async function handler(req, res) {
   }
 
   const isKidWorld = !isAdultWorld(worldConfig, gameState);
+  const viewerName = req.query.player ? getPlayerDisplayName(req.query.player, gameState) : null;
 
-  const systemPrompt = buildRecapSystemPrompt(isKidWorld);
+  const systemPrompt = buildRecapSystemPrompt(isKidWorld, viewerName);
 
   try {
     const recap = await generateContent(systemPrompt, [], transcript);

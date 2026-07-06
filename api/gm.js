@@ -4,6 +4,7 @@ const { getWorldConfig, buildWorldStatePayload } = require("../lib/worldconfig")
 const { extractRoll } = require("../lib/gm-tags");
 const { extractSuggestions } = require("../lib/suggestions");
 const { checkAdultAccess } = require("../lib/adultgate");
+const { getRealCharacterKeys, getPlayerDisplayName } = require("../public/pure.js");
 const {
   matchResonanceLocationId,
   matchManlandiaLocationId,
@@ -26,9 +27,14 @@ const GM_LOCK_TTL_MS = 20000;
 // while a FIRST call to Groq for this exact world is still in flight, so a
 // single fast player (Groq often responds in ~1s) is never blocked from
 // immediately taking their next turn — the lock is already released by
-// the time their next submission arrives. A roll_result is the second half
-// of one player's own turn (the dice can't even be rolled until the first
-// call returns), so it's exempt — never a new/competing submission.
+// the time their next submission arrives. Every submission type takes this
+// lock, including roll_result — it was exempt once, on the assumption a
+// roll_result could never be a competing submission, but that broke when
+// the same player had the game open on two devices at once (confirmed
+// live: duplicate "double roll" story entries from two near-simultaneous
+// roll_result calls for the same pending roll). See the stillPending check
+// in the handler for the complementary case of a delayed (not concurrent)
+// duplicate arriving after the lock's already been released.
 async function acquireGmLock(worldId) {
   const result = await redisCommand("SET", `gmlock:${worldId}`, "1", "NX", "PX", GM_LOCK_TTL_MS);
   return result === "OK";
@@ -59,13 +65,15 @@ function formatWaitMessage(retryAfterSeconds) {
 
 // Never lets a push failure break the actual GM response — this is
 // best-effort. Skips entirely (not an error) if VAPID isn't configured yet,
-// or if nobody else is subscribed to this world.
-async function sendTurnNotifications(worldConfig, gameState, senderPlayer, senderDisplayName) {
+// or if nobody else is subscribed to this world. senderPlayers is an array —
+// a merged multi-character turn has more than one contributor, all of whom
+// already know what just happened and shouldn't be notified about it.
+async function sendTurnNotifications(worldConfig, gameState, senderPlayers, senderDisplayName) {
   if (!process.env.VAPID_PUBLIC_KEY || !process.env.VAPID_PRIVATE_KEY) return;
   try {
     const pushKey = `push:${worldConfig.id}:subscriptions`;
     const subscriptions = (await getState(pushKey)) || [];
-    const targets = selectNotifyTargets(subscriptions, senderPlayer);
+    const targets = selectNotifyTargets(subscriptions, senderPlayers);
     if (!targets.length) return;
 
     webpush.setVapidDetails("mailto:mmanne@hbs.edu", process.env.VAPID_PUBLIC_KEY, process.env.VAPID_PRIVATE_KEY);
@@ -120,6 +128,59 @@ module.exports = async function handler(req, res) {
   const gameState = (await getState(key)) || getInitialState();
   if (!(await checkAdultAccess(req, res, worldConfig, gameState))) return;
 
+  // A roll_result only makes sense as the second half of a still-pending
+  // roll. If the same player has the game open on two devices (a phone and
+  // a laptop, or a shared login), both independently poll pendingRoll and
+  // can both fire resumePendingRollIfAny for the very same roll — without
+  // this check, the second one would silently call the GM again and push a
+  // full duplicate turn (confirmed live: "double rolls" creating duplicate
+  // story entries). Checked before any Groq call, not just before the
+  // final save, so a stale/duplicate submission never even reaches the LLM.
+  if (type === "roll_result") {
+    const stillPending = gameState.sessionLog.some((e) => e.role === "user" && e.rolling && e.player === player);
+    if (!stillPending) {
+      return res.status(409).json({ error: "This roll was already resolved — no need to resend it." });
+    }
+  }
+
+  // Wait-for-all-players turn gating: in any world with more than one real
+  // character, a single player's action used to advance the story
+  // immediately — the other character's player would come back to find the
+  // scene had already moved on without them. Now that action is held in
+  // worldState.pending_turn until every real character (getRealCharacterKeys)
+  // has also submitted one for this round, then all of them are merged into
+  // a single joint message and the GM is called once. Only applies to a
+  // real "action" turn — never "begin" (the one-time opening narration) or
+  // "roll_result" (the second half of a turn already in flight). Private
+  // scenes are exempt too: a private scene is inherently one character
+  // acting alone, the opposite of "wait for everyone" — and so is an
+  // explicit soloOverride (the "solo tonight" toggle, for when a partner
+  // genuinely isn't around).
+  const soloOverride = req.body.soloOverride === true;
+  let mergedContributors = [{ player, message }];
+  if (type === "action" && !privateScene && !soloOverride) {
+    const realKeys = getRealCharacterKeys(worldConfig.id, gameState.characters);
+    if (realKeys.length > 1) {
+      if (!gameState.worldState.pending_turn) gameState.worldState.pending_turn = {};
+      gameState.worldState.pending_turn[player] = { message, timestamp: Date.now() };
+      const pending = gameState.worldState.pending_turn;
+      const waitingOn = realKeys.filter((k) => !pending[k]);
+      if (waitingOn.length > 0) {
+        await setState(key, gameState);
+        return res.json({
+          waiting: true,
+          waitingOn,
+          gameState: {
+            characters: gameState.characters,
+            worldState: buildWorldStatePayload(worldConfig, gameState),
+          },
+        });
+      }
+      mergedContributors = realKeys.map((k) => ({ player: k, message: pending[k].message }));
+      gameState.worldState.pending_turn = {};
+    }
+  }
+
   let systemPrompt = buildSystemPrompt(gameState);
 
   if ((worldConfig.id === "manlandia" || worldConfig.type === "custom") && tone && tone !== "adventure") {
@@ -137,10 +198,25 @@ module.exports = async function handler(req, res) {
   }));
 
   const playerLabel = player.charAt(0).toUpperCase() + player.slice(1);
-  const userMessage = type === "roll_result" ? message : `${playerLabel}: ${message}`;
+  // A merged turn (more than one contributor) joins every held action into
+  // one message, each on its own line under that character's display name,
+  // so the GM narrates a single joint response reacting to all of them —
+  // otherwise this is exactly the old single-submitter behavior.
+  const userMessage = type === "roll_result"
+    ? message
+    : mergedContributors.length > 1
+      ? mergedContributors.map((c) => `${getPlayerDisplayName(c.player, gameState)}: ${c.message}`).join("\n")
+      : `${playerLabel}: ${message}`;
 
-  const needsLock = type !== "roll_result";
-  if (needsLock && !(await acquireGmLock(worldConfig.id))) {
+  // Every submission — including roll_result — takes the lock now. A
+  // roll_result used to be exempt on the assumption it could never be a
+  // competing submission (it's "the second half of one player's own turn"),
+  // but that assumption breaks when the same player is open on two devices
+  // at once: both can race to submit the same roll_result concurrently. The
+  // stillPending check above catches a delayed duplicate (arriving after
+  // the first has already released the lock and saved); this lock catches
+  // one arriving at the same instant, before either has saved anything yet.
+  if (!(await acquireGmLock(worldConfig.id))) {
     return res.status(429).json({ error: `Another turn just came in for this world — ${formatWaitMessage(null)} and try again.` });
   }
 
@@ -149,15 +225,19 @@ module.exports = async function handler(req, res) {
     gmResponse = await generateContent(systemPrompt, history, userMessage);
   } catch (err) {
     console.error("GM error:", err);
-    if (needsLock) await releaseGmLock(worldConfig.id);
+    await releaseGmLock(worldConfig.id);
     if (err.status === 429) {
       return res.status(429).json({ error: `The GM is handling a lot of requests right now — ${formatWaitMessage(err.retryAfterSeconds)} and try again.` });
     }
     return res.status(500).json({ error: "The GM encountered an error: " + err.message });
   }
-  if (needsLock) await releaseGmLock(worldConfig.id);
+  await releaseGmLock(worldConfig.id);
 
-  const { clean: rollStripped, needsRoll, rollStat, rollAdvantage } = extractRoll(gmResponse);
+  const { clean: rollStripped, needsRoll, rollStat, rollAdvantage, rollPlayer } = extractRoll(gmResponse, gameState.characters);
+  // Whoever the roll is actually for — the model's explicit attribution if
+  // it named one (needed once more than one character can act in the same
+  // merged turn), otherwise the single submitter, exactly as before.
+  const roller = rollPlayer || player;
   const extracted = extractSuggestions(rollStripped);
   const cleanResponse = extracted.clean;
   const suggestions = (type === "roll_result" || needsRoll) ? [] : extracted.suggestions;
@@ -197,26 +277,39 @@ module.exports = async function handler(req, res) {
   gameState.worldState.last_action_at = ts;
 
   const rolling = needsRoll && type !== "roll_result";
-  const userEntry = { role: "user", content: userMessage, player, timestamp: ts };
-  const gmEntry   = { role: "gm",   content: cleanResponse,           timestamp: ts };
+  // A merged turn produces one sessionLog entry per contributor (so each
+  // still renders as its own line, exactly like today), plus the one shared
+  // GM entry. privateScene/soloOverride mean mergedContributors always has
+  // exactly one entry in every case that isn't a real multi-character merge,
+  // so this collapses to the original single-userEntry behavior otherwise.
+  const userEntries = (type === "roll_result" ? [{ player, message: userMessage }] : mergedContributors).map((c) => ({
+    role: "user",
+    content: type === "roll_result" ? userMessage : `${c.player.charAt(0).toUpperCase() + c.player.slice(1)}: ${c.message}`,
+    player: c.player,
+    timestamp: ts,
+  }));
+  const gmEntry = { role: "gm", content: cleanResponse, timestamp: ts };
   if (privateScene) {
     // Hidden from the other player until a manual reveal_scene action (see
     // api/state.js) — /api/poll filters on this. Not real security, just a
     // UX device (see CLAUDE.md's "Solo/private scenes" section): the point
     // is dramatic irony between two people who trust each other, not access
     // control against a determined bypass.
-    userEntry.private_to = player;
+    userEntries.forEach((e) => { e.private_to = player; });
     gmEntry.private_to = player;
   }
   if (rolling) {
-    userEntry.rolling = true;
+    userEntries.forEach((e) => { e.rolling = true; });
     gmEntry.rolling = true;
     // Persisted so a dropped/interrupted roll can be recovered from a later
-    // poll instead of vanishing — see api/poll.js's pendingRoll.
+    // poll instead of vanishing — see api/poll.js's pendingRoll. rollPlayer
+    // is who the roll is actually for, not necessarily who submitted this
+    // request — see the "roller" comment above extractRoll's call.
     gmEntry.rollStat = rollStat;
     gmEntry.rollAdvantage = rollAdvantage;
+    gmEntry.rollPlayer = roller;
   }
-  gameState.sessionLog.push(userEntry, gmEntry);
+  gameState.sessionLog.push(...userEntries, gmEntry);
 
   if (gameState.sessionLog.length > 100) {
     gameState.sessionLog = gameState.sessionLog.slice(-80); // keep the stored log (and Redis payload) bounded
@@ -244,8 +337,11 @@ module.exports = async function handler(req, res) {
   // during a private scene: the whole point is the other player doesn't know
   // yet, and a "took a turn" push would tip them off to go look for nothing.
   if (!rolling && !privateScene) {
-    const senderDisplayName = gameState.characters[player]?.name || playerLabel;
-    await sendTurnNotifications(worldConfig, gameState, player, senderDisplayName);
+    const senderKeys = mergedContributors.map((c) => c.player);
+    const senderDisplayName = senderKeys
+      .map((k) => getPlayerDisplayName(k, gameState))
+      .join(" & ");
+    await sendTurnNotifications(worldConfig, gameState, senderKeys, senderDisplayName);
   }
 
   return res.json({
@@ -253,6 +349,7 @@ module.exports = async function handler(req, res) {
     needsRoll,
     rollStat,
     rollAdvantage,
+    rollPlayer: needsRoll ? roller : null,
     suggestions,
     serverTimestamp: Date.now(),
     gameState: {

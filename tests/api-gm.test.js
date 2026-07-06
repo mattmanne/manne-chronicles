@@ -1,6 +1,7 @@
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
-const { mockRedisCommand, statefulRedisMock } = require("./helpers");
+const { mockRedisCommand, statefulRedisMock, seedPendingRoll } = require("./helpers");
+const { getWorldConfig } = require("../lib/worldconfig");
 
 // Resonance is always adult-gated — set once for the private-scene tests
 // below (none of which are testing the gate itself).
@@ -64,7 +65,13 @@ test("a roll-request turn forces suggestions to be empty even if the model inclu
 });
 
 test("a roll_result turn forces suggestions to be empty", async (t) => {
-  mockRedisAndGemini(t, "The door creaks open. [SUGGESTIONS: Step inside | Listen first]");
+  const seeded = seedPendingRoll(getWorldConfig("manlandia").getInitialState(), "player1");
+  t.mock.module("../lib/redis.js", {
+    exports: { getState: async () => seeded, setState: async () => {}, redisCommand: mockRedisCommand() },
+  });
+  t.mock.module("../lib/gemini.js", {
+    exports: { generateContent: async () => "The door creaks open. [SUGGESTIONS: Step inside | Listen first]" },
+  });
   const handler = freshHandler("../api/gm.js");
   const req = { method: "POST", headers: {}, query: { world: "manlandia" }, body: { player: "player1", message: "rolled a 9", type: "roll_result" } };
   const res = mockRes();
@@ -298,22 +305,59 @@ test("an overlapping turn for a DIFFERENT world is not blocked by another world'
   assert.equal(res1.statusCode, 200);
 });
 
-test("a roll_result is exempt from the in-flight lock even while its own action call is still open", async (t) => {
-  t.mock.module("../lib/redis.js", { exports: { getState: async () => null, setState: async () => {}, redisCommand: mockRedisCommand() } });
+// Regression coverage for the "double roll" bug: if the same player has the
+// game open on two devices, both can independently resume the very same
+// pending roll and submit roll_result concurrently. roll_result used to be
+// exempt from the in-flight lock (on the assumption it could never be a
+// competing submission) — that exemption is what let both concurrent calls
+// through and produced two GM narrations for one roll. Now every submission
+// type takes the lock, so the second one is rejected instead.
+test("two concurrent roll_result submissions for the same pending roll are serialized, not both allowed through", async (t) => {
+  const seeded = seedPendingRoll(getWorldConfig("manlandia").getInitialState(), "player1");
+  t.mock.module("../lib/redis.js", {
+    exports: { getState: async () => seeded, setState: async () => {}, redisCommand: mockRedisCommand() },
+  });
   const { release } = mockOverlappingGemini(t);
   const handler = freshHandler("../api/gm.js");
+  const makeReq = () => ({ method: "POST", headers: {}, query: { world: "manlandia" }, body: { player: "player1", message: "rolled a 9", type: "roll_result" } });
 
   const res1 = mockRes();
-  const firstCall = handler({ method: "POST", headers: {}, query: { world: "manlandia" }, body: { player: "player1", message: "I open the door", type: "action" } }, res1);
+  const firstCall = handler(makeReq(), res1);
   await letFirstCallReachGemini();
 
   const res2 = mockRes();
-  await handler({ method: "POST", headers: {}, query: { world: "manlandia" }, body: { player: "player1", message: "rolled a 9", type: "roll_result" } }, res2);
-  assert.equal(res2.statusCode, 200);
+  await handler(makeReq(), res2);
+  assert.equal(res2.statusCode, 429);
 
   release();
   await firstCall;
   assert.equal(res1.statusCode, 200);
+});
+
+// Complementary case: not concurrent, but delayed — the first roll_result
+// already fully resolved (state saved, rolling flags cleared) by the time a
+// second device's stale resume attempt arrives. The lock alone wouldn't
+// catch this (it was already released), so this needs its own check.
+test("a roll_result submitted after its pending roll was already resolved is rejected, not treated as a new turn", async (t) => {
+  const seeded = seedPendingRoll(getWorldConfig("manlandia").getInitialState(), "player1");
+  const redis = statefulRedisMock(seeded);
+  t.mock.module("../lib/redis.js", redis);
+  let generateContentCalls = 0;
+  t.mock.module("../lib/gemini.js", {
+    exports: { generateContent: async () => { generateContentCalls++; return "The door creaks open."; } },
+  });
+  const handler = freshHandler("../api/gm.js");
+  const makeReq = () => ({ method: "POST", headers: {}, query: { world: "manlandia" }, body: { player: "player1", message: "rolled a 9", type: "roll_result" } });
+
+  const res1 = mockRes();
+  await handler(makeReq(), res1);
+  assert.equal(res1.statusCode, 200);
+  assert.equal(generateContentCalls, 1);
+
+  const res2 = mockRes();
+  await handler(makeReq(), res2);
+  assert.equal(res2.statusCode, 409);
+  assert.equal(generateContentCalls, 1); // the stale duplicate never reaches the model
 });
 
 test("a solo player submitting again right after their own turn resolves is never blocked", async (t) => {
@@ -393,7 +437,10 @@ test("a normal (non-private) Resonance turn never gets a private_to field", asyn
   t.mock.module("../lib/gemini.js", { exports: { generateContent: async () => "Fen pours a drink." } });
 
   const handler = freshHandler("../api/gm.js");
-  const req = { method: "POST", headers: { "x-adult-pin": ADULT_PIN }, query: { world: "resonance" }, body: { player: "fen", message: "I work the bar", type: "action" } };
+  // soloOverride: Resonance's fen+lyra are both always "real" characters, so
+  // a single-player submission would otherwise be held pending for the
+  // wait-for-both turn gating — not what this test is about.
+  const req = { method: "POST", headers: { "x-adult-pin": ADULT_PIN }, query: { world: "resonance" }, body: { player: "fen", message: "I work the bar", type: "action", soloOverride: true } };
   await handler(req, mockRes());
 
   const log = redis.state.sessionLog;

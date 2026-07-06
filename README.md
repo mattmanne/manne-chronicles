@@ -163,7 +163,7 @@ When the GM calls for a roll, the dice appear and roll automatically.
 
 Just use your ability naturally in the story — describe it in your action and the GM will mark it as used automatically. The ability button on the **⚔ Characters** tab will cross out and grey out by itself.
 
-- Lyra's **◈ Magic** counter: tap to spend one Resonance charge manually if needed
+- Lyra's **◈ Magic** counter: tap to spend one Resonance charge manually if needed — you'll be asked to confirm first, so an accidental tap can't burn a charge
 - Abilities reset automatically when you start a new session
 
 ### Recovering from harm
@@ -176,11 +176,15 @@ When a character is injured, their harm badge in the **⚔ Characters** tab glow
 
 When you're on another tab (Map, Archive, Characters) and your partner takes an action, a small red dot appears on the **◈ Story** tab button. Tap Story to read the new narration and clear the indicator.
 
-There's also a **"waiting on ___"** banner on the Story tab whenever it's been a while and it looks like the story is paused on someone — purely informational, since nothing in this app actually enforces turn order. Anyone can act anytime.
+There's also a **"waiting on ___"** banner on the Story tab. Most of the time it's just informational — a nudge that it's been a while and the story looks paused on someone. But when someone has already typed their action and is waiting on you specifically, it says so ("⏳ Fen acted — the story continues once you act too!") — see below.
 
 ### Playing together or apart
 
-Both of you open the same URL on your own phones. You take turns — each player's actions and the GM's responses are visible to both. The app syncs every 8 seconds, so there's a brief delay when playing from separate locations.
+Both of you open the same URL on your own phones. Either of you can type an action anytime, in any order — there's no strict turn order. But the story itself waits for **both of you** to act before the GM responds: once you send your action, it's held until your partner also sends theirs, then the GM answers both of you together in one scene. This means you won't come back to find the story already moved on without you.
+
+If your partner isn't around for the night, tap **🧍 Solo tonight** above the message box — your actions will go through immediately without waiting, for the rest of the session (or until you tap it off again).
+
+The app syncs every 8 seconds, so there's a brief delay when playing from separate locations.
 
 ### Getting notified when it's your turn
 
@@ -234,7 +238,7 @@ Four characters play together — one per player device.
 
 Each archetype gives your hero different strengths that affect dice rolls. Once created, heroes can be edited at any time from the Characters tab.
 
-**Select your hero** using the player name buttons at the bottom of the Story tab. Everyone plays the same session at their own pace — the story syncs every 8 seconds across all devices.
+**Select your hero** using the player name buttons at the bottom of the Story tab. Anyone can type an action anytime, in any order — but once more than one hero has been created, the story waits until every created hero has acted before the GM responds, then answers everyone together in one scene (same as Resonance — see "Playing together or apart" above, including the **🧍 Solo tonight** toggle for when not everyone's playing that night). The story syncs every 8 seconds across all devices.
 
 **Your quest:** Collect the five magical stones to break the Greying Curse — a creeping enchantment cast by The Hollow Court that slowly drains the colour, magic, and life from Manlandia.
 

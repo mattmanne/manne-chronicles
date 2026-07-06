@@ -619,7 +619,7 @@ html, body {
 .scene-pin-set-actions { display: flex; align-items: center; gap: 10px; }
 #scene-pin-set-status { font-size: 0.72rem; color: var(--gold-dim); }
 
-#private-scene-row {
+#private-scene-row, #solo-mode-row {
   display: flex; align-items: center; gap: 8px;
   padding: 0 2px 6px;
 }

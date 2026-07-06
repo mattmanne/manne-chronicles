@@ -13,7 +13,7 @@ const {
 
 test("extractRoll recognizes the documented bracket-free format", () => {
   const r = extractRoll("You reach for the door.\nROLL:AGILITY");
-  assert.deepEqual(r, { clean: "You reach for the door.", needsRoll: true, rollStat: "agility", rollAdvantage: false });
+  assert.deepEqual(r, { clean: "You reach for the door.", needsRoll: true, rollStat: "agility", rollAdvantage: false, rollPlayer: null });
 });
 
 test("extractRoll recognizes ROLL:[STAT] — what the model actually writes in practice", () => {
@@ -93,6 +93,41 @@ test("extractRoll leaves narration with no ROLL: line completely untouched", () 
   const r = extractRoll("Nothing risky happens here.");
   assert.equal(r.needsRoll, false);
   assert.equal(r.clean, "Nothing risky happens here.");
+});
+
+/* ── extractRoll roller attribution — needed once a merged multi-character
+   turn means there's no longer a single implicit submitter ── */
+
+test("extractRoll resolves an explicit roller name (name then stat)", () => {
+  const r = extractRoll("Fen slips past the guard.\nROLL:FEN:AGILITY", { fen: {}, lyra: {} });
+  assert.equal(r.needsRoll, true);
+  assert.equal(r.rollStat, "agility");
+  assert.equal(r.rollPlayer, "fen");
+});
+
+test("extractRoll resolves an explicit roller name regardless of token order (stat then name)", () => {
+  const r = extractRoll("Lyra reads the room.\nROLL:ACUITY:LYRA", { fen: {}, lyra: {} });
+  assert.equal(r.rollStat, "acuity");
+  assert.equal(r.rollPlayer, "lyra");
+});
+
+test("extractRoll resolves a roller by their custom hero name, not just a fixed key", () => {
+  const r = extractRoll("Globak leaps the chasm.\nROLL:GLOBAK:FORCE", { player1: { name: "Globak" }, player2: { name: "Mira" } });
+  assert.equal(r.rollStat, "force");
+  assert.equal(r.rollPlayer, "player1");
+});
+
+test("extractRoll returns a null rollPlayer when no name is present, unchanged single-actor behavior", () => {
+  const r = extractRoll("You reach for the door.\nROLL:AGILITY", { fen: {}, lyra: {} });
+  assert.equal(r.needsRoll, true);
+  assert.equal(r.rollPlayer, null);
+});
+
+test("extractRoll still resolves correctly with no characters map passed at all", () => {
+  const r = extractRoll("You reach for the door.\nROLL:AGILITY");
+  assert.equal(r.needsRoll, true);
+  assert.equal(r.rollStat, "agility");
+  assert.equal(r.rollPlayer, null);
 });
 
 /* ── normalizeHarm ── */

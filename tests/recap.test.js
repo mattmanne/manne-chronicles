@@ -61,3 +61,16 @@ test("recap prompt asks for simple language for kid worlds", () => {
   assert.match(kidPrompt, /child aged 8/);
   assert.doesNotMatch(adultPrompt, /child aged 8/);
 });
+
+test("recap prompt names the viewing character's POV when given a viewer name", () => {
+  const fenPrompt = buildRecapSystemPrompt(false, "Fen");
+  const lyraPrompt = buildRecapSystemPrompt(false, "Lyra");
+  assert.match(fenPrompt, /Fen's point of view/);
+  assert.match(lyraPrompt, /Lyra's point of view/);
+  assert.notEqual(fenPrompt, lyraPrompt);
+});
+
+test("recap prompt falls back to generic second person with no viewer name", () => {
+  const prompt = buildRecapSystemPrompt(false, null);
+  assert.match(prompt, /second person/);
+});
