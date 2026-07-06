@@ -20,10 +20,12 @@ even if later superseded — note the supersession instead.
 **Core loop**
 - World routing (Resonance, Manlandia, unlimited custom campaigns) via `lib/worldconfig.js`
 - GM narration loop with bracket-tag state notation (full table in `CLAUDE.md`)
-- Dice roll flow, including tolerant `ROLL:` parsing across multiple model phrasing drifts
+- Dice roll flow, including tolerant `ROLL:` parsing across multiple model phrasing drifts, plus a 2026-07-06 natural-language fallback (`extractRoll()`) for when the model asks for a roll in plain prose with no `ROLL:` anchor at all
 - Wait-for-all-players merged turns (multi-hero worlds only; solo worlds unaffected)
 - Session log with 40-entry LLM context window, 80-entry storage trim
 - New session / session archive flow
+- `type: "begin"` idempotency (2026-07-06) — a duplicate opening-narration call once the log already has content is a no-op (`{ alreadyBegun: true }`), not a second contradictory scene
+- Combat status echoed back to the model every turn (`buildCombatStatusBlock()`, 2026-07-06) — same idea as character harm already being shown, now extended to enemy harm/defeat
 
 **Characters & growth**
 - Character creation wizard (archetype, ability, name, photo, backstory)
@@ -63,17 +65,22 @@ even if later superseded — note the supersession instead.
 
 Tracked in **`project_resonance_backlog_decisions.md`** (repo root), not
 duplicated here — that file is the single source of truth for pending
-decisions and known deferred gaps.
+decisions and known deferred gaps. As of 2026-07-06 it has no open pending
+decisions — everything raised so far has been resolved or explicitly
+deferred with a reason.
 
-**Newest addition (2026-07-05)**: `playtest_findings_2026-07-05.md` documents
-a 6-persona live playtest against production. Headline, high-confidence,
-independently-reproduced-twice finding: the GM frequently asks for a dice
-roll in plain prose with no `ROLL:` token at all, so the roll never actually
-triggers. Also: combat tracking not engaging during clear fights, item/
-location tags not firing reliably, and a new (not-yet-live) malformed
-`[CHARACTER N (Name): ...]`/`[ABILITY N (Name): ...]` tag shape that would
-silently fail to parse if it ever reaches production. Not yet triaged into
-fix/defer — that's the next thing to review.
+**2026-07-05 playtest, closed out 2026-07-06**: `playtest_findings_2026-07-05.md`
+documents a 6-persona live playtest against production. All 6 confirmed
+findings are now fixed and deployed: the roll-request-with-no-anchor bug
+(headline finding, fixed via a parser fallback — a true compliance-
+independent safety net), malformed `(Name)`-padded `CHARACTER`/`ABILITY`
+tags (parser tolerance fix), combat tracking and item/location tags not
+firing reliably (both prompt-adherence mitigations only — no reliable
+grammatical signal exists for "a fight/move/pickup happened" the way there
+is for a roll request, so these can't be proven fixed from a single live
+call the way the roll fix could), `[SUGGESTIONS: ...]` parentheses drift
+(parser tolerance fix), and `type: "begin"` non-idempotency (fixed and
+directly, definitively verified live).
 
 ## Key files
 
