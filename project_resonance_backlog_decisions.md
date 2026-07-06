@@ -15,27 +15,21 @@ what was already decided instead of re-litigating it.
 
 ## Pending decisions (need a call)
 
-### Review the remaining 2026-07-05 playtest findings
-**All six confirmed findings are now addressed** (see Resolved below):
+_(none open right now — see Resolved below)_
+
+### 2026-07-05 playtest: closed out
+All six confirmed findings from the 2026-07-05 live playtest are now fixed,
+deployed, and verified live (see the individual Resolved entries below):
 malformed `(Name)`-padded `CHARACTER`/`ABILITY` tags, the roll-request-with-
 no-`ROLL:`-anchor bug (the headline finding), combat tracking, item/location
 tags, `[SUGGESTIONS: ...]` parentheses drift, and `begin` idempotency.
-Everything is implemented and locally tested (457/457); the last three
-(items/location prompt reinforcement, SUGGESTIONS parentheses tolerance,
-begin idempotency) are **not yet deployed** as of this writing.
 
-Two of these can't be definitively confirmed working from a single
-non-deterministic live call the way the roll-tag fix could (prompt
-reinforcement makes compliance more likely, it isn't a compliance-
-independent safety net) — worth an `npm run check-drift` re-check on both
-once more real combat/location/item transcripts exist:
-- Combat tracker (deployed 2026-07-06)
-- Items/location tags (pending deployment)
-
-- **What's needed from you**: read through `playtest_findings_2026-07-05.md`
-  once more if you want the full picture, but there's no remaining "pick
-  what's next" decision on this list — it's all done or in flight. Approve
-  deployment of the last three fixes when ready.
+Two of these (combat tracking, item/location tags) are prompt-adherence
+mitigations, not compliance-independent parser fixes the way the roll-tag
+fix is — they make the model more likely to comply, but can't be
+definitively confirmed working from a single non-deterministic live call.
+Worth an `npm run check-drift` re-check on both once more real combat/
+location/item transcripts exist from actual family play.
 
 ## Known simplifications, deliberately deferred
 
@@ -139,7 +133,7 @@ pattern.
   instead of `"[SUGGESTIONS: a | b | c]"`, silently dropped by the original
   bracket-only regex. Same "parser tolerance" pattern as the CHARACTER/
   ABILITY `(Name)` padding fix — cheap, low-risk, no prompt change needed.
-  2 new tests, 457/457 pass. Not yet deployed.
+  2 new tests, 457/457 pass. Deployed and verified live 2026-07-06 (byte-check on the deployed `pure.js`, a live GM round-trip, and a clean `check-drift` pass).
 - **2026-07-06 — `type: "begin"` not idempotent (playtest finding #6)**:
   fixed. `api/gm.js` now checks `sessionLog.length > 0` before calling Groq
   for a `begin` submission and returns `{ alreadyBegun: true, gameState }`
@@ -147,7 +141,11 @@ pattern.
   a duplicate begin from a device race isn't a client bug worth surfacing.
   `public/game.js`'s `sendToGM()` handles it the same way it already
   handles `data.waiting` (resync state, append nothing). 1 new test,
-  457/457 pass. Not yet deployed.
+  457/457 pass. Deployed and verified live 2026-07-06 — confirmed directly
+  by calling `type: "begin"` against the real Dark Wars test campaign
+  (which already has content) and getting back `{"alreadyBegun":true}` with
+  no Groq call and no new sessionLog entry. Unlike the combat/item-location
+  mitigations, this one *is* definitively verifiable, and was.
 - **2026-07-06 — Item/location tags not firing reliably (playtest finding
   #4)**: mitigated via prompt reinforcement, same treatment/reasoning as the
   combat fix above (no parser-side fallback attempted — no narrow, reliable
@@ -155,4 +153,7 @@ pattern.
   up" the way there is for a roll request). All three prompt files' LOCATION
   CHANGE and ITEM(S) instructions gained a concrete ✗ WRONG / ✓ RIGHT example
   pair targeting the exact failures observed live (a real move or a clear
-  pickup narrated with zero tags). Not yet deployed.
+  pickup narrated with zero tags). Deployed 2026-07-06; a live verification
+  round-trip completed cleanly with no crash, though (same limitation as
+  combat) the fix's actual effectiveness can't be proven from one
+  non-deterministic call.
