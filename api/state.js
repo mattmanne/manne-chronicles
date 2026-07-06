@@ -53,6 +53,26 @@ module.exports = async function handler(req, res) {
       return res.status(400).json({ error: "Invalid character or ability" });
     }
 
+    // A bonus (unlocked) ability's used state can't reuse toggle_ability
+    // above — that flips a plain boolean field, but a bonus ability's "used
+    // this session" state is membership in the bonus_abilities_used array,
+    // since a hero can have more than one bonus ability at once (unlike the
+    // single starting ability_id/ability_used pair).
+    if (action === "toggle_bonus_ability") {
+      const current = (await getState(key)) || getInitialState();
+      const { character, ability_id } = payload || {};
+      const c = current.characters[character];
+      if (!c || !(c.bonus_abilities || []).includes(ability_id)) {
+        return res.status(400).json({ error: "Invalid character or ability" });
+      }
+      if (!c.bonus_abilities_used) c.bonus_abilities_used = [];
+      const idx = c.bonus_abilities_used.indexOf(ability_id);
+      if (idx === -1) c.bonus_abilities_used.push(ability_id);
+      else c.bonus_abilities_used.splice(idx, 1);
+      await setState(key, current);
+      return res.json({ ok: true, characters: current.characters });
+    }
+
     if (action === "use_magic") {
       const current = (await getState(key)) || getInitialState();
       if (current.characters.lyra && current.characters.lyra.magic_uses_remaining > 0) {
@@ -221,7 +241,10 @@ module.exports = async function handler(req, res) {
 
       if (worldConfig.id === "manlandia" || worldConfig.type === "custom") {
         ["player1","player2","player3","player4"].forEach(p => {
-          if (current.characters[p]) current.characters[p].ability_used = false;
+          if (current.characters[p]) {
+            current.characters[p].ability_used = false;
+            current.characters[p].bonus_abilities_used = [];
+          }
         });
       }
 

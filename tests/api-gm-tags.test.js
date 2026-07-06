@@ -103,6 +103,20 @@ test("ABILITY N: used tag marks the hero's power as spent (Manlandia)", async (t
   assert.equal(res.body.gameState.characters.player3.ability_used, true);
 });
 
+test("ABILITY N: used tag naming a hero's bonus ability marks that specific power spent, not the starting one (Manlandia)", async (t) => {
+  const { getInitialStateManlandia } = require("../lib/gamestate-manlandia.js");
+  const seeded = getInitialStateManlandia();
+  seeded.characters.player3.ability_id = "protect_friend";
+  seeded.characters.player3.bonus_abilities = ["lucky_break"];
+  const redis = statefulRedisMock(seeded);
+  t.mock.module("../lib/redis.js", redis);
+  mockGemini(t, ["Isibel's luck turns! [ABILITY 3: Lucky Break used]"]);
+
+  const res = await callGm({ player: "player3", message: "hope for the best", type: "action" });
+  assert.equal(res.body.gameState.characters.player3.ability_used, false);
+  assert.deepEqual(res.body.gameState.characters.player3.bonus_abilities_used, ["lucky_break"]);
+});
+
 test("VILLAIN AWARENESS and CURSE tags update world state (Manlandia)", async (t) => {
   const redis = statefulRedisMock(null);
   t.mock.module("../lib/redis.js", redis);

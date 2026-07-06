@@ -237,12 +237,12 @@ test("extractResonanceHarmUpdates tolerates trailing commentary after the new ha
 
 test("extractAbilityUsedKeys matches the documented plain format", () => {
   const characters = { player1: {} };
-  assert.deepEqual(extractAbilityUsedKeys("[ABILITY 1: used]", characters), ["player1"]);
+  assert.deepEqual(extractAbilityUsedKeys("[ABILITY 1: used]", characters), [{ key: "player1", bonusAbilityId: null }]);
 });
 
 test("extractAbilityUsedKeys tolerates the model padding in the ability's name", () => {
   const characters = { player1: {} };
-  assert.deepEqual(extractAbilityUsedKeys("[ABILITY 1: Lucky Break used]", characters), ["player1"]);
+  assert.deepEqual(extractAbilityUsedKeys("[ABILITY 1: Lucky Break used]", characters), [{ key: "player1", bonusAbilityId: null }]);
 });
 
 test("extractAbilityUsedKeys does NOT fire on an explicit negation — live example: '[ABILITY 1: Lucky Break - not used]'", () => {
@@ -253,6 +253,30 @@ test("extractAbilityUsedKeys does NOT fire on an explicit negation — live exam
 test("extractAbilityUsedKeys ignores a character slot that doesn't exist", () => {
   const characters = { player1: {} };
   assert.deepEqual(extractAbilityUsedKeys("[ABILITY 3: used]", characters), []);
+});
+
+test("extractAbilityUsedKeys attributes a named bonus ability to bonus_abilities_used instead of the starting ability", () => {
+  const characters = { player1: { ability_id: "protect_friend", bonus_abilities: ["lucky_break"] } };
+  assert.deepEqual(
+    extractAbilityUsedKeys("[ABILITY 1: Lucky Break used]", characters),
+    [{ key: "player1", bonusAbilityId: "lucky_break" }]
+  );
+});
+
+test("extractAbilityUsedKeys falls back to the starting ability when the named power isn't one of the hero's bonus abilities", () => {
+  const characters = { player1: { ability_id: "protect_friend", bonus_abilities: ["lucky_break"] } };
+  assert.deepEqual(
+    extractAbilityUsedKeys("[ABILITY 1: Protect a Friend used]", characters),
+    [{ key: "player1", bonusAbilityId: null }]
+  );
+});
+
+test("extractAbilityUsedKeys dedupes repeated mentions of the same hero+ability", () => {
+  const characters = { player1: { ability_id: "protect_friend", bonus_abilities: ["lucky_break"] } };
+  assert.deepEqual(
+    extractAbilityUsedKeys("[ABILITY 1: Lucky Break used] later, [ABILITY 1: Lucky Break used] again", characters),
+    [{ key: "player1", bonusAbilityId: "lucky_break" }]
+  );
 });
 
 /* ── buildNameToKeyMap ── */

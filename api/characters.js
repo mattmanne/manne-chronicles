@@ -79,10 +79,11 @@ module.exports = async function handler(req, res) {
     // Growth fields (see lib/growth.js) — untouched by name/archetype edits,
     // just defaulted here so a brand-new character starts from zero instead
     // of undefined.
-    xp:               existing.xp ?? 0,
-    milestones:       existing.milestones ?? [],
-    bonus_abilities:  existing.bonus_abilities ?? [],
-    pending_choice:   existing.pending_choice ?? null,
+    xp:                   existing.xp ?? 0,
+    milestones:           existing.milestones ?? [],
+    bonus_abilities:      existing.bonus_abilities ?? [],
+    bonus_abilities_used: existing.bonus_abilities_used ?? [],
+    pending_choice:       existing.pending_choice ?? null,
   };
 
   await setState(key, gameState);

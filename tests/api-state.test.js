@@ -269,16 +269,45 @@ test("choose_ability rejects an invalid character", async (t) => {
   assert.equal(res.statusCode, 400);
 });
 
-test("new_session resets ability_used for each hero in Manlandia", async (t) => {
+test("toggle_bonus_ability marks an unlocked bonus ability used, then flips it back to available", async (t) => {
+  const seeded = {
+    session: 1, sessionLog: [], worldState: {},
+    characters: { player1: { bonus_abilities: ["lucky_break"], bonus_abilities_used: [] } },
+  };
+  const redis = statefulRedisMock(seeded);
+  t.mock.module("../lib/redis.js", redis);
+
+  const used = await callState({ method: "POST", headers: { "x-adult-pin": ADULT_PIN }, query: { world: "manlandia" }, body: { action: "toggle_bonus_ability", payload: { character: "player1", ability_id: "lucky_break" } } });
+  assert.equal(used.body.ok, true);
+  assert.deepEqual(redis.state.characters.player1.bonus_abilities_used, ["lucky_break"]);
+
+  const available = await callState({ method: "POST", headers: { "x-adult-pin": ADULT_PIN }, query: { world: "manlandia" }, body: { action: "toggle_bonus_ability", payload: { character: "player1", ability_id: "lucky_break" } } });
+  assert.equal(available.body.ok, true);
+  assert.deepEqual(redis.state.characters.player1.bonus_abilities_used, []);
+});
+
+test("toggle_bonus_ability rejects an ability the hero hasn't actually unlocked", async (t) => {
+  const seeded = {
+    session: 1, sessionLog: [], worldState: {},
+    characters: { player1: { bonus_abilities: ["lucky_break"] } },
+  };
+  const redis = statefulRedisMock(seeded);
+  t.mock.module("../lib/redis.js", redis);
+
+  const res = await callState({ method: "POST", headers: { "x-adult-pin": ADULT_PIN }, query: { world: "manlandia" }, body: { action: "toggle_bonus_ability", payload: { character: "player1", ability_id: "ancient_magic" } } });
+  assert.equal(res.statusCode, 400);
+});
+
+test("new_session resets ability_used and bonus_abilities_used for each hero in Manlandia", async (t) => {
   const seeded = {
     session: 1,
     sessionLog: [],
     worldState: {},
     characters: {
-      player1: { ability_used: true },
-      player2: { ability_used: true },
-      player3: { ability_used: false },
-      player4: { ability_used: true },
+      player1: { ability_used: true, bonus_abilities_used: ["lucky_break"] },
+      player2: { ability_used: true, bonus_abilities_used: [] },
+      player3: { ability_used: false, bonus_abilities_used: [] },
+      player4: { ability_used: true, bonus_abilities_used: ["ancient_magic"] },
     },
   };
   const redis = statefulRedisMock(seeded);
@@ -287,6 +316,7 @@ test("new_session resets ability_used for each hero in Manlandia", async (t) => 
   await callState({ method: "POST", headers: { "x-adult-pin": ADULT_PIN }, query: { world: "manlandia" }, body: { action: "new_session", payload: { summary: "The heroes rested." } } });
   for (const p of ["player1", "player2", "player3", "player4"]) {
     assert.equal(redis.state.characters[p].ability_used, false);
+    assert.deepEqual(redis.state.characters[p].bonus_abilities_used, []);
   }
 });
 

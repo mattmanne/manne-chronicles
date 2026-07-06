@@ -56,11 +56,12 @@ test("creates a new hero with stats matching the archetype, and sensible default
   assert.equal(hero.ability_used, false);
   assert.equal(hero.harm, "Unhurt");
   assert.equal(hero.backstory, "");
+  assert.deepEqual(hero.bonus_abilities_used, []);
   assert.ok(redis.state.characters.player1);
 });
 
-test("editing an existing hero preserves ability_used, harm, and backstory unless overwritten", async (t) => {
-  const seeded = { characters: { player1: { name: "Old Name", harm: "Hurt", ability_used: true, backstory: "An old tale." } } };
+test("editing an existing hero preserves ability_used, harm, backstory, and bonus_abilities_used unless overwritten", async (t) => {
+  const seeded = { characters: { player1: { name: "Old Name", harm: "Hurt", ability_used: true, backstory: "An old tale.", bonus_abilities_used: ["lucky_break"] } } };
   const { run, redis } = callCharacters(seeded, { player: "player1", name: "New Name", archetype: "mage", ability_id: "ancient_magic" });
   await run(t);
   const hero = redis.state.characters.player1;
@@ -69,6 +70,7 @@ test("editing an existing hero preserves ability_used, harm, and backstory unles
   assert.equal(hero.harm, "Hurt");
   assert.equal(hero.ability_used, true);
   assert.equal(hero.backstory, "An old tale.");
+  assert.deepEqual(hero.bonus_abilities_used, ["lucky_break"]);
 });
 
 test("truncates an overly long name to 20 characters but leaves backstory uncapped", async (t) => {

@@ -1701,8 +1701,11 @@ function setupWizard() {
     if (abilBtn && !abilBtn.classList.contains("used")) {
       const p = abilBtn.dataset.player;
       const label = abilBtn.textContent.trim();
+      const bonusAbilityId = abilBtn.dataset.abilityId;
       if (!confirm(`Use "${label}"? This can only be used once per session.`)) return;
-      const res = await authPost("/api/state", { action: "toggle_ability", payload: { character: p, ability: "ability_used" } });
+      const res = bonusAbilityId
+        ? await authPost("/api/state", { action: "toggle_bonus_ability", payload: { character: p, ability_id: bonusAbilityId } })
+        : await authPost("/api/state", { action: "toggle_ability", payload: { character: p, ability: "ability_used" } });
       const data = await res.json();
       if (data.ok) { cachedGameState = { ...cachedGameState, characters: data.characters }; updateCharacterUI({ characters: data.characters }); }
       return;
@@ -2019,16 +2022,24 @@ function renderManlandiaCard(n, char) {
     }
   }
 
-  // Ability button
+  // Ability button(s) — the starting ability, plus one more per unlocked
+  // bonus ability. Each bonus ability tracks its own used/available state in
+  // bonus_abilities_used, separate from the starting ability's ability_used
+  // (a hero can have more than one power once growth unlocks a few).
   const abilRow = document.getElementById(`p${n}-ability-row`);
   if (abilRow) {
+    const buttons = [];
     if (char?.ability_id) {
       const label = ABILITY_DISPLAY[char.ability_id] || char.ability_id;
       const used  = char.ability_used;
-      abilRow.innerHTML = `<button class="manlandia-ability-btn ${used ? "used" : "available"}" data-player="${p}" title="${used ? "Already used this session" : "Tap to mark used"}">✦ ${label}</button>`;
-    } else {
-      abilRow.innerHTML = "";
+      buttons.push(`<button class="manlandia-ability-btn ${used ? "used" : "available"}" data-player="${p}" title="${used ? "Already used this session" : "Tap to mark used"}">✦ ${label}</button>`);
     }
+    for (const abilityId of char?.bonus_abilities || []) {
+      const label = ABILITY_DISPLAY[abilityId] || abilityId;
+      const used  = char.bonus_abilities_used?.includes(abilityId);
+      buttons.push(`<button class="manlandia-ability-btn ${used ? "used" : "available"}" data-player="${p}" data-ability-id="${abilityId}" title="${used ? "Already used this session" : "Tap to mark used"}">✦ ${label}</button>`);
+    }
+    abilRow.innerHTML = buttons.join("");
   }
 
   // Growth: an actionable choice of new power to unlock stays always-visible
