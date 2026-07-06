@@ -15,28 +15,23 @@ what was already decided instead of re-litigating it.
 
 ## Pending decisions (need a call)
 
-### Review the 2026-07-05 playtest findings
-Ran a 6-persona live playtest (3 "experienced player" flavors in one round,
-then an experienced/newcomer/genre-transfer trio in a second round) against
-two throwaway custom campaigns on the real production API — dice rolls,
-combat, inventory, growth unlocks, the whole loop. Cross-checked against real
-production transcripts (`npm run check-drift` + a manual roll-mention scan)
-to see which findings are reproduced-but-not-yet-live vs. already happening
-in real play.
+### Review the remaining 2026-07-05 playtest findings
+Two of the six confirmed findings are now fixed (see Resolved below):
+malformed `(Name)`-padded `CHARACTER`/`ABILITY` tags, and the roll-request-
+with-no-`ROLL:`-anchor bug (the headline, most-corroborated finding).
 
-- **Findings are ready**: `playtest_findings_2026-07-05.md` (repo root) —
-  6 confirmed cross-cutting bugs (ranked by corroboration/severity), a
-  production-data cross-check, architecture notes, positive findings worth
-  protecting, and a suggested (not decided) triage order.
-- **Headline finding**: the GM asks for a dice roll in plain prose with no
-  `ROLL:` token at all (e.g. "Roll a FORCE to see how well Kestra can hold
-  her ground") — a new, more extreme variant of a phrasing-drift problem
-  `CLAUDE.md` already documents three prior fixes for. Independently
-  reproduced by all 6 personas across both separate test campaigns.
-- **What's needed from you**: read `playtest_findings_2026-07-05.md` and
-  decide which findings are worth fixing vs. accepting — same "real bug vs.
-  accepted quirk" judgment call as everything else in this doc. Nothing has
-  been fixed yet; only investigated and documented.
+Still open, in suggested priority order — full detail in
+`playtest_findings_2026-07-05.md`:
+1. **Combat tracker not engaging during clear physical fights.** Likely
+   needs the same kind of prompt-adherence attention as the roll-trigger fix
+   did, though a parser-side fallback (inferring combat start from narration)
+   is riskier here than it was for rolls — worth discussing approach before
+   diving in.
+2. Items/location tags and `[SUGGESTIONS: ...]` not firing reliably —
+   lower urgency, cosmetic/completeness gaps.
+3. `type: "begin"` not being idempotent — quick, low-risk guard.
+- **What's needed from you**: same "real bug vs. accepted quirk" judgment
+  call as everything else in this doc — pick what's next, or say "all of it."
 
 ## Known simplifications, deliberately deferred
 
@@ -89,3 +84,28 @@ pattern.
   entry `CLAUDE.md` referenced (as of 2026-07) is no longer present, most
   likely aged out naturally as new turns were played since. No repair
   needed; no code or data change made.
+- **2026-07-06 — Malformed `(Name)`-padded CHARACTER/ABILITY tags (playtest
+  finding #3)**: fixed. `lib/gm-tags.js`'s `extractCharacterHarmUpdates()`
+  and `extractAbilityUsedKeys()` now tolerate a `(Name)` parenthetical
+  between the number and colon, plus a literal `Harm:` label before the harm
+  word — matching `public/pure.js`'s `stripGMTags()` so it doesn't leak into
+  display either. 9 new tests, 448/448 pass. Not yet deployed.
+- **2026-07-06 — Roll request with no `ROLL:` anchor at all (playtest
+  finding #1, headline finding)**: fixed. `extractRoll()` now falls back to
+  a natural-language scan for "Roll(ing) [.../Name's] STAT" phrasing when no
+  literal `ROLL:` tag is found, resolving stat + roller the same way the
+  explicit tag does. Verified against every real "roll"-mentioning
+  production GM entry with zero false positives. 8 new tests, 448/448 pass.
+  Not yet deployed.
+- **2026-07-06 — Roll-trigger prompt-wording reinforcement (belt-and-
+  suspenders alongside the parser fallback above)**: all three prompt files
+  (`lib/prompt.js`, `lib/prompt-manlandia.js`, `lib/prompt-custom.js`) now
+  give a concrete ✗ WRONG / ✓ RIGHT example pair right after the existing
+  "MUST include the ROLL:STAT line" instruction, directly targeting the
+  exact failure phrasing observed live ("Roll a Force to see if you can
+  hold your ground" with no follow-up trigger line). The parser fallback
+  means this isn't load-bearing for correctness anymore, but a model that
+  reliably emits the real tag is strictly better (real dice math, proper
+  advantage/roller-name support) than one that only gets caught by the
+  fallback. 448/448 tests still pass (no test asserts exact prompt text).
+  Not yet deployed.

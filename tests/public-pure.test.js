@@ -73,6 +73,12 @@ test("stripGMTags removes an ability tag padded with extra descriptive text", ()
   assert.equal(stripGMTags("You did it! [ABILITY 1: Lucky Break used]"), "You did it!");
 });
 
+test("stripGMTags removes a CHARACTER/ABILITY tag with a '(Name)' parenthetical after the number (live: '[CHARACTER 1 (Kestra): Harm: Unhurt]', '[ABILITY 1 (Kestra): Protect Friend used]')", () => {
+  assert.equal(stripGMTags("Steady. [CHARACTER 1 (Kestra): Harm: Unhurt]"), "Steady.");
+  assert.equal(stripGMTags("She shields him. [ABILITY 1 (Kestra): Protect Friend used]"), "She shields him.");
+  assert.equal(stripGMTags("Hurt! [CHARACTER 1 (Kestra): Harm: Scratched → Hurt]"), "Hurt!");
+});
+
 test("stripGMTags tolerates trailing commentary after a harm transition (live: '[CHARACTER 1: Scratched → Scratched, no change]')", () => {
   assert.equal(stripGMTags("Still fine. [CHARACTER 1: Scratched → Scratched, no change]"), "Still fine.");
   assert.equal(stripGMTags("Ouch! [Globak: Scratched → Hurt, wincing]"), "Ouch!");

@@ -130,6 +130,58 @@ test("extractRoll still resolves correctly with no characters map passed at all"
   assert.equal(r.rollPlayer, null);
 });
 
+/* ── extractRoll natural-language fallback — no "ROLL:" anchor at all, live
+   examples captured from the 2026-07-05 playtest (all 6 personas hit this) ── */
+
+test("extractRoll falls back to a plain-prose roll request with no ROLL: tag anywhere — live: 'Roll a FORCE to see how well Kestra can hold her ground'", () => {
+  const r = extractRoll("The figure lunges. Roll a FORCE to see how well Kestra can hold her ground and keep the figure at bay.");
+  assert.equal(r.needsRoll, true);
+  assert.equal(r.rollStat, "force");
+});
+
+test("extractRoll's natural-language fallback recognizes 'your STAT' phrasing — live: 'Roll your PRESENCE to see if you can affect the orb'", () => {
+  const r = extractRoll("Roll your PRESENCE to see if you can affect the orb with your words or actions.");
+  assert.equal(r.needsRoll, true);
+  assert.equal(r.rollStat, "presence");
+});
+
+test("extractRoll's natural-language fallback resolves both stat and roller from possessive phrasing — live: 'Rolling Bram's Force for the attack'", () => {
+  const r = extractRoll("Rolling Bram's Force for the attack.", { player1: { name: "Bram" } });
+  assert.equal(r.needsRoll, true);
+  assert.equal(r.rollStat, "force");
+  assert.equal(r.rollPlayer, "player1");
+});
+
+test("extractRoll's natural-language fallback also works with 'Roll Name's STAT' (not just 'Rolling') — live: 'Roll Bram's Will, as he's the one handling the talking'", () => {
+  const r = extractRoll("Roll Bram's Will, as he's the one handling the talking.", { player1: { name: "Bram" } });
+  assert.equal(r.needsRoll, true);
+  assert.equal(r.rollStat, "will");
+  assert.equal(r.rollPlayer, "player1");
+});
+
+test("extractRoll's natural-language fallback never fires when a real ROLL: tag is present — the explicit tag always wins", () => {
+  const r = extractRoll("Roll a FORCE to see what happens.\nROLL:AGILITY");
+  assert.equal(r.rollStat, "agility");
+});
+
+test("extractRoll's natural-language fallback does not false-positive on resolution narration describing an already-completed roll", () => {
+  const cases = [
+    "With a roll of 13 on Acuity, Fen's observation powers are in full swing.",
+    "With an Acuity roll of 9, you quickly process the information.",
+    "With a total of 8, your roll is a partial success.",
+    "You try to roll to see what the noise is.",
+  ];
+  for (const text of cases) {
+    const r = extractRoll(text);
+    assert.equal(r.needsRoll, false, `should not trigger on: ${text}`);
+  }
+});
+
+test("extractRoll's natural-language fallback doesn't strip the matched sentence from display — unlike a raw ROLL: tag, this is real narration a player should read", () => {
+  const r = extractRoll("The figure lunges. Roll a FORCE to see how well Kestra can hold her ground.");
+  assert.equal(r.clean, "The figure lunges. Roll a FORCE to see how well Kestra can hold her ground.");
+});
+
 /* ── normalizeHarm ── */
 
 test("normalizeHarm matches case-insensitively and returns the canonical spelling", () => {
@@ -218,6 +270,18 @@ test("extractCharacterHarmUpdates's trailing-commentary tolerance also applies t
   assert.deepEqual(updates, [{ key: "player1", harm: "Hurt" }]);
 });
 
+test("extractCharacterHarmUpdates tolerates a '(Name)' parenthetical after the number plus a 'Harm:' label — live: '[CHARACTER 1 (Kestra): Harm: Unhurt]'", () => {
+  const characters = { player1: { name: "Kestra" } };
+  const updates = extractCharacterHarmUpdates("[CHARACTER 1 (Kestra): Harm: Unhurt]", characters);
+  assert.deepEqual(updates, [{ key: "player1", harm: "Unhurt" }]);
+});
+
+test("extractCharacterHarmUpdates's '(Name)'/'Harm:' tolerance also applies to the arrow variant", () => {
+  const characters = { player1: { name: "Kestra" } };
+  const updates = extractCharacterHarmUpdates("[CHARACTER 1 (Kestra): Harm: Scratched → Hurt]", characters);
+  assert.deepEqual(updates, [{ key: "player1", harm: "Hurt" }]);
+});
+
 /* ── extractResonanceHarmUpdates ── */
 
 test("extractResonanceHarmUpdates matches LYRA/FEN with either arrow style", () => {
@@ -275,6 +339,22 @@ test("extractAbilityUsedKeys dedupes repeated mentions of the same hero+ability"
   const characters = { player1: { ability_id: "protect_friend", bonus_abilities: ["lucky_break"] } };
   assert.deepEqual(
     extractAbilityUsedKeys("[ABILITY 1: Lucky Break used] later, [ABILITY 1: Lucky Break used] again", characters),
+    [{ key: "player1", bonusAbilityId: "lucky_break" }]
+  );
+});
+
+test("extractAbilityUsedKeys tolerates a '(Name)' parenthetical after the number — live: '[ABILITY 1 (Kestra): Protect Friend used]'", () => {
+  const characters = { player1: { ability_id: "protect_friend", bonus_abilities: [] } };
+  assert.deepEqual(
+    extractAbilityUsedKeys("[ABILITY 1 (Kestra): Protect Friend used]", characters),
+    [{ key: "player1", bonusAbilityId: null }]
+  );
+});
+
+test("extractAbilityUsedKeys's '(Name)' tolerance still attributes a named bonus ability correctly", () => {
+  const characters = { player1: { ability_id: "protect_friend", bonus_abilities: ["lucky_break"] } };
+  assert.deepEqual(
+    extractAbilityUsedKeys("[ABILITY 1 (Kestra): Lucky Break used]", characters),
     [{ key: "player1", bonusAbilityId: "lucky_break" }]
   );
 });

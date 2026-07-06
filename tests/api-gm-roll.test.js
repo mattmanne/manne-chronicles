@@ -57,6 +57,16 @@ test("recognizes a bracketed ADVANTAGE roll", async (t) => {
   assert.equal(res.body.rollAdvantage, true);
 });
 
+test("fires end-to-end on a plain-prose roll request with no ROLL: tag at all (live, 2026-07-05 playtest: 'Roll a FORCE to see how well Kestra can hold her ground')", async (t) => {
+  t.mock.module("../lib/redis.js", statefulRedisMock(null));
+  mockGemini(t, "The figure lunges. Roll a FORCE to see how well Kestra can hold her ground and keep the figure at bay.");
+  const res = await callGm({ player: "player1", message: "brace myself", type: "action" });
+  assert.equal(res.body.needsRoll, true);
+  assert.equal(res.body.rollStat, "force");
+  // Unlike a raw ROLL: tag, this prose is real narration the player should still see.
+  assert.equal(res.body.response, "The figure lunges. Roll a FORCE to see how well Kestra can hold her ground and keep the figure at bay.");
+});
+
 test("a truly unrecognized stat name doesn't trigger a roll, but the stray tag is still stripped from the narration", async (t) => {
   t.mock.module("../lib/redis.js", statefulRedisMock(null));
   mockGemini(t, "The creature's eyes lock onto you.\nROLL:[LUCK]");

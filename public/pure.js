@@ -59,13 +59,18 @@ function stripGMTags(content) {
     .replace(/\[STONE FOUND: [^\]]+\]/g, "")
     // Trailing [^\]]* tolerates the model appending commentary after the new
     // harm word — live: "[CHARACTER 1: Scratched → Scratched, no change]".
-    .replace(new RegExp(`\\[CHARACTER \\d:\\s*[A-Za-z]+\\s*${ARROW}\\s*[A-Za-z]+[^\\]]*\\]`, "gi"), "")
+    // Also tolerates a "(Name)" parenthetical after the number and a literal
+    // "Harm:" label before the harm word — live: "[CHARACTER 1 (Kestra):
+    // Harm: Unhurt]" — matching the same padding lib/gm-tags.js now parses.
+    .replace(new RegExp(`\\[CHARACTER \\d(?:\\s*\\([^)]*\\))?:\\s*(?:Harm:\\s*)?[A-Za-z]+\\s*${ARROW}\\s*[A-Za-z]+[^\\]]*\\]`, "gi"), "")
     // Also strip the arrow-less variant — live example: "[CHARACTER 1: Hurt]".
-    .replace(/\[CHARACTER \d:\s*[A-Za-z]+\s*\]/gi, "")
+    .replace(/\[CHARACTER \d(?:\s*\([^)]*\))?:\s*(?:Harm:\s*)?[A-Za-z]+\s*\]/gi, "")
     .replace(/\[LOCATION: [^\]]+\]/g, "")
     .replace(/\[SCAR: [^\]]+\]/g, "")
     .replace(new RegExp(`\\[(LYRA|FEN):\\s*[A-Za-z]+\\s*${ARROW}\\s*[A-Za-z]+[^\\]]*\\]`, "gi"), "")
-    .replace(/\[ABILITY \d: [^\]]*used[^\]]*\]/gi, "")
+    // Tolerates the same "(Name)" parenthetical lib/gm-tags.js now parses —
+    // live: "[ABILITY 1 (Kestra): Protect Friend used]".
+    .replace(/\[ABILITY \d(?:\s*\([^)]*\))?: [^\]]*used[^\]]*\]/gi, "")
     .replace(/\[ABILITY (FEN|LYRA): [a-z_]+\]/gi, "")
     .replace(/\[SUGGESTIONS: [^\]]+\]/gi, "")
     .replace(/\[OBJECTIVE(?: COMPLETE)?: [^\]]+\]/gi, "")
