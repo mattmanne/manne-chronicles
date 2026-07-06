@@ -167,18 +167,6 @@ module.exports = async function handler(req, res) {
       return res.json({ ok: true, revealed });
     }
 
-    // TEMP CLEANUP: one-off action to restore Lyra's magic_uses_remaining to
-    // 3 after it was accidentally depleted by a stray click on the magic
-    // button (no confirmation existed before this fix). Used once, then
-    // reverted — same pattern as the earlier pinned_notes cleanup.
-    if (action === "debug_restore_lyra_magic") {
-      const current = (await getState(key)) || getInitialState();
-      const before = current.characters?.lyra?.magic_uses_remaining;
-      if (current.characters?.lyra) current.characters.lyra.magic_uses_remaining = 3;
-      await setState(key, current);
-      return res.json({ ok: true, before, after: current.characters?.lyra?.magic_uses_remaining });
-    }
-
     if (action === "set_author_note") {
       const current = (await getState(key)) || getInitialState();
       const note = typeof payload?.note === "string" ? payload.note.trim().slice(0, 1000) : "";
