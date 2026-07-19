@@ -60,11 +60,38 @@ test("create appends to the campaign index and writes a separate gamestate key",
   const res = await callCampaigns({ method: "POST", headers: {}, query: {}, body: { action: "create", payload: { name: "Star Reach", theme: "Space pirates hunting a lost relic", playerCount: 3 } } });
   const id = res.body.campaign.id;
 
-  assert.match(id, /^c_\d+$/);
+  assert.match(id, /^c_\d+_[0-9a-f]{8}$/);
   assert.equal(redis.get("campaigns:index").length, 1);
   assert.equal(redis.get("campaigns:index")[0].id, id);
   assert.ok(redis.get(`campaign:${id}:gamestate`), "gamestate for the new campaign should be persisted under its own key");
   assert.equal(redis.get(`campaign:${id}:gamestate`).worldConfig.playerCount, 3);
+});
+
+// The pre-2026-07-19 id scheme (a bare Date.now() timestamp, no randomness)
+// meant two campaigns created in the same millisecond would collide onto the
+// exact same Redis key and silently share state from then on — found while
+// investigating a real "worlds bleeding into each other" report (though that
+// specific incident turned out to be something else; see CLAUDE.md). The
+// random suffix guarantees uniqueness regardless of request timing.
+test("two campaigns created at the exact same millisecond still get distinct ids", async (t) => {
+  const redis = keyedRedisMock();
+  t.mock.module("../lib/redis.js", redis);
+
+  const originalNow = Date.now;
+  Date.now = () => 1700000000000;
+  try {
+    const first = await callCampaigns({ method: "POST", headers: {}, query: {}, body: { action: "create", payload: { name: "First", theme: "T" } } });
+    const second = await callCampaigns({ method: "POST", headers: {}, query: {}, body: { action: "create", payload: { name: "Second", theme: "T" } } });
+    assert.notEqual(first.body.campaign.id, second.body.campaign.id);
+    assert.equal(redis.get("campaigns:index").length, 2);
+    assert.ok(redis.get(`campaign:${first.body.campaign.id}:gamestate`));
+    assert.ok(redis.get(`campaign:${second.body.campaign.id}:gamestate`));
+    // Confirms the two really are independent keys, not one overwriting the other.
+    assert.equal(redis.get(`campaign:${first.body.campaign.id}:gamestate`).worldConfig.name, "First");
+    assert.equal(redis.get(`campaign:${second.body.campaign.id}:gamestate`).worldConfig.name, "Second");
+  } finally {
+    Date.now = originalNow;
+  }
 });
 
 test("create truncates overly long names and themes, and shortens the subtitle with an ellipsis", async (t) => {

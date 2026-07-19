@@ -1,3 +1,4 @@
+const { randomUUID } = require("crypto");
 const { getState, setState } = require("../lib/redis");
 const { getInitialStateCustom } = require("../lib/gamestate-custom");
 
@@ -26,7 +27,15 @@ module.exports = async function handler(req, res) {
       if (!name || !String(name).trim()) return res.status(400).json({ error: "Name required" });
       if (!theme || !String(theme).trim()) return res.status(400).json({ error: "Theme required" });
 
-      const id = `c_${Date.now()}`;
+      // A timestamp alone (the pre-2026-07-19 scheme) has no collision
+      // protection — two creates landing in the same millisecond (a
+      // double-tap, a network retry, two devices creating at once) would
+      // get the identical id and silently share one Redis key from then on.
+      // The random suffix guarantees uniqueness regardless of timing; the
+      // timestamp prefix is kept for rough chronological readability when
+      // eyeballing raw Redis keys, though createdAt below is the real source
+      // of truth for ordering.
+      const id = `c_${Date.now()}_${randomUUID().slice(0, 8)}`;
       const wc = {
         id,
         name:        String(name).trim().slice(0, 40),

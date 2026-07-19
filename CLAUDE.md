@@ -27,6 +27,8 @@ Custom worlds carry their own config (`name`, `theme`, `playerCount`, `adult`) i
 
 `lib/worldconfig.js` also exports `buildWorldStatePayload(worldConfig, gameState)` — the single source of truth for "which `worldState` fields does this world type expose to the client," shared by `api/gm.js`'s response and `api/poll.js`'s poll payload (previously hand-duplicated in both files; every new field like `npcs`/`inventory`/`last_actor` had to be added to both separately before this existed).
 
+**Custom campaign IDs** (`api/campaigns.js`'s `create` action) are `c_<timestamp>_<8-char random hex>`, e.g. `c_1784469655708_a3f9c1d2`. Before 2026-07-19 this was just `c_${Date.now()}` — a bare millisecond timestamp with no collision protection at all. Two creates landing in the same millisecond (a double-tap on "Create World," a network retry, two devices creating at nearly the same instant) would get the *identical* id and, since the Redis key is derived purely from it (`campaign:<id>:gamestate`), would silently share one gamestate from then on — both campaigns' session logs, NPCs, and narration mixing together with no error or warning to anyone. Found while investigating a "worlds bleeding into each other" report (that specific incident turned out to be something else — see the Resolved section of `project_resonance_backlog_decisions.md` — but the risk itself was real and worth closing regardless). The random suffix guarantees uniqueness independent of timing; the timestamp prefix is kept only for rough chronological readability when eyeballing raw Redis keys — `createdAt` in `campaigns:index` is the actual source of truth for ordering.
+
 ## Redis key structure
 
 - `resonance:gamestate`, `manlandia:gamestate` — the two built-in worlds' full state

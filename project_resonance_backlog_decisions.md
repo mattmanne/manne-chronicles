@@ -225,3 +225,29 @@ pattern.
   see CLAUDE.md's "Rate limiting" section and the `project_groq_ratelimit_monitoring`
   memory note (check it — and this data — before that topic comes up again,
   rather than re-estimating from scratch). 9 new tests, 465/465 pass.
+- **2026-07-19 — "Underseas bleeding into other worlds" report**: investigated
+  by pulling the real live data (Matt shared `GAME_SECRET` directly for this).
+  Read Underseas' entire stored sessionLog (8 entries) plus its NPCs/
+  objectives/clues/inventory/location — everything traced back cleanly to
+  its own theme (a pearl, an underwater kingdom, an ancient door with
+  whispers behind it warning of a "Great Dark"). Cross-checked Stratustopia
+  and Flabbershock for any of Underseas' specific content (none found) and
+  noticed something genuinely interesting instead: both those campaigns
+  *also* independently feature a near-identical "whispers behind a locked/
+  hidden door, guarding secrets" beat (Flabbershock literally has both a
+  "Tree of Whispers" and "Library of Whispers"). Conclusion: not a data
+  bleed — the underlying model (Llama 3.3 70B) just has a recurring generic
+  fantasy-RPG narrative habit it reaches for across unrelated campaigns,
+  which can feel like cross-contamination without actually being any. No
+  code change needed for the reported symptom itself.
+- **2026-07-19 — Custom campaign ID collision risk (found during the above
+  investigation, unrelated to its actual cause)**: fixed. `api/campaigns.js`'s
+  `create` action generated ids as a bare `c_${Date.now()}` with no
+  collision protection — two creates in the same millisecond would get an
+  identical id and silently share one Redis key from then on. Checked: none
+  of the 5 live campaigns currently collide, so nothing is corrupted today.
+  Now `c_<timestamp>_<8-char random hex>` via `crypto.randomUUID()`,
+  guaranteeing uniqueness regardless of request timing. 1 new test
+  (two same-millisecond creates get distinct ids and independent gamestate),
+  1 existing test's regex updated to match the new id shape. 466/466 pass.
+  See CLAUDE.md's "World routing" section.
