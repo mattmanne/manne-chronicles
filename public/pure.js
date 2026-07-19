@@ -66,6 +66,15 @@ function stripGMTags(content) {
     // Also strip the arrow-less variant — live example: "[CHARACTER 1: Hurt]".
     .replace(/\[CHARACTER \d(?:\s*\([^)]*\))?:\s*(?:Harm:\s*)?[A-Za-z]+\s*\]/gi, "")
     .replace(/\[LOCATION: [^\]]+\]/g, "")
+    // The prompt files' own instruction section is literally labeled
+    // "LOCATION CHANGE:" (plain prose, not notation) — live (found via
+    // npm run check-drift, 2026-07-19, Underseas): the model echoed that
+    // label back as a bracket tag of its own, "[LOCATION CHANGE]", right
+    // before the real "[LOCATION: Name]" tag. Not real notation, so
+    // lib/gm-tags.js's parsers never touch it — but nothing was stripping
+    // it from display either, so it leaked into the player-facing story
+    // verbatim. Bare marker, no colon/content, so it needs its own strip.
+    .replace(/\[LOCATION CHANGE\]/gi, "")
     .replace(/\[SCAR: [^\]]+\]/g, "")
     .replace(new RegExp(`\\[(LYRA|FEN):\\s*[A-Za-z]+\\s*${ARROW}\\s*[A-Za-z]+[^\\]]*\\]`, "gi"), "")
     // Tolerates the same "(Name)" parenthetical lib/gm-tags.js now parses —

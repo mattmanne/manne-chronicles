@@ -119,6 +119,31 @@ test("short-circuits with a friendly message when there is no history, without c
   assert.match(res.body.recap, /hasn't begun yet/);
 });
 
+test("a Groq 429 during recap records a hit in the rate-limit tracker", async (t) => {
+  const gameState = { sessionLog: [{ role: "gm", content: "Something happened." }], worldState: {} };
+  t.mock.module("../lib/redis.js", statefulRedisMock(gameState));
+  t.mock.module("../lib/gemini.js", {
+    exports: {
+      generateContent: async () => {
+        const err = new Error("Groq error: rate limited");
+        err.status = 429;
+        throw err;
+      },
+    },
+  });
+
+  const handler = freshHandler();
+  const req = { method: "GET", headers: {}, query: { world: "manlandia" } };
+  const res = mockRes();
+  await handler(req, res);
+  assert.equal(res.statusCode, 500);
+
+  const { getRateLimitStats } = require("../lib/groq-tracking.js");
+  const stats = await getRateLimitStats();
+  assert.equal(stats.totalAllTime, 1);
+  assert.deepEqual(stats.byWorld, { manlandia: 1 });
+});
+
 test("returns a 500 with a friendly error when the model call fails", async (t) => {
   const gameState = { sessionLog: [{ role: "gm", content: "Something happened." }], worldState: {} };
   t.mock.module("../lib/redis.js", statefulRedisMock(gameState));

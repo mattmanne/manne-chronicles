@@ -251,3 +251,30 @@ pattern.
   (two same-millisecond creates get distinct ids and independent gamestate),
   1 existing test's regex updated to match the new id shape. 466/466 pass.
   See CLAUDE.md's "World routing" section.
+- **2026-07-19 — Underseas investigation, follow-up**: Matt also shared
+  `ADULT_PIN` so the two adult-flagged campaigns (Dark Wars, Pirate teat)
+  could be checked too, closing the loose end from the entry above. Same
+  result — no Underseas-specific content in either, and both *also*
+  independently feature the same "whispering = tension" narrative habit
+  (Dark Wars has a near-identical "faint whispering... from the other side
+  of the door" beat). Fully confirms the "generic model habit, not a bleed"
+  conclusion across all 5 live campaigns, not just the 2 non-adult ones.
+- **2026-07-19 — Closeout findings**: running the full closeout routine
+  (syntax check, tests, live `check-drift`) surfaced two real issues, both
+  fixed same-day:
+  1. **`[LOCATION CHANGE]` leaking into player-facing narration.** The
+     prompt files' own instruction section is literally labeled "LOCATION
+     CHANGE:" (plain prose) — live evidence (Underseas) showed the model
+     echoing that label back as a bracket tag of its own, right before the
+     real `[LOCATION: Name]` tag. Not real notation (`lib/gm-tags.js` never
+     parses it), so nothing was stripping it from display either.
+     `stripGMTags()` now strips the bare marker too. Display-only fix — no
+     data migration needed, since stripping happens at render time against
+     whatever's already stored. 1 new test.
+  2. **Groq rate-limit tracking had a gap.** The tracking shipped earlier
+     today only instrumented `api/gm.js`; a live recap call failed from the
+     exact same Groq quota (the *daily* token cap this time, a separate
+     dimension from the per-minute one discussed earlier — 99,066/100,000
+     used) during this same closeout, exposing that `api/recap.js` wasn't
+     wired in. Fixed — both endpoints now record hits. 1 new test.
+  468/468 tests pass after both fixes.

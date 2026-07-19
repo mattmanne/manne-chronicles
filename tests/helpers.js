@@ -12,12 +12,14 @@ function mockRes() {
 
 function freshRequire(modPath) {
   delete require.cache[require.resolve(modPath)];
-  // lib/ratelimit.js destructures redisCommand out of lib/redis.js once, at
-  // require time — if it's still cached from an earlier test in this file,
-  // it keeps using that test's (possibly now-stale) mocked redisCommand
-  // instead of the one just registered via t.mock.module. Always clearing it
-  // here forces a rebind against whatever mock is currently active.
+  // lib/ratelimit.js and lib/groq-tracking.js both destructure redisCommand
+  // out of lib/redis.js once, at require time — if either is still cached
+  // from an earlier test in this file, it keeps using that test's (possibly
+  // now-stale) mocked redisCommand instead of the one just registered via
+  // t.mock.module. Always clearing them here forces a rebind against
+  // whatever mock is currently active.
   delete require.cache[require.resolve("../lib/ratelimit.js")];
+  delete require.cache[require.resolve("../lib/groq-tracking.js")];
   return require(modPath);
 }
 

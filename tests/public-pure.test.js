@@ -114,6 +114,18 @@ test("stripGMTags removes every ITEM tag variant: FOUND, numbered, named, and FE
   assert.equal(stripGMTags("Fen pockets it. [ITEM FEN: A pocketknife]"), "Fen pockets it.");
 });
 
+// Live (2026-07-19, found via npm run check-drift, Underseas): the model
+// echoed the prompt files' own "LOCATION CHANGE:" instruction label back as
+// a bracket tag of its own, right before the real [LOCATION: Name] tag.
+// Not real notation (lib/gm-tags.js never parses it), so nothing was
+// stripping it from display either — it leaked into the player-facing story.
+test("stripGMTags removes a bare [LOCATION CHANGE] marker the model echoes from its own prompt instructions", () => {
+  assert.equal(
+    stripGMTags("The door creaks open. [LOCATION CHANGE] [LOCATION: The Ancient Door]"),
+    "The door creaks open."
+  );
+});
+
 test("getCleanText strips tags and collapses excess blank lines", () => {
   const raw = "First line. [LOCATION: The Docks]\n\n\n\nSecond line.";
   // stripGMTags only removes the bracketed tag itself, so the space that preceded

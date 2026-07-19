@@ -4,6 +4,7 @@ const { getWorldConfig } = require("../lib/worldconfig");
 const { formatTranscript, buildRecapSystemPrompt } = require("../lib/recap");
 const { checkAdultAccess, isAdultWorld } = require("../lib/adultgate");
 const { checkRateLimit } = require("../lib/ratelimit");
+const { recordRateLimitHit } = require("../lib/groq-tracking");
 
 module.exports = async function handler(req, res) {
   const allowedOrigin = process.env.ALLOWED_ORIGIN || "*";
@@ -36,6 +37,7 @@ module.exports = async function handler(req, res) {
     return res.json({ recap: recap.trim() });
   } catch (err) {
     console.error("Recap error:", err);
+    if (err.status === 429) await recordRateLimitHit(worldConfig.id);
     return res.status(500).json({ error: "Could not put together a recap right now. Please try again!" });
   }
 };

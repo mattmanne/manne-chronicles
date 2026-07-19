@@ -54,20 +54,32 @@ even if later superseded — note the supersession instead.
 - Push notifications (web-push, VAPID), iOS PWA caveat documented
 - Sound effects (synthesized tones, opt-in, off by default)
 - World archive/unarchive, delete-with-typed-confirmation
+- Catch-up recap (2026-07-19): dismissible banner nudges a returning player toward the existing recap after 24h+ away (`checkCatchUp()`, device-local via `localStorage`); recap now writes in **third person naming every character**, not a per-viewer second-person POV (the earlier POV-aware version fixed the wrong half of the problem — it made the POV correct per viewer but still locked to one character, so it didn't read naturally for whichever hero actually picked it up); recap overlay also gained a "🔊 Listen" read-aloud button reusing the existing speech engine
+- Action input box (2026-07-19): `#action-input` is now an auto-growing `<textarea>` (was a single-line `<input>`) so a multi-line action stays visible; Shift+Enter inserts a real newline as a side effect
 
 **Security/robustness**
 - Two independent auth layers: `X-Game-Secret` (fails open if unset) and `X-Adult-Pin` (fails closed)
 - Rate limiting: paid-API cost control (help/recap) and PIN-guessing protection (unlock + every adult-gated endpoint)
 - Groq quota handling: retry, 8B fallback, per-world `gmlock`, player-facing wait messages
 - Duplicate roll_result / double-submission protection
+- Groq rate-limit hit tracking (2026-07-19): `lib/groq-tracking.js` records every player-visible Groq-quota failure (both `api/gm.js` and `api/recap.js` — the recap call site was a gap in the first version, caught during this same day's closeout) to Redis; `GET /api/groq-stats` + `scripts/check-groq-ratelimit.js` surface total/24h/7d/by-world frequency. Matt is staying on Groq's free tier for now and monitoring via this before deciding whether to upgrade.
+- Custom campaign ID collision fix (2026-07-19): ids were a bare `Date.now()` timestamp with no collision protection — two creates in the same millisecond would silently share one Redis key. Now `c_<timestamp>_<random hex>` via `crypto.randomUUID()`.
+- Voice input error surfacing (2026-07-19): `recognition.onerror` used to fail completely silently; now shows a specific "microphone blocked" message or a generic fallback, auto-hiding after 4s. iOS Safari has actually supported the underlying API since 14.5 — the mic button itself was never the problem.
+- Fixed two UI-state bugs (2026-07-19): a half-typed draft no longer carries over when switching worlds; a failed send no longer leaves a phantom line in the story log (the optimistically-appended entry is now rolled back alongside the restored input text).
+- `stripGMTags()` now also strips a bare `[LOCATION CHANGE]` marker (2026-07-19, found live via `npm run check-drift` during this session's closeout) — the model echoed the prompt files' own "LOCATION CHANGE:" instruction *label* back as if it were a bracket tag, and nothing was stripping it from display since it's not real notation (`lib/gm-tags.js` never parses it either). Pure display-layer fix — no data migration needed, since `stripGMTags()` runs at render time against whatever's already stored.
 
 ## Active backlog
 
 Tracked in **`project_resonance_backlog_decisions.md`** (repo root), not
 duplicated here — that file is the single source of truth for pending
-decisions and known deferred gaps. As of 2026-07-06 it has no open pending
+decisions and known deferred gaps. As of 2026-07-19 it has no open pending
 decisions — everything raised so far has been resolved or explicitly
-deferred with a reason.
+deferred with a reason. Notable 2026-07-19 investigation: a "worlds bleeding
+into each other" report (Underseas) turned out to be the model reusing a
+generic "whispers behind a locked door" narrative trope across unrelated
+campaigns, not real data sharing — confirmed by reading the actual stored
+transcripts of all 5 live campaigns. The real (unrelated) risk found along
+the way — same-millisecond campaign ID collisions — is fixed.
 
 **2026-07-05 playtest, closed out 2026-07-06**: `playtest_findings_2026-07-05.md`
 documents a 6-persona live playtest against production. All 6 confirmed
@@ -93,7 +105,8 @@ directly, definitively verified live).
 | `api/help.js` | Kid-safe rules-question endpoint (no game secret required) |
 | `api/poll.js` | Client polling endpoint — new entries, world state, pending roll recovery |
 | `api/push.js` | Push subscription management |
-| `api/recap.js` | POV-aware session recap |
+| `api/recap.js` | Third-person, viewer-agnostic session recap |
+| `api/groq-stats.js` | Read-only Groq rate-limit hit stats (`X-Game-Secret` gated) |
 | `api/state.js` | Player-driven actions (toggles, bonds, pins, author note, new_session, etc.) |
 | `api/unlock.js` | Adult PIN verification |
 | `api/vapid-public-key.js` | Serves the public VAPID key for push subscription |
@@ -103,6 +116,7 @@ directly, definitively verified live).
 | `lib/gamestate.js` / `-manlandia.js` / `-custom.js` | Initial state builders per world type |
 | `lib/gemini.js` | Groq API client (named `gemini.js` for historical reasons — not Google Gemini) |
 | `lib/gm-tags.js` | Pure regex tag-extraction functions, unit-tested directly |
+| `lib/groq-tracking.js` | Records/aggregates player-visible Groq rate-limit hits to Redis |
 | `lib/growth.js` | XP/milestone/ability-unlock logic |
 | `lib/livingworld.js` | Ambient "meanwhile..." beat prompt builder |
 | `lib/prompt.js` / `-manlandia.js` / `-custom.js` / `-shared.js` | System prompt builders per world type + shared blocks |
@@ -116,6 +130,7 @@ directly, definitively verified live).
 | `public/pure.js` | Logic-only functions shared between browser and Node tests |
 | `public/sw.js` | Push notification service worker |
 | `scripts/check-tag-drift.js` | Live-transcript bracket-tag auditor — run every closeout |
+| `scripts/check-groq-ratelimit.js` | Human-readable Groq rate-limit hit-frequency report |
 | `project_resonance_backlog_decisions.md` | Pending decisions + known deferred gaps |
 | `playtest_findings_2026-07-05.md` | 2026-07-05 live playtest results |
 
