@@ -73,6 +73,32 @@ function mockRedisCommand() {
       const entry = live(key);
       return entry ? entry.value : null;
     }
+    if (cmd === "LPUSH") {
+      const [key, ...values] = args;
+      const entry = live(key);
+      const list = entry ? entry.value : [];
+      // Real LPUSH pushes each value to the head in the given order, so with
+      // multiple values the last one ends up at index 0 — not needed by any
+      // current caller (always pushes one value at a time) but matched here
+      // for correctness anyway.
+      const next = [...values].reverse().concat(list);
+      store.set(key, { value: next, expiresAt: entry ? entry.expiresAt : null });
+      return next.length;
+    }
+    if (cmd === "LTRIM") {
+      const [key, start, stop] = args;
+      const entry = live(key);
+      if (entry) entry.value = entry.value.slice(Number(start), Number(stop) + 1);
+      return "OK";
+    }
+    if (cmd === "LRANGE") {
+      const [key, start, stop] = args;
+      const entry = live(key);
+      if (!entry) return [];
+      const s = Number(start);
+      const e = Number(stop);
+      return entry.value.slice(s, e === -1 ? undefined : e + 1);
+    }
     throw new Error("unsupported command in mock: " + cmd);
   };
 }

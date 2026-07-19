@@ -113,6 +113,7 @@
       <div class="recap-title">The Story So Far</div>
       <p id="recap-text" class="recap-text"></p>
       <div class="recap-actions">
+        <button id="recap-speak-btn" class="secondary-btn" type="button" data-speak-label="Listen">🔊 Listen</button>
         <button id="recap-share-btn" class="secondary-btn" type="button">📤 Share</button>
         <button id="recap-close-btn" class="wc-cancel-btn">Close</button>
       </div>
@@ -314,6 +315,13 @@
       <!-- Story -->
       <div id="tab-story" class="tab-panel active">
         <div id="waiting-banner" class="hidden"></div>
+        <div id="catchup-banner" class="hidden">
+          <span id="catchup-banner-text"></span>
+          <div class="catchup-banner-actions">
+            <button id="catchup-view-btn" class="secondary-btn" type="button">📜 View catch-up</button>
+            <button id="catchup-dismiss-btn" type="button" aria-label="Dismiss">✕</button>
+          </div>
+        </div>
         <div id="combat-tracker" class="hidden">
           <div class="combat-tracker-header">
             <span class="combat-tracker-title">⚔ COMBAT — Round <span id="combat-round">0</span></span>
@@ -349,7 +357,7 @@
             <button id="solo-mode-toggle" type="button" class="private-scene-toggle" aria-pressed="false" title="Send your turns immediately instead of waiting for everyone else to act too">🧍 Solo tonight</button>
           </div>
           <div id="action-row">
-            <input type="text" id="action-input" placeholder="What do you do?" autocomplete="off" autocorrect="off" />
+            <textarea id="action-input" placeholder="What do you do?" autocomplete="off" autocorrect="off" rows="1"></textarea>
             <button id="voice-btn" title="Speak your action" aria-label="Speak your action">🎤</button>
             <button id="send-btn" title="Send" aria-label="Send">▶</button>
           </div>

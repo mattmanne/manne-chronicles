@@ -49,6 +49,21 @@ pattern.
   overkill for what the feature actually protects (a UX device between two
   people who trust each other, not real access control). Deliberately left
   as-is — don't "fix" without checking with him first.
+- **Catch-up banner's "last seen" is per-device, not per-player globally**
+  (2026-07-19). `checkCatchUp()` in `public/game.js` uses a `localStorage`
+  timestamp, so a player alternating between two devices gets independent
+  tracking on each and could see the "welcome back" banner on one device the
+  same day they played on the other. Fixing this for real would need a
+  server-side per-character `last_seen_at` field (a new write on every turn)
+  — deferred as not worth the cost for a nice-to-have nudge. Revisit only if
+  it proves genuinely annoying in practice.
+- **Optimistic-entry rollback doesn't cover a roll-then-fail sequence.**
+  (2026-07-19) If a roll-triggered action's first leg succeeds but the
+  recursive `roll_result` leg then fails, only the original action's
+  optimistically-appended log line is removed — the separate roll-result
+  entry added in between is left in place. Rare (two round-trips have to
+  succeed-then-fail back to back); not fixed, revisit if it shows up live.
+  See CLAUDE.md's "Action input box" section.
 
 ## Known platform limits (not fixable by us)
 
@@ -157,3 +172,56 @@ pattern.
   round-trip completed cleanly with no crash, though (same limitation as
   combat) the fix's actual effectiveness can't be proven from one
   non-deterministic call.
+- **2026-07-19 — Catch-up recap batch**: (1) added a "🔊 Listen" read-aloud
+  button to the recap overlay, reusing the existing per-entry speech
+  machinery via a new shared `setSpeakBtnIcon()` helper so a labeled button
+  and icon-only buttons can coexist without either clobbering the other's
+  text. (2) Rewrote the recap prompt from a per-viewer second-person POV
+  (`"you" = whichever character requested it`) to a universal third-person
+  narration naming every character — Matt found the POV version still didn't
+  read naturally for whichever hero actually picked it up. The now-unused
+  `?player=` param and `getPlayerDisplayName` wiring were removed from
+  `api/recap.js` rather than left as dead code. 456/456 tests pass (2 tests
+  rewritten for the new prompt shape). Verified in a headless-browser pass
+  (Playwright against a local static server, since `vercel dev` isn't
+  available in this environment) — screenshots confirmed the banner, the
+  recap overlay, and the Listen button's icon/label swap all render
+  correctly; not yet deployed/checked against the live site.
+- **2026-07-19 — Voice input silently failing (parent report: "didn't work on
+  an iPad, might be user error")**: iOS Safari has supported
+  `webkitSpeechRecognition` since 14.5, so the mic button itself was never
+  the problem — `recognition.onerror` swallowing every failure with zero
+  user-facing feedback was. Now shows a specific message for a blocked mic
+  permission and a generic one for anything else, auto-hiding after 4s. See
+  CLAUDE.md's "Voice input" section for the `onend`-after-`onerror` ordering
+  gotcha this ran into.
+- **2026-07-19 — Draft text carrying over between worlds**: `switchWorld()`
+  now clears `#action-input` and any visible suggestion chips on every
+  switch — previously a half-typed draft in one world's box was still there
+  after switching to an unrelated world, since the box is one shared DOM
+  element with no per-world state of its own.
+- **2026-07-19 — Failed send leaving a contradictory UI state**: a failed
+  `submitAction()` already restored the typed text to the input box for easy
+  resending, but also left the optimistically-appended player line sitting in
+  the story log — reading as "this both did and didn't happen." The
+  optimistic log entry is now removed on failure, matching the restored
+  input box. Root cause of the specific failure that surfaced this
+  (`Error: Unauthorized`) is almost certainly a stale/mismatched
+  `X-Game-Secret` on that player's device — see the Env vars / Authorization
+  sections of CLAUDE.md; the fix here is about the UI's failure *display*,
+  not that underlying cause.
+- **2026-07-19 — Action input box auto-resize**: `#action-input` changed
+  from a single-line `<input>` to an auto-growing `<textarea>` so a
+  multi-line action (typed or spoken) stays fully visible instead of
+  scrolling sideways. Shift+Enter now inserts a real newline as a side
+  effect of the element-type change. See CLAUDE.md's "Action input box"
+  section for the implementation (`autoResizeActionInput()`,
+  `setActionInputValue()`).
+- **2026-07-19 — Groq rate-limit hit tracking**: added after Matt hit the
+  free tier's limit despite little play. `lib/groq-tracking.js` records
+  every player-visible Groq-quota failure to Redis; `GET /api/groq-stats`
+  and `scripts/check-groq-ratelimit.js` surface total/24h/7d/by-world
+  frequency. Matt's call was to stay on the free tier for now and monitor —
+  see CLAUDE.md's "Rate limiting" section and the `project_groq_ratelimit_monitoring`
+  memory note (check it — and this data — before that topic comes up again,
+  rather than re-estimating from scratch). 9 new tests, 465/465 pass.

@@ -36,7 +36,7 @@ test("returns a recap string built from the session transcript", async (t) => {
   assert.match(receivedSystemPrompt, /child aged 8/);
 });
 
-test("writes the recap from the requesting player's POV when a player param is given", async (t) => {
+test("writes a third-person recap regardless of any player param passed", async (t) => {
   process.env.ADULT_PIN = ADULT_PIN;
   try {
     let receivedSystemPrompt = null;
@@ -57,7 +57,8 @@ test("writes the recap from the requesting player's POV when a player param is g
     const res = mockRes();
     await handler(req, res);
 
-    assert.match(receivedSystemPrompt, /Lyra's point of view/);
+    assert.match(receivedSystemPrompt, /third person/);
+    assert.doesNotMatch(receivedSystemPrompt, /Lyra's point of view/);
   } finally {
     delete process.env.ADULT_PIN;
   }

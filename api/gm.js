@@ -12,6 +12,7 @@ const {
   applyStateTags,
 } = require("../lib/apply-state-tags");
 const { selectNotifyTargets, buildNotificationPayload } = require("../lib/push");
+const { recordRateLimitHit } = require("../lib/groq-tracking");
 const webpush = require("web-push");
 
 const MAX_HISTORY = 40; // entries of context sent to the LLM per turn — bounds prompt cost; full log is still stored
@@ -248,6 +249,7 @@ module.exports = async function handler(req, res) {
     console.error("GM error:", err);
     await releaseGmLock(worldConfig.id);
     if (err.status === 429) {
+      await recordRateLimitHit(worldConfig.id);
       return res.status(429).json({ error: `The GM is handling a lot of requests right now — ${formatWaitMessage(err.retryAfterSeconds)} and try again.` });
     }
     return res.status(500).json({ error: "The GM encountered an error: " + err.message });

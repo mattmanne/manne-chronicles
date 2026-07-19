@@ -23,10 +23,12 @@ function mockRes() {
 
 function freshHandler(modPath) {
   delete require.cache[require.resolve(modPath)];
-  // lib/ratelimit.js destructures redisCommand out of lib/redis.js once, at
-  // require time — clear it too so each test's mocked redisCommand actually
-  // takes effect instead of an earlier test's stale binding sticking around.
+  // lib/ratelimit.js and lib/groq-tracking.js both destructure redisCommand
+  // out of lib/redis.js once, at require time — clear them too so each
+  // test's mocked redisCommand actually takes effect instead of an earlier
+  // test's stale binding sticking around.
   delete require.cache[require.resolve("../lib/ratelimit.js")];
+  delete require.cache[require.resolve("../lib/groq-tracking.js")];
   return require(modPath);
 }
 
@@ -136,6 +138,31 @@ test("a Groq 429 surfaces as a 429 with a friendly, non-leaky message", async (t
   assert.equal(res.statusCode, 429);
   assert.match(res.body.error, /wait a few seconds/i);
   assert.doesNotMatch(res.body.error, /tokens per minute/i);
+});
+
+test("a Groq 429 records a hit in the rate-limit tracker, keyed by world", async (t) => {
+  const redisCmd = mockRedisCommand();
+  t.mock.module("../lib/redis.js", { exports: { getState: async () => null, setState: async () => {}, redisCommand: redisCmd } });
+  t.mock.module("../lib/gemini.js", {
+    exports: {
+      generateContent: async () => {
+        const err = new Error("Groq error: rate limited");
+        err.status = 429;
+        throw err;
+      },
+    },
+  });
+
+  const handler = freshHandler("../api/gm.js");
+  const req = { method: "POST", headers: {}, query: { world: "manlandia" }, body: { player: "player1", message: "I arrive", type: "action" } };
+  const res = mockRes();
+  await handler(req, res);
+  assert.equal(res.statusCode, 429);
+
+  const { getRateLimitStats } = require("../lib/groq-tracking.js");
+  const stats = await getRateLimitStats();
+  assert.equal(stats.totalAllTime, 1);
+  assert.deepEqual(stats.byWorld, { manlandia: 1 });
 });
 
 test("a Groq 429 with a known short retryAfterSeconds still says 'a few seconds', not a specific number", async (t) => {

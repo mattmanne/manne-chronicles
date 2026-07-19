@@ -554,9 +554,16 @@ async function switchWorld(worldId) {
     logEntries.innerHTML = "";
     lastTimestamp = 0;
     cachedGameState = null;
+    // A half-typed draft (or that draft's suggestion chips) belongs to
+    // whichever world it was written for — carrying it over to a different
+    // world's story would be at best irrelevant, at worst confusing.
+    setActionInputValue("");
+    hideSuggestionChips();
     await loadExistingLog();
     startPolling();
     triggerOpeningIfNeeded();
+    hideCatchUpBanner();
+    checkCatchUp();
   }
 }
 
@@ -603,6 +610,7 @@ async function continueInit() {
   await loadExistingLog();
   startPolling();
   triggerOpeningIfNeeded();
+  checkCatchUp();
 }
 
 /* ── Tabs ── */
@@ -860,6 +868,8 @@ function completePlayerSwitch(btn, needsReload) {
     lastTimestamp = 0;
     loadExistingLog();
   }
+  hideCatchUpBanner();
+  checkCatchUp();
 }
 
 function openScenePinPrompt(target, btn) {
@@ -994,6 +1004,22 @@ function setupScenePinSettings() {
 }
 
 /* ── Voice Input ── */
+// iOS Safari (and every iOS browser, which must use Safari's engine) has
+// never implemented the Web Speech API's SpeechRecognition interface at all
+// — window.SpeechRecognition/webkitSpeechRecognition are simply undefined
+// there, so the mic button hides itself below. That's a real, unfixable
+// platform gap, not a bug — see README.md. Separately, recognition.onerror
+// used to fail completely silently (just re-hid the "Listening…" status),
+// so a player whose *browser does* support it but hit a real failure (mic
+// permission denied, no network for the recognition service, etc.) saw
+// nothing explaining why nothing happened — worth fixing regardless of the
+// iOS gap, since a support platform could still fail this way.
+const VOICE_ERROR_MESSAGES = {
+  "not-allowed": "Microphone access is blocked — check your browser's site permissions.",
+  "service-not-allowed": "Microphone access is blocked — check your browser's site permissions.",
+};
+let voiceErrorTimer = null;
+
 function setupVoice() {
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SpeechRecognition) { voiceBtn.style.display = "none"; return; }
@@ -1001,16 +1027,25 @@ function setupVoice() {
   recognition.continuous = false;
   recognition.interimResults = false;
   recognition.lang = "en-US";
-  recognition.onresult = (e) => { actionInput.value = e.results[0][0].transcript; stopListening(); };
-  recognition.onerror  = () => stopListening();
-  recognition.onend    = () => stopListening();
+  recognition.onresult = (e) => { setActionInputValue(e.results[0][0].transcript); stopListening(); };
+  recognition.onerror = (e) => {
+    if (e.error === "no-speech" || e.error === "aborted") { stopListening(); return; }
+    showVoiceError(VOICE_ERROR_MESSAGES[e.error] || "Voice input isn't working right now — try typing instead.");
+  };
+  // onend always fires after onresult/onerror too — only treat it as a plain
+  // stop (and clear any status message) if nothing already handled this
+  // recognition session, so it can't immediately wipe out the error message
+  // showVoiceError() just set.
+  recognition.onend = () => { if (isListening) stopListening(); };
   voiceBtn.addEventListener("click", () => { isListening ? stopListening() : startListening(); });
 }
 
 function startListening() {
   if (!recognition) return;
+  clearTimeout(voiceErrorTimer);
   isListening = true;
   voiceBtn.classList.add("listening");
+  voiceStatus.textContent = "Listening…";
   voiceStatus.classList.remove("hidden");
   recognition.start();
 }
@@ -1022,12 +1057,41 @@ function stopListening() {
   if (recognition) try { recognition.stop(); } catch(_) {}
 }
 
+function showVoiceError(message) {
+  isListening = false;
+  voiceBtn.classList.remove("listening");
+  if (recognition) try { recognition.stop(); } catch(_) {}
+  voiceStatus.textContent = message;
+  voiceStatus.classList.remove("hidden");
+  clearTimeout(voiceErrorTimer);
+  voiceErrorTimer = setTimeout(() => voiceStatus.classList.add("hidden"), 4000);
+}
+
 /* ── Input Handlers ── */
 function setupInputHandlers() {
   sendBtn.addEventListener("click", submitAction);
   actionInput.addEventListener("keydown", (e) => {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submitAction(); }
   });
+  actionInput.addEventListener("input", autoResizeActionInput);
+  autoResizeActionInput();
+}
+
+// The action box grows to fit multi-line input (typed or spoken) instead of
+// scrolling its own single line out of view, capped at ACTION_INPUT_MAX_HEIGHT
+// so one huge paste can't take over the screen — it scrolls internally past
+// that instead. Setting .value programmatically (voice results, suggestion
+// chips, restoring text after a failed send) doesn't fire an "input" event,
+// so every such call site routes through setActionInputValue() below rather
+// than assigning .value directly, to keep the height in sync.
+const ACTION_INPUT_MAX_HEIGHT = 160;
+function autoResizeActionInput() {
+  actionInput.style.height = "auto";
+  actionInput.style.height = Math.min(actionInput.scrollHeight, ACTION_INPUT_MAX_HEIGHT) + "px";
+}
+function setActionInputValue(text) {
+  actionInput.value = text;
+  autoResizeActionInput();
 }
 
 /* ── Combat Tracker ── */
@@ -1212,16 +1276,23 @@ async function submitAction() {
   // chips means "the 3rd chip" — send that chip's actual text instead of the
   // ambiguous digit, which the GM has no reliable way to interpret on its own.
   const message = resolveSuggestionSelection(text, currentSuggestions) || text;
-  actionInput.value = "";
+  setActionInputValue("");
   setLoading(true);
   hideSuggestionChips();
-  appendPlayerEntry(currentPlayer, message, true);
+  const optimisticEntry = appendPlayerEntry(currentPlayer, message, true);
   scrollToBottom();
   const ok = await sendToGM(currentPlayer, message, "action");
   // On failure (rate limit, server error, dropped connection), put the
   // player's own words back in the box so they can just hit send again
-  // instead of retyping the whole thing.
-  if (!ok) actionInput.value = text;
+  // instead of retyping the whole thing — and remove the optimistically-
+  // appended log line, since the action never actually went through. Leaving
+  // it in place made a failed send look contradictory: the player's words
+  // sitting in the story log (implying it worked) right next to the same
+  // words back in the input box (implying it didn't).
+  if (!ok) {
+    optimisticEntry.remove();
+    setActionInputValue(text);
+  }
 }
 
 /* ── Suggestion chips ── */
@@ -1242,7 +1313,7 @@ function renderSuggestionChips(suggestions) {
     chip.className = "suggestion-chip";
     chip.textContent = text;
     chip.addEventListener("click", () => {
-      actionInput.value = text;
+      setActionInputValue(text);
       actionInput.focus();
     });
     suggestionChips.appendChild(chip);
@@ -1253,7 +1324,7 @@ function renderSuggestionChips(suggestions) {
   other.className = "suggestion-chip other";
   other.textContent = "Other…";
   other.addEventListener("click", () => {
-    actionInput.value = "";
+    setActionInputValue("");
     actionInput.focus();
   });
   suggestionChips.appendChild(other);
@@ -1429,11 +1500,21 @@ function getStoryVoice() {
   return voices.find(v => v.lang.startsWith("en")) || null;
 }
 
+// Some speak-buttons are icon-only (per-entry 🔊), others carry a trailing
+// label (recap's "🔊 Listen") — data-speak-label preserves that label across
+// the icon swap instead of the icon replacing the button's whole text.
+function setSpeakBtnIcon(btn, icon, speaking) {
+  if (!btn) return;
+  const label = btn.dataset.speakLabel;
+  btn.textContent = label ? `${icon} ${label}` : icon;
+  btn.classList.toggle("speaking", speaking);
+}
+
 function stopSpeech() {
   if (iosSpeechKeepalive) { clearInterval(iosSpeechKeepalive); iosSpeechKeepalive = null; }
   if (activeSpeech) {
     window.speechSynthesis.cancel();
-    if (activeSpeech.btn) { activeSpeech.btn.textContent = "🔊"; activeSpeech.btn.classList.remove("speaking"); }
+    setSpeakBtnIcon(activeSpeech.btn, "🔊", false);
     activeSpeech = null;
   }
 }
@@ -1443,7 +1524,7 @@ function speakText(text, btn) {
   const isSame = activeSpeech && activeSpeech.text === text;
   stopSpeech();
   if (isSame) return;
-  btn.textContent = "⏹"; btn.classList.add("speaking");
+  setSpeakBtnIcon(btn, "⏹", true);
   activeSpeech = { text, btn };
   const voices = window.speechSynthesis.getVoices();
   if (voices.length > 0) {
@@ -1479,7 +1560,7 @@ function doSpeak(text, voice, btn) {
 
 function finishSpeech(btn) {
   if (iosSpeechKeepalive) { clearInterval(iosSpeechKeepalive); iosSpeechKeepalive = null; }
-  if (btn) { btn.textContent = "🔊"; btn.classList.remove("speaking"); }
+  setSpeakBtnIcon(btn, "🔊", false);
   activeSpeech = null;
 }
 
@@ -1548,17 +1629,60 @@ function setupRecap() {
   document.getElementById("recap-btn").addEventListener("click", loadRecap);
   document.getElementById("recap-close-btn").addEventListener("click", () => {
     document.getElementById("recap-overlay").classList.remove("active");
+    stopSpeech();
   });
   document.getElementById("recap-share-btn").addEventListener("click", shareRecap);
+  document.getElementById("recap-speak-btn").addEventListener("click", function() {
+    const text = document.getElementById("recap-text").textContent;
+    if (!text || text === "Loading recap…") return;
+    speakText(text, this);
+  });
+  document.getElementById("catchup-view-btn").addEventListener("click", () => {
+    hideCatchUpBanner();
+    loadRecap();
+  });
+  document.getElementById("catchup-dismiss-btn").addEventListener("click", hideCatchUpBanner);
+}
+
+// Surfaces the existing recap as an unmissed nudge, not just a button someone
+// has to remember exists. Tracked per player *per device* via localStorage
+// (there's no server-side "last seen" field) — same device-local trust model
+// as adult_pin/unlockedScenePins elsewhere in this file. A gap of a day or
+// more since this player was last on this device is treated as "catching up."
+const CATCHUP_THRESHOLD_MS = 24 * 60 * 60 * 1000;
+
+function catchUpStorageKey() {
+  return `last_seen_${currentWorld}_${currentPlayer}`;
+}
+
+function checkCatchUp() {
+  const key = catchUpStorageKey();
+  const now = Date.now();
+  const stored = parseInt(localStorage.getItem(key) || "0", 10);
+  localStorage.setItem(key, String(now));
+  if (!stored) return;
+
+  const gapMs = now - stored;
+  if (gapMs < CATCHUP_THRESHOLD_MS) return;
+
+  const days = Math.round(gapMs / (24 * 60 * 60 * 1000));
+  const textEl = document.getElementById("catchup-banner-text");
+  textEl.textContent = `👋 Welcome back — it's been ${days} day${days === 1 ? "" : "s"} since you were last here.`;
+  document.getElementById("catchup-banner").classList.remove("hidden");
+}
+
+function hideCatchUpBanner() {
+  document.getElementById("catchup-banner").classList.add("hidden");
 }
 
 async function loadRecap() {
+  stopSpeech();
   const overlay = document.getElementById("recap-overlay");
   const textEl  = document.getElementById("recap-text");
   textEl.textContent = "Loading recap…";
   overlay.classList.add("active");
   try {
-    const res  = await authGet(`/api/recap?player=${encodeURIComponent(currentPlayer)}`);
+    const res  = await authGet("/api/recap");
     const data = await res.json();
     textEl.textContent = data.recap || data.error || "Could not load a recap right now.";
   } catch(_) {
@@ -2728,6 +2852,7 @@ function appendPlayerEntry(player, text, animate, privateTo) {
     pinLogEntry(text, this);
   });
   logEntries.appendChild(entry);
+  return entry;
 }
 
 /* ── Pinned notes ("remember this") ── */
