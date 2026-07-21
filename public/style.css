@@ -17,6 +17,13 @@
   --amber:     #e67e22;
   --font-serif: Georgia, 'Times New Roman', serif;
   --font-sans:  system-ui, -apple-system, sans-serif;
+  /* Scales the app's reading column with the viewport instead of the old fixed
+     680px — phones stay edge-to-edge (clamp's floor never forces a width past
+     what the viewport actually has), while tablets/desktops get a noticeably
+     wider column so the same content wraps into fewer lines and needs less
+     vertical scrolling. Capped at 1100px so lines don't get so long they hurt
+     readability on very wide monitors. */
+  --content-max: clamp(680px, 92vw, 1100px);
 }
 
 html, body {
@@ -31,7 +38,7 @@ html, body {
   display: flex;
   flex-direction: column;
   height: 100dvh;
-  max-width: 680px;
+  max-width: var(--content-max);
   margin: 0 auto;
   position: relative;
 }
@@ -1430,7 +1437,7 @@ body.world-manlandia #villain-badge   { display: inline-block; }
 
 .help-box {
   display: flex; flex-direction: column;
-  width: 100%; max-width: 680px;
+  width: 100%; max-width: var(--content-max);
   height: 82dvh;
   background: var(--surface);
   border-top: 1px solid var(--gold-dim);
@@ -1519,7 +1526,7 @@ body.world-manlandia #villain-badge   { display: inline-block; }
 
 .end-session-box {
   display: flex; flex-direction: column; gap: 14px;
-  width: 100%; max-width: 680px;
+  width: 100%; max-width: var(--content-max);
   background: var(--surface);
   border-top: 1px solid var(--gold-dim);
   border-radius: 18px 18px 0 0;
@@ -1883,7 +1890,7 @@ body.world-custom .manlandia-lore { display: none !important; }
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 24px 20px;
-  max-width: 420px;
+  max-width: clamp(420px, 90vw, 720px);
   width: 100%;
   max-height: 80vh;
   overflow-y: auto;

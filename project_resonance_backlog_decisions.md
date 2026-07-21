@@ -15,7 +15,22 @@ what was already decided instead of re-litigating it.
 
 ## Pending decisions (need a call)
 
-_(none open right now — see Resolved below)_
+### 2026-07-21: further story-log UX ideas, not yet decided
+Matt asked for the story log to use more of the screen width and to make the
+story easier to follow without scrolling as much. The width fix shipped same
+day (see Resolved below — `#app`'s max-width is now a responsive
+`clamp(680px, 92vw, 1100px)` instead of a fixed 680px). Three follow-up ideas
+were floated but not yet requested — evaluate later, pick whichever (if any)
+are still worth it once the width fix has been used for a while:
+
+- **Tighter narration spacing.** Reduce the gap between log entries so more
+  turns fit on screen at once, without shrinking the actual reading font.
+- **"Jump to latest" button.** Appears once you've scrolled up from the
+  bottom of the story log, instead of relying on scrolling all the way down
+  by hand.
+- **Auto-collapse older sessions.** Collapse story content from before the
+  current session by default (expandable on tap) — mainly useful once a
+  campaign has a long history.
 
 ### 2026-07-05 playtest: closed out
 All six confirmed findings from the 2026-07-05 live playtest are now fixed,
@@ -73,6 +88,24 @@ pattern.
 
 ## Resolved
 
+- **2026-07-21 — Story log too narrow / too much scrolling on larger
+  screens**: `#app`'s max-width changed from a fixed 680px to a responsive
+  `--content-max: clamp(680px, 92vw, 1100px)` in `public/style.css`, applied
+  to `#app` and the two bottom-sheet overlays that mirror its width (`.help-
+  box`, `.end-session-box`); `.recap-box` (a separate centered modal) got a
+  smaller matching clamp, `clamp(420px, 90vw, 720px)`. On phones this is a
+  no-op (the clamp floor never forces the layout wider than the actual
+  viewport), but on tablets/desktops the reading column now grows with the
+  screen instead of sitting fixed at 680px with large empty margins — capped
+  at 1100/720px so lines don't get so long they hurt readability on very wide
+  monitors. Verified visually via a headless Playwright pass against a local
+  static server (`vercel dev` isn't available in this environment): `#app`
+  measured 390px wide at a 390px mobile viewport (unchanged) and 1100px wide
+  at a 1600px desktop viewport (was 680px before), with no overflow or
+  clipping in the header, tabs, or input row at either size. Three further
+  UX ideas (tighter log spacing, a "jump to latest" button, auto-collapsing
+  older sessions) were floated but not requested — see the Pending decisions
+  section above.
 - **2026-07-05 — "Leads" tag naming/scope**: keep as "Leads", stays universal
   across all world types. Rationale: any world's story can raise an open
   question worth tracking, not just mystery-flavored ones — a kid custom
