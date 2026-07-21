@@ -135,6 +135,25 @@ pattern.
   or at an extreme 2200px viewport. Three further UX ideas (tighter log
   spacing, a "jump to latest" button, auto-collapsing older sessions) were
   floated but not requested — see the Pending decisions section above.
+- **2026-07-21 — Story log, round 3 (mobile counterpart to the sidebar)**:
+  after reviewing round 2 on a preview deployment, Matt asked whether the
+  same party/location/threads info could be visible on a phone too without
+  disturbing the existing compact mobile layout. The sidebar itself only
+  fits above 1100px, so a collapsible summary was added instead: a
+  `#story-summary-toggle` button next to the existing Recap button
+  (`📍 <location> ▾`), which expands `#story-summary-panel` in place on tap
+  — collapsed by default, so a phone's Story tab looks exactly like it
+  always did until a player actually taps it. `buildStorySummaryHTML()` was
+  extracted out of `renderStorySidebar()` so both the desktop sidebar and
+  this mobile panel render from the exact same function and can never show
+  different info. Force-hidden via the same `min-width: 1100px` breakpoint
+  once the real sidebar takes over, so the two never appear at once.
+  Verified visually (headless Playwright): collapsed state shows just the
+  location next to Recap at 390px width; tapping it expands to the full
+  party/location/threads content with the chevron flipping; at 1600px both
+  the toggle and panel are correctly force-hidden while the sidebar shows
+  instead. Pushed to the same `preview/wide-screen-layout` branch as rounds
+  1-2 for Matt to check on his phone before merging to production.
 - **2026-07-05 — "Leads" tag naming/scope**: keep as "Leads", stays universal
   across all world types. Rationale: any world's story can raise an open
   question worth tracking, not just mystery-flavored ones — a kid custom

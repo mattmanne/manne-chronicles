@@ -604,6 +604,7 @@ async function continueInit() {
   setupSoloMode();
   setupScenePinSettings();
   setupRecap();
+  setupStorySummaryToggle();
   setupWizard();
   setupHelp();
   setupToneSelector();
@@ -2991,10 +2992,11 @@ function updateCharacterUI(data) {
 // here (same as every other updateCharacterUI() consumer) rather than only
 // rendering it once a wide viewport is detected, so it's never stale the
 // moment a window gets resized or rotated.
-function renderStorySidebar(ws, characters) {
-  const el = document.getElementById("story-sidebar");
-  if (!el || !characters) return;
-
+// Shared by the wide-screen #story-sidebar and the narrow-screen collapsible
+// #story-summary-panel (see renderStorySidebar() below) — same content either
+// way, just a different container/visibility rule, so the two can never drift
+// out of sync with each other.
+function buildStorySummaryHTML(ws, characters) {
   const partyRows = getRealCharacterKeys(currentWorld, characters).map((key) => {
     const char = characters[key] || {};
     const name = getPlayerDisplayName(key, { characters });
@@ -3022,7 +3024,7 @@ function renderStorySidebar(ws, characters) {
       (threads.length > THREAD_LIMIT ? `<div class="sidebar-threads-more">+${threads.length - THREAD_LIMIT} more — see Map tab</div>` : "")
     : `<div class="sidebar-empty">Nothing open yet.</div>`;
 
-  el.innerHTML = `
+  return `
     <div>
       <div class="sidebar-section-title">Party</div>
       <div class="sidebar-party-list">${partyRows || `<div class="sidebar-empty">No characters yet.</div>`}</div>
@@ -3036,6 +3038,30 @@ function renderStorySidebar(ws, characters) {
       ${threadsHtml}
     </div>
   `;
+}
+
+function renderStorySidebar(ws, characters) {
+  if (!characters) return;
+  const html = buildStorySummaryHTML(ws, characters);
+
+  const sidebar = document.getElementById("story-sidebar");
+  if (sidebar) sidebar.innerHTML = html;
+
+  const panel = document.getElementById("story-summary-panel");
+  if (panel) panel.innerHTML = html;
+
+  const label = document.getElementById("story-summary-toggle-label");
+  if (label) label.textContent = `📍 ${ws?.location || "Party & Location"}`;
+}
+
+function setupStorySummaryToggle() {
+  const toggle = document.getElementById("story-summary-toggle");
+  const panel  = document.getElementById("story-summary-panel");
+  if (!toggle || !panel) return;
+  toggle.addEventListener("click", () => {
+    const expanded = panel.classList.toggle("expanded");
+    toggle.setAttribute("aria-expanded", expanded ? "true" : "false");
+  });
 }
 
 // worldState.pending_turn (when non-empty) means the story is actually held

@@ -1873,7 +1873,41 @@ body.world-custom .manlandia-lore { display: none !important; }
 .delete-confirm-actions { display: flex; gap: 10px; justify-content: flex-end; }
 
 /* Recap */
-#recap-bar { padding: 10px 14px 0; }
+#recap-bar { display: flex; align-items: center; gap: 8px; padding: 10px 14px 0; }
+#recap-btn { flex-shrink: 0; }
+
+/* ── Collapsible party/location/threads summary — narrow-screen counterpart
+   to #story-sidebar (see the story-sidebar section above). Same content
+   (rendered by the shared buildStorySummaryHTML() in game.js so the two
+   never drift out of sync), but tucked behind a tap instead of always
+   visible, since there's no spare width on a phone to give it a permanent
+   place without pushing the log down further. Hidden entirely once the
+   sidebar itself takes over at the 1100px breakpoint. ── */
+#story-summary-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  justify-content: space-between;
+}
+.story-summary-chevron { transition: transform 0.2s; flex-shrink: 0; }
+#story-summary-toggle[aria-expanded="true"] .story-summary-chevron { transform: rotate(180deg); }
+
+#story-summary-panel {
+  display: none;
+  flex-direction: column;
+  gap: 14px;
+  margin: 10px 14px 0;
+  padding: 12px 14px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+#story-summary-panel.expanded { display: flex; }
+
+@media (min-width: 1100px) {
+  #story-summary-toggle, #story-summary-panel { display: none !important; }
+}
 
 #waiting-banner {
   margin: 10px 14px 0;

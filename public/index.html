@@ -332,7 +332,11 @@
           </div>
           <div id="recap-bar">
             <button id="recap-btn" class="secondary-btn">📜 Recap</button>
+            <button id="story-summary-toggle" class="secondary-btn" type="button" aria-expanded="false" aria-controls="story-summary-panel">
+              <span id="story-summary-toggle-label">📍 Party &amp; Location</span><span class="story-summary-chevron">▾</span>
+            </button>
           </div>
+          <div id="story-summary-panel"></div>
           <main id="log-area">
             <div id="log-entries" aria-live="polite"></div>
           </main>
