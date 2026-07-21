@@ -17,11 +17,12 @@ what was already decided instead of re-litigating it.
 
 ### 2026-07-21: further story-log UX ideas, not yet decided
 Matt asked for the story log to use more of the screen width and to make the
-story easier to follow without scrolling as much. The width fix shipped same
-day (see Resolved below — `#app`'s max-width is now a responsive
-`clamp(680px, 92vw, 1100px)` instead of a fixed 680px). Three follow-up ideas
-were floated but not yet requested — evaluate later, pick whichever (if any)
-are still worth it once the width fix has been used for a while:
+story easier to follow without scrolling as much. Two rounds shipped same day
+(see Resolved below — the responsive `--content-max` width, then the
+wide-screen party/location/threads sidebar after Matt reviewed a screenshot
+and found the first pass still wasted space). Three further ideas were floated
+but not yet requested — evaluate later, pick whichever (if any) are still
+worth it once the current shape has been used for a while:
 
 - **Tighter narration spacing.** Reduce the gap between log entries so more
   turns fit on screen at once, without shrinking the actual reading font.
@@ -89,23 +90,51 @@ pattern.
 ## Resolved
 
 - **2026-07-21 — Story log too narrow / too much scrolling on larger
-  screens**: `#app`'s max-width changed from a fixed 680px to a responsive
-  `--content-max: clamp(680px, 92vw, 1100px)` in `public/style.css`, applied
-  to `#app` and the two bottom-sheet overlays that mirror its width (`.help-
-  box`, `.end-session-box`); `.recap-box` (a separate centered modal) got a
-  smaller matching clamp, `clamp(420px, 90vw, 720px)`. On phones this is a
-  no-op (the clamp floor never forces the layout wider than the actual
-  viewport), but on tablets/desktops the reading column now grows with the
-  screen instead of sitting fixed at 680px with large empty margins — capped
-  at 1100/720px so lines don't get so long they hurt readability on very wide
-  monitors. Verified visually via a headless Playwright pass against a local
-  static server (`vercel dev` isn't available in this environment): `#app`
-  measured 390px wide at a 390px mobile viewport (unchanged) and 1100px wide
-  at a 1600px desktop viewport (was 680px before), with no overflow or
-  clipping in the header, tabs, or input row at either size. Three further
-  UX ideas (tighter log spacing, a "jump to latest" button, auto-collapsing
-  older sessions) were floated but not requested — see the Pending decisions
-  section above.
+  screens, round 1**: `#app`'s max-width changed from a fixed 680px to a
+  responsive `--content-max: clamp(680px, 92vw, 1100px)` in
+  `public/style.css`, applied to `#app` and the two bottom-sheet overlays
+  that mirror its width (`.help-box`, `.end-session-box`); `.recap-box` (a
+  separate centered modal) got a smaller matching clamp,
+  `clamp(420px, 90vw, 720px)`. On phones this is a no-op (the clamp floor
+  never forces the layout wider than the actual viewport), but on
+  tablets/desktops the reading column now grows with the screen instead of
+  sitting fixed at 680px with large empty margins. Verified visually via a
+  headless Playwright pass against a local static server (`vercel dev` isn't
+  available in this environment): `#app` measured 390px wide at a 390px
+  mobile viewport (unchanged) and 1100px wide at a 1600px desktop viewport
+  (was 680px before), with no overflow or clipping in the header, tabs, or
+  input row at either size.
+- **2026-07-21 — Story log too narrow, round 2 (wide-screen sidebar)**: Matt
+  reviewed a screenshot on a genuinely wide monitor (1880px browser window)
+  and found round 1 still left large empty gutters outside the 1100px-capped
+  `#app`, while the narration lines inside it (already ~150+ characters at
+  that width) were already too long for comfortable reading — pushing the cap
+  higher would have shrunk the gutters at the cost of even longer lines, a
+  straight tradeoff with no good single number. Asked Matt which way to
+  resolve that tradeoff (`AskUserQuestion`); he chose putting the reclaimed
+  width to use rather than just stretching text further. Shipped: `#tab-story`
+  now splits into a row layout at `min-width: 1100px` — the existing content
+  moved into a new `#story-main` column, with a new `<aside id="story-sidebar">`
+  next to it (`public/index.html`, `public/style.css`, `public/game.js`'s new
+  `renderStorySidebar()`, wired into the existing `updateCharacterUI()` so it
+  stays in sync for free with every poll/turn/initial load). The sidebar shows
+  party harm status (reusing `getRealCharacterKeys()`/`getPlayerDisplayName()`
+  from `public/pure.js`, same "real character" definition as the waiting-on
+  banner), current location, and up to 5 open Objectives/Leads merged into one
+  condensed list (`worldState.objectives`/`.clues`, both already in the poll
+  payload via `buildWorldStatePayload()` — no new API surface needed) with a
+  "+N more — see Map tab" note if truncated, no data loss. `--content-max`'s
+  cap raised from 1100px to 1400px alongside this, since past the sidebar
+  breakpoint the extra width splits between sidebar and log instead of only
+  lengthening narration lines. Below 1100px, layout is byte-for-byte the
+  round-1 single-column shape (`#story-sidebar` is `display:none`). Verified
+  visually (headless Playwright, fake `worldState`/`characters` driven through
+  the real `updateCharacterUI()` render path): sidebar correctly hidden at
+  390px/1000px, shown at 1600px/2200px with harm chips colored per level,
+  location, and open threads all rendering; no overflow at either breakpoint
+  or at an extreme 2200px viewport. Three further UX ideas (tighter log
+  spacing, a "jump to latest" button, auto-collapsing older sessions) were
+  floated but not requested — see the Pending decisions section above.
 - **2026-07-05 — "Leads" tag naming/scope**: keep as "Leads", stays universal
   across all world types. Rationale: any world's story can raise an open
   question worth tracking, not just mystery-flavored ones — a kid custom

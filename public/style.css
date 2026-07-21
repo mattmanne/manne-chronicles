@@ -19,11 +19,11 @@
   --font-sans:  system-ui, -apple-system, sans-serif;
   /* Scales the app's reading column with the viewport instead of the old fixed
      680px — phones stay edge-to-edge (clamp's floor never forces a width past
-     what the viewport actually has), while tablets/desktops get a noticeably
-     wider column so the same content wraps into fewer lines and needs less
-     vertical scrolling. Capped at 1100px so lines don't get so long they hurt
-     readability on very wide monitors. */
-  --content-max: clamp(680px, 92vw, 1100px);
+     what the viewport actually has). Capped at 1400px: past the story-sidebar
+     breakpoint below, the reclaimed width is split between the sidebar and
+     the log rather than all going into ever-longer narration lines, so this
+     cap can be roomier than a single-column layout would want. */
+  --content-max: clamp(680px, 94vw, 1400px);
 }
 
 html, body {
@@ -133,6 +133,101 @@ html, body {
   inset: 0;
 }
 .tab-panel.active { display: flex; }
+
+/* #story-main always wraps the Story tab's existing column of content —
+   harmless on narrow screens (it just stacks exactly as #tab-story used to),
+   and lets #tab-story switch to a row layout at the breakpoint below without
+   its normal children needing to become flex items themselves. */
+#story-main {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* Hidden below the breakpoint; on a wide screen it's what the extra width
+   unlocked by --content-max above actually goes toward, instead of just
+   stretching narration into uncomfortably long lines. See renderStorySidebar()
+   in game.js. */
+#story-sidebar { display: none; }
+
+@media (min-width: 1100px) {
+  #tab-story.active { flex-direction: row; }
+  #story-sidebar {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    width: clamp(280px, 22vw, 380px);
+    flex-shrink: 0;
+    overflow-y: auto;
+    padding: 14px 16px;
+    border-left: 1px solid var(--border);
+    background: var(--surface);
+  }
+}
+
+/* ── Story sidebar content (wide screens only, see #story-sidebar above) ──
+   Reuses .objective-item/.objective-check's look for the open-threads list
+   so it reads as the same visual language as the Map tab's own panels. */
+.sidebar-section-title {
+  font-size: 0.65rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--parch-dim);
+  margin-bottom: 8px;
+}
+.sidebar-party-list { display: flex; flex-direction: column; gap: 8px; }
+.sidebar-party-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 0.82rem;
+}
+.sidebar-party-name { display: flex; align-items: center; gap: 6px; min-width: 0; color: var(--parchment); }
+.sidebar-party-name-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sidebar-color-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+/* Deliberately its own small set of color classes rather than reusing
+   .harm-value directly — that class is also the clickable "tap to recover"
+   control on the Characters tab, and its :not(.Unhurt) cursor/hover rules
+   would follow along and make this read-only chip look clickable too. */
+.sidebar-harm-chip {
+  font-size: 0.68rem;
+  letter-spacing: 0.02em;
+  padding: 1px 8px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  flex-shrink: 0;
+  cursor: default;
+}
+.sidebar-harm-chip.Unhurt    { color: var(--green); border-color: var(--green); }
+.sidebar-harm-chip.Scratched { color: #8bc34a; border-color: #8bc34a; }
+.sidebar-harm-chip.Hurt      { color: var(--amber); border-color: var(--amber); }
+.sidebar-harm-chip.Wounded   { color: #e74c3c; border-color: #e74c3c; }
+.sidebar-harm-chip.Broken    { color: var(--red); border-color: var(--red); }
+.sidebar-harm-chip.Dying     { color: var(--red); border-color: var(--red); animation: pulse 1s infinite; }
+.sidebar-location {
+  font-size: 0.82rem;
+  color: var(--parchment);
+  font-style: italic;
+  line-height: 1.4;
+}
+.sidebar-threads-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.sidebar-threads-more {
+  font-size: 0.72rem;
+  color: var(--parch-dim);
+  font-style: italic;
+  margin-top: 2px;
+}
+.sidebar-empty { font-size: 0.78rem; color: var(--parch-dim); font-style: italic; }
 
 .tab-scroll {
   flex: 1;

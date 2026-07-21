@@ -2982,7 +2982,60 @@ function updateCharacterUI(data) {
 
   renderWaitingBanner(ws, chars);
   renderCombatTracker(ws);
+  renderStorySidebar(ws, chars);
   if (ws?.session) sessionLabel.textContent = `Session ${ws.session}`;
+}
+
+// Wide-screen companion to the story log — see #story-sidebar in style.css.
+// Hidden entirely below that CSS breakpoint, but kept in sync unconditionally
+// here (same as every other updateCharacterUI() consumer) rather than only
+// rendering it once a wide viewport is detected, so it's never stale the
+// moment a window gets resized or rotated.
+function renderStorySidebar(ws, characters) {
+  const el = document.getElementById("story-sidebar");
+  if (!el || !characters) return;
+
+  const partyRows = getRealCharacterKeys(currentWorld, characters).map((key) => {
+    const char = characters[key] || {};
+    const name = getPlayerDisplayName(key, { characters });
+    const harm = char.harm || "Unhurt";
+    const hex = char.color ? HERO_COLOR_HEX[char.color] : null;
+    const dot = hex ? `<span class="sidebar-color-dot" style="background:${hex}"></span>` : "";
+    return `
+      <div class="sidebar-party-row">
+        <span class="sidebar-party-name">${dot}<span class="sidebar-party-name-text">${escapeHtml(name)}</span></span>
+        <span class="sidebar-harm-chip ${harm}">${escapeHtml(harm)}</span>
+      </div>`;
+  }).join("");
+
+  // Objectives (goal-shaped) and Leads/clues (question-shaped) are already
+  // separate concepts on the Map tab — merged here into one condensed list
+  // since sidebar space is tight and both represent "something still open."
+  const threads = [
+    ...(ws?.objectives || []).filter(o => !o.done).map(o => ({ icon: "📋", text: o.text })),
+    ...(ws?.clues       || []).filter(c => !c.done).map(c => ({ icon: "🔍", text: c.text })),
+  ];
+  const THREAD_LIMIT = 5;
+  const shown = threads.slice(0, THREAD_LIMIT);
+  const threadsHtml = shown.length
+    ? `<ul class="sidebar-threads-list">${shown.map(t => `<li class="objective-item"><span>${t.icon} ${escapeHtml(t.text)}</span></li>`).join("")}</ul>` +
+      (threads.length > THREAD_LIMIT ? `<div class="sidebar-threads-more">+${threads.length - THREAD_LIMIT} more — see Map tab</div>` : "")
+    : `<div class="sidebar-empty">Nothing open yet.</div>`;
+
+  el.innerHTML = `
+    <div>
+      <div class="sidebar-section-title">Party</div>
+      <div class="sidebar-party-list">${partyRows || `<div class="sidebar-empty">No characters yet.</div>`}</div>
+    </div>
+    <div>
+      <div class="sidebar-section-title">Location</div>
+      <div class="sidebar-location">📍 ${escapeHtml(ws?.location || "Unknown")}</div>
+    </div>
+    <div>
+      <div class="sidebar-section-title">Open threads</div>
+      ${threadsHtml}
+    </div>
+  `;
 }
 
 // worldState.pending_turn (when non-empty) means the story is actually held
