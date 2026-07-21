@@ -34,8 +34,8 @@ Each world has its own separate story and saved progress. To switch:
 Tap **✨ New World** on the world selector to build a custom campaign:
 1. **Name** your world
 2. **Describe** the setting, quest, and creatures — the GM uses this to write every scene
-3. **Player count** (1–4 heroes)
-4. Optionally mark it **adult** for a mature-themed campaign (see "Adult Worlds" below)
+3. Optionally mark it **adult** for a mature-themed campaign (see "Adult Worlds" below)
+4. **Player count** (1–4 heroes)
 
 Your world is saved on the server and shows up in the world selector from then on, for any device.
 
@@ -56,6 +56,8 @@ Resonance and any custom world marked "adult" are locked behind a PIN so kids do
 | **≡ Archive** | Full logs from completed sessions — tap **⬇ Export** to download the campaign as a text file |
 | **⊕ Map** | Locations, awareness/curse meters, and (depending on the world) the stone tracker, quest log, Leads board, Who's Who, and party inventory — see "Keeping track of your story" below |
 | **⚙ Settings** | Story Mood (Manlandia), Sound Effects, Author's Note, your Resonance scene PIN, and "End Session & Save" |
+
+Above the story log, tap **📍 Party & Location** for a quick-glance summary of everyone's harm, where the party is, and what's still open (quests/leads). On a tablet or desktop-sized screen, that same summary stays visible permanently in a sidebar next to the log instead of needing a tap.
 
 ### Getting help
 
@@ -146,7 +148,9 @@ If a world goes quiet for a few days, you may get a short "meanwhile…" beat an
 
 ### Picking up where you left off
 
-Tap **📜 Recap** above the story log any time — it summarizes what's happened recently in a few sentences, great for jumping back in after a break.
+Tap **📜 Recap** above the story log any time — it summarizes what's happened recently in a few sentences, great for jumping back in after a break. Inside the recap, tap **🔊 Listen** to have it read aloud, or **📤 Share** to send it to someone outside the app (opens your phone's share sheet, or copies it to your clipboard on a computer) — handy for keeping grandparents or absent players in the loop.
+
+If it's been more than a day since you last opened a world on this device, a **"👋 Welcome back"** banner appears at the top of the Story tab — tap **📜 View catch-up** to open the same recap, or **✕** to dismiss the banner if you don't need it.
 
 ### Dice rolls
 
@@ -182,13 +186,15 @@ There's also a **"waiting on ___"** banner on the Story tab. Most of the time it
 
 Both of you open the same URL on your own phones. Either of you can type an action anytime, in any order — there's no strict turn order. But the story itself waits for **both of you** to act before the GM responds: once you send your action, it's held until your partner also sends theirs, then the GM answers both of you together in one scene. This means you won't come back to find the story already moved on without you.
 
-If your partner isn't around for the night, tap **🧍 Solo tonight** above the message box — your actions will go through immediately without waiting, for the rest of the session (or until you tap it off again).
+If your partner isn't around for the night, tap **🧍 Solo tonight** above the message box — your actions will go through immediately without waiting, until you tap it off again or reload the page (it doesn't persist, so it won't silently stay on for whoever opens the app next).
 
 The app syncs every 8 seconds, so there's a brief delay when playing from separate locations.
 
 ### Getting notified when it's your turn
 
 Tap the **🔔 Alert** button in the top-right header to turn on notifications. Your browser will ask for permission — once you allow it, you'll get a notification whenever someone else takes a turn in a world you're subscribed to (not for your own turns). Tap the notification to jump back into the app.
+
+If a world goes quiet for about 2 days with someone's action still waiting, you'll also get a one-time "your turn is waiting" nudge — separate from the "meanwhile…" beats described in "The world keeps moving" below.
 
 **On iPhone**, this only works if you've added the app to your Home Screen first (Safari → Share → Add to Home Screen, then open it from there) — Apple doesn't allow regular Safari tabs to send notifications, only installed home-screen apps. On Android/Chrome it works straight from the browser, no install needed.
 
@@ -299,7 +305,7 @@ Different lands make up the world:
 
 ### Custom worlds
 
-Whatever you described when you created it — the GM writes every scene from your setting/quest/creatures description, with the same danger and peril meters as Manlandia. If you marked it "adult," it gets Resonance's more mature narration guardrails and its own Bonds section instead of Manlandia's kid-safe tone; otherwise it plays just like Manlandia, including hero growth and party inventory.
+Whatever you described when you created it — the GM writes every scene from your setting/quest/creatures description, with the same danger and peril meters as Manlandia, and hero growth (XP, milestone badges, unlockable powers) either way. If you marked it "adult," it gets Resonance's more mature narration guardrails, its own Bonds section, and items tracked per-hero instead of Manlandia's kid-safe tone and shared party inventory.
 
 ---
 
@@ -318,7 +324,7 @@ Everything in the world vibrates at a natural frequency. Most people feel nothin
 ## Troubleshooting
 
 **Mic button not working?**
-Use Chrome on Android or Safari on iOS. Other browsers may not support voice input — type instead.
+Use Chrome on Android or Safari on iOS. Other browsers may not support voice input — type instead. If you tap the mic and see a message appear under the text box (e.g. "microphone access is blocked"), that tells you why it failed — usually a browser/site permission to fix in your phone's settings.
 
 **🔊 Speaker button not working?**
 Some browsers require a user interaction before allowing audio. Tap something else on the page first, then tap the speaker button.

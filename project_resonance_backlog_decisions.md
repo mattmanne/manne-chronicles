@@ -17,12 +17,14 @@ what was already decided instead of re-litigating it.
 
 ### 2026-07-21: further story-log UX ideas, not yet decided
 Matt asked for the story log to use more of the screen width and to make the
-story easier to follow without scrolling as much. Two rounds shipped same day
-(see Resolved below — the responsive `--content-max` width, then the
+story easier to follow without scrolling as much. Three rounds shipped same
+day (see Resolved below — the responsive `--content-max` width, then the
 wide-screen party/location/threads sidebar after Matt reviewed a screenshot
-and found the first pass still wasted space). Three further ideas were floated
-but not yet requested — evaluate later, pick whichever (if any) are still
-worth it once the current shape has been used for a while:
+and found the first pass still wasted space, then a collapsible mobile
+counterpart to the sidebar) — all three are now on `main` and pushed to
+`origin/main`. Three further ideas were floated but not yet requested —
+evaluate later, pick whichever (if any) are still worth it once the current
+shape has been used for a while:
 
 - **Tighter narration spacing.** Reduce the gap between log entries so more
   turns fit on screen at once, without shrinking the actual reading font.
@@ -152,8 +154,11 @@ pattern.
   location next to Recap at 390px width; tapping it expands to the full
   party/location/threads content with the chevron flipping; at 1600px both
   the toggle and panel are correctly force-hidden while the sidebar shows
-  instead. Pushed to the same `preview/wide-screen-layout` branch as rounds
-  1-2 for Matt to check on his phone before merging to production.
+  instead. **Update**: all three rounds (this one plus the two below) are
+  committed directly to `main` and pushed to `origin/main` (`git log` shows
+  no separate preview branch remains) — per `CLAUDE.md`'s "Vercel auto-deploys
+  on push to main," this is live in production now, not sitting on a preview
+  branch awaiting a merge decision.
 - **2026-07-05 — "Leads" tag naming/scope**: keep as "Leads", stays universal
   across all world types. Rationale: any world's story can raise an open
   question worth tracking, not just mystery-flavored ones — a kid custom
