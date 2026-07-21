@@ -35,6 +35,80 @@ shape has been used for a while:
   current session by default (expandable on tap) — mainly useful once a
   campaign has a long history.
 
+### 2026-07-21: full-review follow-ups, not yet decided
+A full multi-dimension project review (12 dimensions, ~130 sub-agents) surfaced
+27 individually-verified findings plus 5 cross-cutting suggestions from its
+closing reflection pass — the 5 below are strategic bundles worth deciding on
+as a group, not the full findings list (which lives in this session's
+transcript/`ReportFindings` output, not duplicated here). Evaluate and pick a
+starting point whenever there's a slow week — none of these are urgent enough
+to interrupt other work, but the first two bundle the review's highest-severity
+individual findings.
+
+- **One shared "safe write" helper for Redis, instead of patching call sites
+  one at a time.** Several findings are the same root cause in different
+  clothes: two requests read the same Redis key, each mutates its own copy,
+  and whichever `setState` lands second silently erases the other's change.
+  Confirmed concretely in `api/campaigns.js`'s `campaigns:index` (a concurrent
+  create can vanish from the world selector; a concurrent archive/delete/update
+  can undo each other) and in `api/gm.js` (holds its gamestate snapshot across
+  the whole Groq round-trip with no coordination against `api/state.js` — a
+  partner tapping `recover_harm`/`add_bond` while the other's turn is
+  resolving can silently lose either the state change or the whole narrated
+  turn). `api/gm.js`'s `gmlock` already solved this once for its own case;
+  worth generalizing that pattern into one reusable helper instead of
+  re-discovering the same bug in the next file that needs it.
+- **Vercel environment cleanup pass (config only, no code).** Three
+  deployment findings, all fixable from the Vercel dashboard alone: (1)
+  Preview and Production currently share the exact same secrets and the same
+  live Upstash Redis instance — a preview deploy reads/writes real
+  `resonance:gamestate`/`manlandia:gamestate`/`campaign:*:gamestate` keys and
+  burns the same Groq quota as production, with no isolation; (2)
+  `CRON_SECRET`, documented in `CLAUDE.md` as configured, is not actually set
+  — `api/cron-turn-reminder.js` is unauthenticated in the real deployment,
+  callable by anyone since the repo is public on GitHub; (3) a leftover
+  `GEMINI_API_KEY` is still configured in both environments despite being
+  fully unreferenced since the Gemini-to-Groq switch. Highest-severity items
+  from the review and the cheapest to close — no code change needed.
+- **Table-driven bracket-tag spec, so parsing and display-stripping can't
+  drift apart.** Every tag currently has its "parse this" logic
+  (`lib/gm-tags.js`) and its "hide this from the player" logic
+  (`public/pure.js`'s `stripGMTags()`) hand-written as two separate regexes
+  with nothing linking them. This is exactly how a real bug got in: all four
+  Combat tags (`[COMBAT START:...]`, `[ENEMY:...]`, `[ENEMY DEFEATED:...]`,
+  `[COMBAT END]`) are correctly parsed server-side but `stripGMTags()` never
+  learned to hide any of them, so they leak verbatim into the story log.
+  (Separately, a related but distinct bug: `extractAbilityUsedKeys()`'s
+  negative lookahead for "not used" is unbounded, so a second, unrelated
+  `[ABILITY N: ... not used]` tag later in the same merged-turn response can
+  silently cancel out an earlier legitimate `[ABILITY M: used]` tag — worth
+  fixing directly regardless of the table-driven idea.) The longer-term fix:
+  describe each tag once and generate both the extractor and the stripper
+  from that single description, closing off this whole class of drift
+  structurally instead of catching each instance by hand.
+- **Extend `lib/groq-tracking.js`'s durable-failure pattern beyond Groq
+  429s.** That module exists so a Groq rate-limit hit doesn't just vanish
+  unnoticed — but four other spots have the identical "if this fails, nobody
+  would ever know" shape: `/api/poll`'s Redis read has no try/catch at all
+  (hit by every device every ~8s, no secret required); `api/help.js` never
+  calls `recordRateLimitHit` on its own Groq 429s (the same gap already found
+  and fixed once for `api/recap.js`); `api/cron-turn-reminder.js`'s per-world
+  catch only writes the error into a JSON response body nobody reads, with no
+  `console.error` and nothing durable; and that same cron handler's
+  `campaigns:index` fetch sits outside its own per-world try/catch, so one
+  bad Redis call can take down the whole cron run despite the file's stated
+  per-world-isolation design. Reuse or extend the existing tracking mechanism
+  rather than four separate one-off fixes.
+- **Run `npm run check-drift` against real transcripts before acting on the
+  bracket-tag findings above.** A caveat, not a build item. The Combat-tag
+  and ABILITY-tag bugs above were confirmed by directly executing the parser
+  functions against hand-written inputs, not by checking whether they've
+  actually shown up in real Resonance/Manlandia/custom-campaign play.
+  `check-drift` exists specifically to answer that — worth running before
+  spending real effort on fixes for something that might be rare in practice
+  (though the Combat-tag one seems likely to matter given how often combat
+  happens).
+
 ### 2026-07-05 playtest: closed out
 All six confirmed findings from the 2026-07-05 live playtest are now fixed,
 deployed, and verified live (see the individual Resolved entries below):
